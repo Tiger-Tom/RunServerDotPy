@@ -1,4 +1,4 @@
-# PyRunServer
+# EunServerDotPy
 A script to run a Java Minecraft server, and can run special ChatCommands, automatically backs up the server, and log important information.
 
 This script has the following abilities (besides interfacing with Minecraft server as a command line):
