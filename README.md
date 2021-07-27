@@ -13,6 +13,8 @@ This script has the following abilities (besides interfacing with the Minecraft 
 
 -Randomized MOTDs and server icons
 
+-Profanity detection and logging
+
 -Automatically logging things of interest (chat, profanity, errors, and unusual behavior)
 
 -And more!
