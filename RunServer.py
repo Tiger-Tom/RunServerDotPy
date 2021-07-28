@@ -34,12 +34,13 @@ import queue
 #  Non-builtin imports
 try:
     import keyboard #For the keyboard "hook", to detect enter key presses
-    import psutil #Will be used to close all trailing file handles
+    import psutil #Will be used to close all trailing file handles, as well as getting some system informatino
     from better_profanity import profanity #For censoring and detecting profanity in chat
+    from pyspectator.computer import Computer #For getting system information
 except ModuleNotFoundError: #Means that we have to try to install the modules
     if input('Warning: some required modules were not found. Attempt to install? (Y/n) >').lower() == 'n':
         exit()
-    modulesToInstall = 'keyboard psutil better_profanity'
+    modulesToInstall = 'keyboard psutil better_profanity pyspectator'
     print ('Installing...\npip3 -q install '+modulesToInstall)
     os.system('pip3 -q install '+modulesToInstall) #Install the modules (-q means quiet, to prevent a lot of spam in a console)
     del modulesToInstall # Free up memory, we will be seeing a lot of this
@@ -47,6 +48,7 @@ except ModuleNotFoundError: #Means that we have to try to install the modules
     import keyboard
     import psutil
     from better_profanity import profanity
+    from pyspectator.computer import Computer
 
 #  Check if speedtest-cli is installed, and install it if it isn't
 if os.system('speedtest-cli --version'): #Return code is not 0
@@ -73,6 +75,7 @@ if not os.path.exists(srvrFolder+'RunServerDotPy'):
 
 # Setup some module-related things
 gc.enable()
+compMain = Computer()
 
 # Setup some values
 sizeVals = ['bytes', 'kibibytes', 'mebibytes', 'gibibytes']
@@ -98,6 +101,10 @@ def runWCallback(callbackFunc, cmd): #Runs a system command and waits for it to 
     callbackFunc(runWOutput(cmd))
 def asyncRunWCallback(callbackFunc, cmd): #Runs a system command with a callback, but asynchronously
     threading.Thread(target=runWCallback, args=(callbackFunc,cmd), daemon=True).start()
+#  Function functions
+def funcWithDelay(delay, func, args=[], kwargs={}):
+    time.sleep(delay)
+    func(*args, **kwargs)
 
 #  String formatting & similar
 def makeValues(startValue, delimiter, values): #"values" is a list of strings (something like "second, minute, hour") in ascending order, "delimiter" is the divider (60 for "second, minute, hour"), and "startValue" is pretty obvious
@@ -169,9 +176,10 @@ def closeOpenFileHandles():
     p = psutil.Process(os.getpid()) #Gets the working process (AKA this one)
     for handle in p.open_files(): #Close all open file handles
         try:
-            os.close(handle.fd) #Close the handle
-            print ('Closed '+str(handle))
-        except OSError as e:
+            if handle.fd != -1:
+                os.close(handle.fd) #Close the handle
+                print ('Closed '+str(handle))
+        except:
             print ('Error! Unable to close file handle '+str(handle)+'\n'+traceback.format_exc())
     print ('Closed all open file handles')
 
@@ -188,7 +196,7 @@ def getOutput(process): #Prints all of the process' buffered STDOUT (decoded it 
     else:
             try:
                 parseOutput(data)
-            except Exception as e:
+            except:
                 print ('AN ERROR OCCURED WHEN PARSING!\n'+traceback.format_exc())
     try:
         if not inputQueue.empty(): #Inject output & automatically parse it
@@ -294,7 +302,7 @@ def finalizeLogFile(lost=False): #Finish the log file and save it
         print ('Closing log file handle for "'+i+'"...')
         try:
             logFileHandles[i].close()
-        except Exception as e:
+        except:
             print ('Could not close log file handle for "'+i+'" because\n'+traceback.format_exc())
     #Make file name
     if lost:
@@ -466,6 +474,7 @@ chatCommandsLastUsed = {}
 #   Help variables (help text keys in-game will be organized by the order by they are defined)
 chatCommandsHelp = { #Help for regular ChatCommands that any user can run
     'help [command*]': 'Show help (this page) or help about optional [command]',
+    'fan': 'Shows the system\'s fan speed', #I'm a big fan of this one
     'memory | cpu': 'Shows memory, CPU, and swap usage',
     'temp': 'Shows the CPU temperature',
     'size': 'Get the total size of the server world folder',
@@ -490,6 +499,9 @@ chatCommandsHelpRoot = { #Help for root commands that only the server console ca
     'clearlogs': 'Delete all logs, and resets the current log files',
     'py [command]': 'Runs the [command] in Python and returns output',
 }
+#   Remove help variables that are only usable on some systems (to keep order, instead of adding them here)
+if not hasattr(psutil, 'sensors_temperatures'):
+    print ('WARNING: Removing "temp" command, as this machine does not support "psutil.sensors_temperatures"')
 
 #  Functions
 def parseChatCommand(user, data):
@@ -563,12 +575,18 @@ def runChatCommand(cmd, args, user):
     tellRaw('Running ChatCommand '+cmd, '$'+user)
     if cmd == 'help': #Displays a list of commands, or details for a specific command if arguments are specified
         cc_help(chatCommandsHelp, args, user=user)
+    elif cmd == 'fan': #Displays the fan speed
+        if not hasattr(psutil, 'sensors_fan'):
+            tellRaw('Sorry, this command is not availiable on this operating system!', 'Fan', user)
+            tellRaw('(Guess you weren\'t a big fan of that)', None, user)
+        else:
+            
     elif cmd in {'memory', 'cpu'}: #Displays the resource usage
         tellRaw(str(psutil.cpu_percent())+'% used', 'CPU', user)
         tellRaw(str(psutil.virtual_memory().percent)+'% used', 'Memory', user)
     elif cmd == 'temp': #Displays the temperature of the system
         if not hasattr(psutil, 'sensors_temperatures'):
-            tellRaw('Sorry, this command is not supported on this operating system!', 'Temp', user)
+            tellRaw('Sorry, this command is not availiable on this operating system!', 'Temp', user)
         else:
             tellRaw() #MAKE THIS THING SOMETIME!!!
     elif cmd == 'size': #Displays the size of the server's world folder
@@ -584,18 +602,34 @@ def runChatCommand(cmd, args, user):
         waitSecs = 600
         timeSinceLast = round(time.monotonic())-lastSpeedTest
         if (timeSinceLast > waitSecs) or (user in admins): #Enough time has passed since last ran, or the user is an admin
-            if not (user in admins):
-                lastSpeedTest = round(time.monotonic()) #Reset timer if the user is not an admin
+            lastSpeedTest = round(time.monotonic()) #Reset timer
             tellRaw('Beginning asynchronous speed test...\nThis could take a little while', 'SpeedTest')
             asyncRunWCallback(cc_parseSpeedTest, 'speedtest-cli --json')
         else:
             print ('Last speed test: '+str(lastSpeedTest))
             tellRaw('Please wait '+parseMadeValues(makeValues(600-timeSinceLast, 60, timeVals))+' to run another speed test', 'SpeedTest')
     elif cmd == 'tps': #Gets the server's TPS over 10 seconds
+        #*10:          1         2         3         4         5         6
+        #+  :0123456789012345678901234567890123456789012345678901234567890123456789
+        #    [14:47:22] [Server thread/INFO]: Stopped tick profiling after 10.81 seconds and 217 ticks (20.08 ticks per second)
+        #                                                               62:0     1       2   3   4     5     6     7   8
         global lastTickTest
         waitSecs = 120
         timeSinceLast = round(time.monotonic())-lastTickTest
         if (timeSinceLast > waitSecs) or (user in admins): #Enough time has passed since last ran, or the user is an admin
+            lastTickTest = round(time.monotonic()) #Reset timer
+            tellRaw('Beginning asynchronous TPS test...\nThis should take about 10 seconds', 'TPSTest')
+            writeCommand('debug start')
+            threading.Thread(target=funcWithDelay, args=(10, writeCommand, ['debug stop']), daemon=True).start()
+            while True:
+                out = getOutput(process)
+                if (out[0] == '[') and (out[9:55] == '] [Server thread/INFO]: Stopped tick profiling'):
+                    out = out[62:].split(' ')
+                    break
+            secsTest = out[0]
+            ticksTest = out[3]
+            tpsTest = out[5][1:]
+            tellRaw('Test lasted '+secsTest+' seconds ('+ticksTest+' ticks)\nRunning at about '+tpsTest+' ticks per second (should be ~20)', 'TPSTest')
     elif cmd == 'uptime': #Gets the server and system's uptime
         tellRaw('The server has been online for '+parseMadeValues(makeValues(round(time.monotonic()-uptimeStart), 60, timeVals)), 'Uptime', user)
         tellRaw('(Online since '+(time.ctime(uptimeStart).rstrip().replace('  ', ' '))+')', None, user)
@@ -696,7 +730,7 @@ def enterKeyPressed(key):
         else: #Otherwise pass it to the server console as normal
             print ('> '+line)
             writeCommand(line)
-    except Exception as e:
+    except:
         print ('Error when parsing input!\n'+traceback.format_exc())
 def rehookKeyboard():
     print ('Unhooking keyboard...')
@@ -764,7 +798,7 @@ def serverHandler(): #Wed Jul 28 13:53:08 2021
     while True: #Main loop
         try:
             getOutput(process)
-        except Exception as e:
+        except:
             e = traceback.format_exc().rstrip()
             print ('Error caught!')
             print (e)
@@ -772,7 +806,7 @@ def serverHandler(): #Wed Jul 28 13:53:08 2021
                 for i in e.split('\n'):
                     print (safeTellRaw(i))
                     writeCommand('tellraw @a ["",{"text":"'+safeTellRaw(i)+'","bold":true,"color":"red"}]')
-            except Exception as e:
+            except:
                 print (traceback.format_exc())
         if process.poll() != None:
             break
@@ -784,7 +818,7 @@ def serverLoopHandler(): #Main program that handles auto-restarting and exceptio
     while True:
         try:
             serverHandler()
-        except Exception as e:
+        except:
             print ('Error!\n'+traceback.format_exc())
         try:
             print (process.stdout.read().decode('UTF-8')) #Read any leftover messages and flush buffer
