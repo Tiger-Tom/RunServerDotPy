@@ -13,6 +13,7 @@ import sys
 import subprocess
 import gc
 import traceback
+import threading
 
 #  Network
 import requests
@@ -95,6 +96,8 @@ def runWOutput(cmd): #Runs a system command and returns the output
     return out
 def runWCallback(callbackFunc, cmd): #Runs a system command and waits for it to finish, and then runs "callbackFunc" with the output as an argument
     callbackFunc(runWOutput(cmd))
+def asyncRunWCallback(callbackFunc, cmd): #Runs a system command with a callback, but asynchronously
+    threading.Thread(target=runWCallback, args=(callbackFunc,cmd), daemon=True).start()
 
 #  String formatting & similar
 def makeValues(startValue, delimiter, values): #"values" is a list of strings (something like "second, minute, hour") in ascending order, "delimiter" is the divider (60 for "second, minute, hour"), and "startValue" is pretty obvious
@@ -149,12 +152,6 @@ def getDTime(format_='%M-%D-%Y %h:%m:%s'): #Format: %M=Month;%D=Day;%Y=Year;%h=H
     return format_.replace('%M', pad0s(t.tm_mon)).replace('%D', pad0s(t.tm_mday)).replace('%Y', str(t.tm_year)).replace('%h', pad0s(t.tm_hour)).replace('%m', pad0s(t.tm_min)).replace('%s', pad0s(t.tm_sec))
 
 #  Filesystem functions
-def getSize(path): #Returns the size of a path (in [summary, [bytes, kibibytes, mebibytes, gibibytes]] format)
-    bt = runWOutput('du -sb '+path).split(' ')[0]
-    kb = bt/1024
-    mb = kb/1024
-    gb = mb/1024
-    return [bt, kb, mb, gb]
 def writeFileToZip(filePath, zipPath, compressionLevel=9, openMode='a'): #Compresses the file to a zip, using specified mode, and compression levels 0-9
     print ('Compressing:\n'+filePath+' >'+str(compressionLevel)+'> '+zipPath)
     zf = zipfile.ZipFile(zipPath, openMode, zipfile.ZIP_DEFLATED, compresslevel=compressionLevel)
@@ -222,7 +219,6 @@ confFiles = { #'[name].conf': '[default contents]',
     'serverVersion.conf': 'Configure this in serverVersion.conf!',
     'ramInMB.conf': '1024',
     'chatCommandPrefix.conf': ';',
-    'autoRestartHours.conf': '12',
 }
 for i in confFiles:
     if not os.path.exists(confDir+i):
@@ -230,12 +226,21 @@ for i in confFiles:
             cf.write(confFiles[i]) #Write defaults if missing
         
 #  Read configs
-admins = set(open(confDir+'admins.conf').read().split('\n')) #Usernames of server administrators, who can run "sudo" commands (in a set, since it is faster because sets are unindexed and unordered)
-srvrVersionTxt = open(confDir+'serverVersion.conf').read().rstrip()
-motds = open(confDir+'motds.conf').read().rstrip().replace('{%VERSION}', srvrVersionTxt).split('\n') #List of MOTDs (single line only, changes every server restart)
-ramMB = int(open(confDir+'ramInMB.conf').read().rstrip())
-chatComPrefix = open(confDir+'chatCommandPrefix.conf').read().rstrip()
-autoRestartTime = int(open(confDir+'autoRestartHours.conf').read().rstrip())*60 #Amount of time between the server restarts. Given in hours, converted to minutes
+def loadConfiguration():
+    print ('Loading configuration...')
+    global admins, srvrVersionTxt, motds, ramMB, chatComPrefix
+    with open(confDir+'admins.conf') as f:
+        admins = set(f.read().split('\n')) #Usernames of server administrators, who can run "sudo" commands (in a set, since it is faster because sets are unindexed and unordered)
+    with open(confDir+'serverVersion.conf') as f:
+        srvrVersionTxt = f.read().rstrip()
+    with open(confDir+'motds.conf') as f:
+        motds = f.read().rstrip().replace('{%VERSION}', srvrVersionTxt).split('\n') #List of MOTDs (single line only, changes every server restart)
+    with open(confDir+'ramInMB.conf') as f:
+        ramMB = int(f.read().rstrip())
+    with open(confDir+'chatCommandPrefix.conf') as f:
+        chatComPrefix = f.read().rstrip()
+    print ('Configuration loaded')
+loadConfiguration()
 
 #  Display configuration
 print ('Administrators:\n'+(', '.join(admins)))
@@ -412,6 +417,8 @@ def parseOutput(line): #Parses the output, running subfunctions for logging and 
                         #return False #Stop checking output
                 elif chatL[0] == 2: #Is a /me message
                     logData('"'+chatL[1]+'" me-ed "'+chatL[2]+'"', 'Chat') #Save formatted chat to chat log: "[User]" me-ed "[Message]"
+                elif chatL[0] == 3: #Is a /say message
+                    logData('"'+chatL[1]+'" /said "'+chatL[2]+'"', 'Chat')
             if profanity.contains_profanity(chatL[1]): #Chat message contains profanity, warn user
                 tellRaw('<'+chatL[0]+'> '+profanity.censor(chatL[1], '!'))
                 tellRaw('Potential profanity detected and logged', '[Swore!]')
@@ -426,7 +433,7 @@ def parseOutput(line): #Parses the output, running subfunctions for logging and 
         logData(line, 'Profanity')
     return True #Continue checking output
 def parseChat(line): #Get the chat / /me message and username out of a console line
-    #Returns ["0 if not chat, 1 if chat, 2 if /me", "username (if present)", "message (if present)"]
+    #Returns ["0 if not chat, 1 if chat, 2 if /me, 3 if /say", "username (if present)", "message (if present)"]
     #+10:             1         2         3
     #Index: 0123456789012345678901234567890123456789
     #Chat:  [HH:MM:SS] [Server thread/INFO]: <Username> Message
@@ -444,6 +451,11 @@ def parseChat(line): #Get the chat / /me message and username out of a console l
                 username = line[0]
                 message = ' '.join(line[1:])
                 return [2, username, message] #2=is a /me message
+            elif line[33] == '[': #It is a /say message!
+                line = line[34:].split('] ')
+                username = line[0]
+                message = '] '.join(line[1:])
+                return [3, username, message]
     return [0] #0=not a chat or /me message
 
 # ChatCommands
@@ -460,13 +472,14 @@ chatCommandsHelp = { #Help for regular ChatCommands that any user can run
     'speedtest': 'Runs an internet speed test (has a 10 minute cooldown)', #Anything with a cooldown will be bypassed by admins, although the cooldown will also be reset
     'tps': 'Shows the TPS (has a 2 minute cooldown)',
     'uptime': 'Show how long the server has been online since last restart',
-    'website': 'Gives a clickable link to the website',
 }
 chatCommandsHelpAdmin = { #Help for administrator commands that only admins and the server console can run
     'help [command*]': 'Show help (this page) or help about optional [command]',
     'ban [player] [reason*]': 'Ban [player] for optional [reason]',
     'kick [player] [reason*]': 'Kick [player] for optional [reason]',
+    'reconfig': 'Reloads configuration from files',
     'logs {total}': 'Show how many logs have been collected (since last server restart, or since last shutdown if {total} is specified)',
+    'refresh': 'Refreshes RunServerDotPy, reloading config and script. The server has to go offline during this time',
     'reload': 'Reloads all datapacks and assets (/reload command)',
     'restart | stop [reason*]': 'Restart the server for optional [reason]',
     'unban | pardon [player]': 'Unban/pardon [player]',
@@ -505,7 +518,7 @@ def parseChatCommand(user, data):
         print (user+' is attempting to run ChatCommand "'+cmd+'" with '+str(len(args))+' arguments')
         chatCommandsLastUsed.setdefault(user, -1)
         if time.monotonic()-chatCommandsLastUsed[user] < 1:
-            tellRaw('Please wait 1 second, '+user, 'SpamProtection')
+            tellRaw('Please wait 1 second, '+user, 'SpamProtection', user)
         else:
             runChatCommand(cmd, args, user)
         if chatCommandsLastUsed[user] != -1: #User is not an admin
@@ -525,7 +538,7 @@ def cc_help(ccHelpDict, args, ccPref=chatComPrefix, user='', toConsole=False): #
         print (cHelp)
     else:
         tellRaw(cHelp, 'Help', user)
-    showAll = command == None #Save a bit of time from calculations
+    showAll = (command == None) #Save a bit of time from calculations
     for i in ccHelpDict.keys():
         if showAll:
             if toConsole:
@@ -533,10 +546,11 @@ def cc_help(ccHelpDict, args, ccPref=chatComPrefix, user='', toConsole=False): #
             else:
                 tellRaw(' • '+i, None, user)
         else:
-            if toConsole:
-                print (' • '+i+': '+ccHelpDict[i])
-            else:
-                tellRaw(' • '+i+': '+ccHelpDict[i], None, user)
+            if command in i:
+                if toConsole:
+                    print (' • '+i+': '+ccHelpDict[i])
+                else:
+                    tellRaw(' • '+i+': '+ccHelpDict[i], None, user)
 def cc_parseSpeedTest(res):
     res = json.loads(res)
     down = makeValues(res['download'], 1024, sizeVals)
@@ -546,51 +560,106 @@ def cc_parseSpeedTest(res):
 
 #   Basic functions (any user can run)
 def runChatCommand(cmd, args, user):
-    tellRaw('>$ Running ChatCommand '+cmd, user)
+    tellRaw('Running ChatCommand '+cmd, '$'+user)
     if cmd == 'help': #Displays a list of commands, or details for a specific command if arguments are specified
         cc_help(chatCommandsHelp, args, user=user)
     elif cmd in {'memory', 'cpu'}: #Displays the resource usage
-        tellRaw(str(psutil.cpu_percent(1))+'% used', 'CPU')
-        tellRaw(str(psutil.virtual_memory()[2])+'% used', 'Memory')
+        tellRaw(str(psutil.cpu_percent())+'% used', 'CPU', user)
+        tellRaw(str(psutil.virtual_memory().percent)+'% used', 'Memory', user)
     elif cmd == 'temp': #Displays the temperature of the system
-        print (cmd)
+        if not hasattr(psutil, 'sensors_temperatures'):
+            tellRaw('Sorry, this command is not supported on this operating system!', 'Temp', user)
+        else:
+            tellRaw() #MAKE THIS THING SOMETIME!!!
     elif cmd == 'size': #Displays the size of the server's world folder
         size = 0
         for path, dirs, files in os.walk(srvrFolder+'world/'):
             for f in files:
                 size += os.path.getsize(os.path.join(path, f))
-                print (os.path.join(path, f))
         for i in os.scandir(srvrFolder):
             size += os.path.getsize(i)
-        tellRaw('The server world folder is '+parseMadeValues(makeValues(size, 1024, sizeVals))+' large', 'Size')
+        tellRaw('The server world folder is '+parseMadeValues(makeValues(size, 1024, sizeVals))+' large', 'Size', user)
     elif cmd == 'speedtest': #Runs an internet speed test
         global lastSpeedTest
         waitSecs = 600
         timeSinceLast = round(time.monotonic())-lastSpeedTest
-        if (timeSinceLast > waitSecs) or (user in admins): #Enough time has passed since last ran, or the user is an administrator
+        if (timeSinceLast > waitSecs) or (user in admins): #Enough time has passed since last ran, or the user is an admin
             if not (user in admins):
-                lastSpeedTest = round(time.monotonic()) #Reset timer if the user is not an administrator
-            tellRaw('Beginning speed test...\nThis could take a little while', 'SpeedTest')
-            try:
-                runWCallback(cc_parseSpeedTest, 'speedtest-cli --json')
-            except Exception as e:
-                tellRaw('Error! Speedtest failed!', 'SpeedTestErr')
-                print ('WARNING-SPEEDTEST FAILURE\n'+str(e))
+                lastSpeedTest = round(time.monotonic()) #Reset timer if the user is not an admin
+            tellRaw('Beginning asynchronous speed test...\nThis could take a little while', 'SpeedTest')
+            asyncRunWCallback(cc_parseSpeedTest, 'speedtest-cli --json')
         else:
             print ('Last speed test: '+str(lastSpeedTest))
             tellRaw('Please wait '+parseMadeValues(makeValues(600-timeSinceLast, 60, timeVals))+' to run another speed test', 'SpeedTest')
+    elif cmd == 'tps': #Gets the server's TPS over 10 seconds
+        global lastTickTest
+        waitSecs = 120
+        timeSinceLast = round(time.monotonic())-lastTickTest
+        if (timeSinceLast > waitSecs) or (user in admins): #Enough time has passed since last ran, or the user is an admin
+    elif cmd == 'uptime': #Gets the server and system's uptime
+        tellRaw('The server has been online for '+parseMadeValues(makeValues(round(time.monotonic()-uptimeStart), 60, timeVals)), 'Uptime', user)
+        tellRaw('(Online since '+(time.ctime(uptimeStart).rstrip().replace('  ', ' '))+')', None, user)
+        tellRaw('The system has been powered on for '+parseMadeValues(makeValues(round(time.monotonic()-psutil.boot_time()), 60, timeVals)), 'Uptime', user)
+        tellRaw('(Powered on since '+(time.ctime(psutil.boot_time()).rstrip().replace('  ', ' '))+')', None, user)
 
 #   Sudo/admin commands (only admins or server console can run these commands)
 def runAdminChatCommand(cmd, args, user):
-    tellRaw('>$ Running SuperUser ChatCommand '+cmd, user)
+    tellRaw('Running SuperUser ChatCommand '+cmd, '$'+user, user)
     if cmd == 'help':
         cc_help(chatCommandsHelpAdmin, args, chatComPrefix+'sudo', user)
+    elif cmd == 'ban':
+        print (cmd)
+    elif cmd == 'kick':
+        print (cmd)
+    elif cmd == 'logs':
+        print (cmd)
+    elif cmd == 'reconfig':
+        tellRaw('Reloading configuration...', 'Config', user)
+        loadConfiguration()
+        tellRaw('Done', 'Config', user)
+    elif cmd == 'refresh':
+        tellRaw('Refreshing server...', user)
+        runAdminChatCommand('stop', [], user) #Manually calls the "stop" admin ChatCommand with the user as the executor
+        print ('Unhooking keyboard...')
+        keyboard.unhook_all()
+        while process.poll() == None: #Get remaining output while the process is still running
+            getOutput(process)
+        try:
+            process.wait() #Wait for the process to complete
+            print (process.stdout.read().decode('UTF-8')) #Read any leftover messsages and flush buffer
+        except:
+            pass
+        finalizeLogFile() #Finalize the log file
+        closeOpenFileHandles() #Important, because command below leaves file handles open
+        print ('Goodbye')
+        os.execl(sys.executable, sys.executable, *sys.argv) #Immediately replace the current process with this one, retaining arguments
+    elif cmd == 'reload':
+        print (cmd)
+    elif cmd in {'restart', 'stop'}:
+        tellRaw('Restarting server...', user)
+        for i in range(3, 1, -1): #Countdown to warn users
+            writeCommand('tellraw @a {"text":"Warning! Server closing for a restart in '+str(i)+' seconds!","bold":true,"color":"red"}')
+            time.sleep(1)
+        writeCommand('tellraw @a {"text":"Warning! Server closing for a restart in 1 second!","bold":true,"color":"red"}')
+        time.sleep(1)
+        writeCommand('tellraw @a ["",{"text":"Warning! Server closing for a restart ","bold":true,"color":"red"},{"text":"NOW!","bold":true,"color":"dark_red"}]')
+        writeCommand('kick @a Server restarting!') #Kick all the players from the server
+        writeCommand('save-all') #Save the game
+        writeCommand('stop') #Stop the server
+    elif cmd in {'unban', 'pardon'}:
+        print (cmd)
+    elif cmd in {'update', 'upgrade'}:
+        print (cmd)
 
 #   Root commands (only server console can run these commands)
 def runRootChatCommand(cmd, args):
-    print ('>$ Running Root ChatCommand '+cmd)
+    print ('$ Running Root ChatCommand '+cmd)
     if cmd == 'help':
         cc_help(chatCommandsHelpRoot, args, chatComPrefix+'root', '', True)
+    elif cmd == 'clearlogs':
+        print (cmd)
+    elif cmd == 'py':
+        print (cmd)
 
 # Indev AntiCheat (not currently in development)
 def getPlayerPos(user):
@@ -655,11 +724,11 @@ def swapIcon():
         print ('Done')
     else: #If there are no server icons to choose from
         print ('\nNO *.png SERVER ICONS PRESENT! ADD SOME IN '+iconsDir+'!\n')
-def swapMOTD(): #MOTD = message of the day
+def swapMOTD(uptimeStart): #MOTD = message of the day
     print ('Swapping MOTD...')
     if len(motds) > 0:
         motd = random.choice(motds)
-        motd += '\\u00A7r\\n\\u00A7o(Last restart: \\u00A7n'+(time.ctime().rstrip().replace('  ', ' '))+'\\u00A7r\\u00A7o)' #Add timestamp to MOTD
+        motd += '\\u00A7r\\n\\u00A7o(Last restart: \\u00A7n'+(time.ctime(uptimeStart).rstrip().replace('  ', ' '))+'\\u00A7r\\u00A7o)' #Add timestamp to MOTD
         print ('Selected MOTD:\n'+motd+'\nReading properties...')
         with open('server.properties') as pf: #Read the properties
             props = pf.read().split('\n')
@@ -672,14 +741,8 @@ def swapMOTD(): #MOTD = message of the day
         print ('Done')
     else: #If there are no MOTDs to choose from
         print ('\nNO MOTDs TO CHOOSE FROM! ADD SOME IN '+confDir+'motds.conf!\n')
-def serverHandler():
+def serverHandler(): #Wed Jul 28 13:53:08 2021
     global process
-    keyboard.unhook_all() #Unhook keyboard while processes are running
-    autoBackup() #Automatically backup everything
-    swapIcon() #Swap the server icon (if there are any present)
-    swapMOTD() #Swap the server MOTD (message of the day) (if there are any present)
-    makeLogFile() #Setup logging
-    closeOpenFileHandles() #Close any open file handles
     #Setup timing variables
     global lastSpeedTest
     global lastTickTest
@@ -687,6 +750,13 @@ def serverHandler():
     lastSpeedTest = -1
     lastTickTest = -1
     uptimeStart = time.monotonic()
+    #Setup functions
+    keyboard.unhook_all() #Unhook keyboard while processes are running
+    autoBackup() #Automatically backup everything
+    swapIcon() #Swap the server icon (if there are any present)
+    swapMOTD(uptimeStart) #Swap the server MOTD (message of the day) (if there are any present)
+    makeLogFile() #Setup logging
+    closeOpenFileHandles() #Close any open file handles
     #Rehook keyboard
     rehookKeyboard()
     #Main server starting and handling
