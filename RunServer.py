@@ -225,6 +225,8 @@ userJoinMSG = '{"text":"Welcome, {%USER}!","clickEvent":{"action":"copy_to_clipb
 if not os.path.exists(confDir):
     os.mkdir(confDir)
 ccRootUsr = '§server admin__'
+emoticonsReq = requests.get('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Default%20Emoticon%20Configuration')
+print (emoticonsReq.encoding)
 confFiles = { #'[name].conf': '[default contents]',
     'admins.conf': ccRootUsr,
     'motds.conf': 'Minecraft Server (Version {%VERSION})',
@@ -232,16 +234,17 @@ confFiles = { #'[name].conf': '[default contents]',
     'ramInMB.conf': '1024',
     'chatCommandPrefix.conf': ';',
     'tempUnit.conf': 'c',
+    'emoticons.conf': emoticonsReq.text,
 }
 for i in confFiles:
     if not os.path.exists(confDir+i):
-        with open(confDir+i, 'w') as cf:
+        with open(confDir+i, 'w', encoding='UTF-16') as cf:
             cf.write(confFiles[i]) #Write defaults if missing
         
 #  Read configs
 def loadConfiguration():
     print ('Loading configuration...')
-    global admins, srvrVersionTxt, motds, ramMB, chatComPrefix, tempUnit
+    global admins, srvrVersionTxt, motds, ramMB, chatComPrefix, tempUnit, emoticons
     with open(confDir+'admins.conf') as f:
         admins = set(f.read().split('\n')) #Usernames of server administrators, who can run "sudo" commands (in a set, since it is faster because sets are unindexed and unordered)
     with open(confDir+'serverVersion.conf') as f:
@@ -262,6 +265,20 @@ def loadConfiguration():
             tempUnit = [1, 'K']
         else:
             raise Exception('Unknown temperature unit "'+tempUnit+'"! Must be "c"|"f"|"k"!')
+    with open(confDir+'emoticons.conf', encoding='UTF-16') as f:
+        e = f.read().rstrip().split('\n')
+        emoticonLines = []
+        emoticonSingles = []
+        emoticonDelay = float(e[0])
+        e = e[1:]
+        for i in e:
+            if (len(i) == 0) or i.startswith('#'):
+                pass
+            elif i.startswith('&'):
+                emoticonSingles.append(i[1:])
+            else:
+                emoticonLines.append(i)
+        emoticons = [emoticonDelay, emoticonLines, emoticonSingles]
     print ('Configuration loaded')
 loadConfiguration()
 
@@ -491,6 +508,7 @@ chatCommandsLastUsed = {}
 #   Help variables (help text keys in-game will be organized by the order by they are defined)
 chatCommandsHelp = { #Help for regular ChatCommands that any user can run
     'help [command*]': 'Show help (this page) or help about optional [command]',
+    'emoticons': 'Shows a list of copyable emoticons (specified by the server owner)',
     'size': 'Get the total size of the server world folder',
     'speedtest': 'Runs an internet speed test (has a 10 minute cooldown)', #Anything with a cooldown will be bypassed by admins, although the cooldown will also be reset
     'sysinfo | info': 'Shows some system information, such as memory and cpu usage',
@@ -558,7 +576,7 @@ def parseChatCommand(user, data):
     else:
         print (user+' is attempting to run ChatCommand "'+cmd+'" with '+str(len(args))+' arguments')
         chatCommandsLastUsed.setdefault(user, -1)
-        if time.monotonic()-chatCommandsLastUsed[user] < 1:
+        if time.monotonic()-chatCommandsLastUsed[user] < 10:
             writeCommand('kick '+user+' SpamProtection: Please wait 1 second between ChatCommands')
             #tellRaw('Please wait 1 second, '+user, 'SpamProtection', user)
         else:
@@ -599,12 +617,28 @@ def cc_parseSpeedTest(res):
     up = makeValues(res['upload'], 1024, sizeVals)
     tellRaw(parseMadeValues(down)+' download', 'SpeedTest')
     tellRaw(parseMadeValues(up)+' upload', 'SpeedTest')
+def cc_tellrawEmoticons(user):
+    #emoticons = [emoticonDelay, emoticonLines, emoticonSingles]
+    tellRaw('Click on an emoticon to copy it to your clipboard!', ' :) ', user)
+    tellRaw('Multi-character emoticons:', ' :) ', user)
+    for i in emoticons[1]:
+        writeCommand('tellraw '+user+' {"text":"{%EMOTICON}","clickEvent":{"action":"copy_to_clipboard","value":"{%EMOTICON}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%EMOTICON}","bold":true}]}}'.replace('{%EMOTICON}', i))
+        time.sleep(emoticons[0])
+    tellRaw('Single-character emoticons:', ' :) ', user)
+    for i in emoticons[2]:
+        emotiComs = []
+        for j in i:
+            emotiComs.append('{"text":"{%EMOTICON}","clickEvent":{"action":"copy_to_clipboard","value":"{%EMOTICON}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%EMOTICON}","bold":true}]}}'.replace('{%EMOTICON}', j))
+        writeCommand('tellraw '+user+' ['+(',{"text":" | "},'.join(emotiComs))+']')
+        time.sleep(emoticons[0])
 
 #   Basic functions (any user can run)
 def runChatCommand(cmd, args, user):
     tellRaw('Running ChatCommand '+cmd, '$'+user)
     if cmd == 'help': #Displays a list of commands, or details for a specific command if arguments are specified
         cc_help(chatCommandsHelp, args, user=user)
+    elif cmd == 'emoticons':
+        threading.Thread(target=cc_tellrawEmoticons, args=(user,), daemon=True).start()
     elif cmd == 'size': #Displays the size of the server's world folder
         size = 0
         for path, dirs, files in os.walk(srvrFolder+'world/'):
@@ -865,8 +899,10 @@ def serverHandler(): #Wed Jul 28 13:53:08 2021
     global lastSpeedTest
     global lastTickTest
     global uptimeStart
+    global lastEmoticonShow
     lastSpeedTest = -1
     lastTickTest = -1
+    lastEmoticonShow = -1
     uptimeStart = time.monotonic()
     #Setup functions
     keyboard.unhook_all() #Unhook keyboard while processes are running
