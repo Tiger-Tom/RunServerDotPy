@@ -60,7 +60,7 @@ if os.system('speedtest-cli --version'): #Return code is not 0
 
 # Directories
 #All directories should be followed by a "/"
-baseDir = os.path.split(os.getcwd())[0] # ../
+baseDir = os.path.split(os.getcwd())[0]+'/' # ../
 srvrFolder = os.getcwd()+'/' # ./
 confDir = srvrFolder+'RunServerDotPy/Config/' # ./RunServerDotPy/Config/
 iconsDir = confDir+'Icons/' # ./RunServer/Config/Icons/
@@ -225,8 +225,6 @@ userJoinMSG = '{"text":"Welcome, {%USER}!","clickEvent":{"action":"copy_to_clipb
 if not os.path.exists(confDir):
     os.mkdir(confDir)
 ccRootUsr = '§server admin__'
-emoticonsReq = requests.get('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Default%20Emoticon%20Configuration')
-print (emoticonsReq.encoding)
 confFiles = { #'[name].conf': '[default contents]',
     'admins.conf': ccRootUsr,
     'motds.conf': 'Minecraft Server (Version {%VERSION})',
@@ -234,7 +232,7 @@ confFiles = { #'[name].conf': '[default contents]',
     'ramInMB.conf': '1024',
     'chatCommandPrefix.conf': ';',
     'tempUnit.conf': 'c',
-    'emoticons.conf': emoticonsReq.text,
+    'emoticons.conf': requests.get('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Default%20Emoticon%20Configuration').text,
 }
 for i in confFiles:
     if not os.path.exists(confDir+i):
@@ -245,17 +243,17 @@ for i in confFiles:
 def loadConfiguration():
     print ('Loading configuration...')
     global admins, srvrVersionTxt, motds, ramMB, chatComPrefix, tempUnit, emoticons
-    with open(confDir+'admins.conf') as f:
+    with open(confDir+'admins.conf', encoding='UTF-16') as f:
         admins = set(f.read().split('\n')) #Usernames of server administrators, who can run "sudo" commands (in a set, since it is faster because sets are unindexed and unordered)
-    with open(confDir+'serverVersion.conf') as f:
+    with open(confDir+'serverVersion.conf', encoding='UTF-16') as f:
         srvrVersionTxt = f.read().rstrip()
-    with open(confDir+'motds.conf') as f:
+    with open(confDir+'motds.conf', encoding='UTF-16') as f:
         motds = f.read().rstrip().replace('{%VERSION}', srvrVersionTxt).split('\n') #List of MOTDs (single line only, changes every server restart)
-    with open(confDir+'ramInMB.conf') as f:
+    with open(confDir+'ramInMB.conf', encoding='UTF-16') as f:
         ramMB = int(f.read().rstrip())
-    with open(confDir+'chatCommandPrefix.conf') as f:
+    with open(confDir+'chatCommandPrefix.conf', encoding='UTF-16') as f:
         chatComPrefix = f.read().rstrip()
-    with open(confDir+'tempUnit.conf') as f:
+    with open(confDir+'tempUnit.conf', encoding='UTF-16') as f:
         tempUnit = f.read().lower()
         if tempUnit == 'c':
             tempUnit = [0, '°C']
@@ -295,7 +293,7 @@ if not os.path.exists(iconsDir): #Fix if missing
 serverIcons = []
 for i,j,k in os.walk(iconsDir): #Find all *.png's in the icon directory
     for l in k:
-        if k.endswith('.png'):
+        if l.endswith('.png'):
             print (i+l)
             serverIcons.append(i+l)
         else:
@@ -306,7 +304,7 @@ print ('Server MOTDs:\n'+(', '.join(motds)))
 mainCommand = 'java -jar -Xms'+str(ramMB)+'M -Xmx'+str(ramMB)+'M "'+srvrFolder+'server.jar" nogui'
 
 # Logging
-logFiles = ['Chat', 'RawChat', 'Profanity', 'Unusual+Errors']
+logFiles = ['Chat', 'RawChat', 'ChatCommands', 'Profanity', 'Unusual+Errors']
 loggedAmountTotal = {} #Total amount of logs collected
 loggedAmountIter = {} #Amount of logs collected since last finalized log
 logFileHandles = {}
@@ -452,6 +450,7 @@ def parseOutput(line): #Parses the output, running subfunctions for logging and 
                 if chatL[0] == 1: #Is a regular chat message
                     logData('"'+chatL[1]+'" said "'+chatL[2]+'"', 'Chat') #Save formatted chat to chat log: "[User]" said "[Message]"
                     if chatL[2].startswith(chatComPrefix): #If it is a ChatCommand
+                        logData('"'+chatL[1]+'" tried to run "'+chatL[2]+'"', 'ChatCommands')
                         parseChatCommand(chatL[1], chatL[2])
                         #return False #Stop checking output
                 elif chatL[0] == 2: #Is a /me message
@@ -910,14 +909,15 @@ def autoBackup(): #Requires Linux
         print ('Starting auto-backup...')
         cwd = os.getcwd()
         os.chdir(srvrFolder+'..') #Change to directory directly outside of server folder, so that the zip file has everything without a bunch of extra directory structure
-        os.system('zip -q -r -FS -9 '+autoBckpZip+' '+os.path.basename(srvrFolder))
+        print ('zip -q -r -FS -9 '+autoBckpZip+' '+os.path.basename(cwd))
+        os.system('zip -q -r -FS -9 '+autoBckpZip+' '+os.path.basename(cwd))
         os.chdir(cwd) #Go back to previous working directory to prevent conflicts
 def swapIcon():
     print ('Swapping server icon...')
     if len(serverIcons) > 0:
-        svrIco = random.choice(serverIcons)
-        print ('Selected server icon:\n'+os.path.basename(srvIco)+'\nSwapping...')
-        shutil.copy(srvIco, srvrFolder+'server-icon.png') #Copy over new server icon
+        srvrIco = random.choice(serverIcons)
+        print ('Selected server icon:\n'+os.path.basename(srvrIco)+'\nSwapping...')
+        shutil.copy(srvrIco, srvrFolder+'server-icon.png') #Copy over new server icon
         print ('Done')
     else: #If there are no server icons to choose from
         print ('\nNO *.png SERVER ICONS PRESENT! ADD SOME IN '+iconsDir+'!\n')
