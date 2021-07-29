@@ -26,4 +26,4 @@ This script has the following features (besides interfacing with the Minecraft s
 >
 >-And more!
 
-_Fun fact: the original RunServer.py script that I made was around 825 lines, and my goal for the new version (this one) was to make it more efficient, but I still ended up with more lines (hopefully the extra lines are just because of better commenting, better spacing, and more features being added)
+_Fun fact: the original RunServer.py script that I made was around 825 lines, and my goal for the new version (this one) was to make it more efficient, but I still ended up with more lines (hopefully the extra lines are just because of better commenting, better spacing, and more features being added)_
