@@ -125,7 +125,7 @@ def parseMadeValues(values, doReverse=True): #Removes values of 0, removes a tra
     for i in tuple(values):
         if values[i] != 0: #Corresponding value is not 0, so save it
             if i.endswith('s') and (values[i] == 1):
-                newVals[i[:-1]] = str(values[i]) #Set "newVals" to "values" with index "i", but remove the last character of the key when saving to "newVals" (removes the trailing "s")
+                newVals[i[:-1]] = str(values[i]) #Set "newVals" to "values" with index "i", but remove the last character of the key when saving to "newVals" (removes the trailing "s" to make it singular)
             else:
                 newVals[i] = str(values[i])
     if len(newVals) == 0:
@@ -483,7 +483,7 @@ def parseChat(line): #Get the chat / /me message and username out of a console l
     #Death: [HH:MM:SS] [Server thread/INFO]: Username was slain by Entity Name
     if line[0] == '[' and line[9] == ']': #Check for [HH:MM:SS]
         if line[11:33] == '[Server thread/INFO]: ': #Check for [Server thread/INFO]: 
-            if line[33] == '<': #It is a chat message!
+            if (line[33] == '<') and (line[33:36] != '<--'): #It is a chat message!
                 line = line[34:].split('> ')
                 username = line[0]
                 message = '> '.join(line[1:])
@@ -518,6 +518,7 @@ chatCommandsHelp = { #Help for regular ChatCommands that any user can run
 chatCommandsHelpAdmin = { #Help for administrator commands that only admins and the server console can run
     'help [command*]': 'Show help (this page) or help about optional [command]',
     'ban [player] [reason*]': 'Ban [player] for optional [reason]',
+    'crash [player] [severity*=3, 1-5]': 'Crashes the target player\'s game. Optional argument severity (default 3) chooses how "severe" the crash is (as well as how long it takes before the command is finished)',
     'kick [player] [reason*]': 'Kick [player] for optional [reason]',
     'reconfig': 'Reloads configuration from files',
     'logs {total}': 'Show how many logs have been collected (since last server restart, or since last shutdown if {total} is specified)',
@@ -635,6 +636,8 @@ def cc_crashPlayer(user, severity=3):
     #particle <name> <pos> <delta> <speed> <count> [force|normal] [<viewers>]
     writeCommand('execute at '+user+' run particle minecraft:barrier ~ ~1.5 ~ 0 0 0 1 5 force')
     writeCommand('execute at '+user+' run particle minecraft:barrier ~ ~0.5 ~ 0 0 0 1 5 force')
+    writeCommand('execute at '+user+' run particle '+random.choice(crashParticles)+' ~ ~ ~ 1 1 1 1 2147483647 force '+user)
+    time.sleep(severity-1)
     for i in range(1, severity):
         writeCommand('execute at '+user+' run particle '+random.choice(crashParticles)+' ~ ~ ~ 1 1 1 1 2147483647 force '+user)
         time.sleep(i*10)
@@ -725,17 +728,29 @@ def runAdminChatCommand(cmd, args, user):
     if cmd == 'help':
         cc_help(chatCommandsHelpAdmin, args, chatComPrefix+'sudo', user)
     elif cmd == 'ban':
-        if len(args) > 0:
+        if len(args) > 1:
             tellRaw('Banning '+args[0]+' for '+(' '.join(args[1:])), 'Ban', user)
         else:
             tellRaw('Banning '+args[0], 'Ban', user)
         writeCommand('ban '+(' '.join(args)))
-        if len(args) > 0:
+        if len(args) > 1:
             tellRaw(args[0]+' was banned for '+(' '.join(args[1]))+' by '+user, 'Ban')
         else:
             tellRaw(args[0]+' was banned by '+user, 'Ban')
+    elif cmd == 'crash':
+        target = args[0]
+        if len(args) > 1:
+            severity = int(args[1])
+            if severity < 1 or severity > 5:
+                tellRaw('Severity cannot be more than 5 or less than 1', 'Crasher', user)
+                return
+        else:
+            severity = 3
+        tellRaw('Crashing player '+target+' with severity '+str(severity), 'Crasher', user)
+        threading.Thread(target=cc_crashPlayer, args=(target,severity), daemon=True).start()
+        'crash [player] [severity*=3, 1-5]'
     elif cmd == 'kick':
-        if len(args) > 0:
+        if len(args) > 1:
             tellRaw('Kicking '+args[0]+' for '+(' '.join(args[1:])), 'Kick', user)
         else:
             tellRaw('Kicking '+args[0], 'Ban', user)
@@ -780,7 +795,8 @@ def runAdminChatCommand(cmd, args, user):
         writeCommand('save-all') #Save the game
         writeCommand('stop') #Stop the server
     elif cmd in {'unban', 'pardon'}:
-        print (cmd)
+        tellRaw('Unbanning '+(' '.join(args[0])), 'Pardon', user)
+        writeCommand('pardon '+(' '.join(args)))
     elif (os.name != 'nt') and (cmd in {'update', 'upgrade'}):
         #runWFullOutput(cmd, callbackFunc, callbackFuncXtraArgs=[])
         tellRaw('Updating package lists...', 'Update')
