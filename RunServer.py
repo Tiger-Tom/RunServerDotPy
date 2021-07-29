@@ -14,6 +14,7 @@ import subprocess
 import gc
 import traceback
 import threading
+import platform
 
 #  Network
 import requests
@@ -36,7 +37,6 @@ try:
     import keyboard #For the keyboard "hook", to detect enter key presses
     import psutil #Will be used to close all trailing file handles, as well as getting some system informatino
     from better_profanity import profanity #For censoring and detecting profanity in chat
-    from pyspectator.computer import Computer #For getting system information
 except ModuleNotFoundError: #Means that we have to try to install the modules
     if input('Warning: some required modules were not found. Attempt to install? (Y/n) >').lower() == 'n':
         exit()
@@ -48,7 +48,6 @@ except ModuleNotFoundError: #Means that we have to try to install the modules
     import keyboard
     import psutil
     from better_profanity import profanity
-    from pyspectator.computer import Computer
 
 #  Check if speedtest-cli is installed, and install it if it isn't
 if os.system('speedtest-cli --version'): #Return code is not 0
@@ -75,10 +74,9 @@ if not os.path.exists(srvrFolder+'RunServerDotPy'):
 
 # Setup some module-related things
 gc.enable()
-compMain = Computer()
 
 # Setup some values
-sizeVals = ['bytes', 'kibibytes', 'mebibytes', 'gibibytes']
+sizeVals = ['bytes', 'kibibytes', 'mebibytes', 'gibibytes', 'tebibytes']
 timeVals = ['seconds', 'minutes', 'hours']
 
 # Setup profanity filter
@@ -97,6 +95,13 @@ def runWOutput(cmd): #Runs a system command and returns the output
     if type(out) == bytes: #Automatically decode it from UTF-8
         return out.decode('UTF-8')
     return out
+def runWFullOutput(cmd, callbackFunc, callbackFuncXtraArgs=[]): #Runs a system command, and runns the callback function with each output
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
+    while True:
+        out = proc.stdout.readline().decode('UTF-8')
+        if not len(out):
+            break
+        callbackFunc(out, *callbackFuncXtraArgs)
 def runWCallback(callbackFunc, cmd): #Runs a system command and waits for it to finish, and then runs "callbackFunc" with the output as an argument
     callbackFunc(runWOutput(cmd))
 def asyncRunWCallback(callbackFunc, cmd): #Runs a system command with a callback, but asynchronously
@@ -117,7 +122,6 @@ def makeValues(startValue, delimiter, values): #"values" is a list of strings (s
     return doneVals
 def parseMadeValues(values, doReverse=True): #Removes values of 0, removes a trailing "s" if the corresponsing value is 1, adds commas and "and"s where appropriate, etc.
     newVals = {}
-    print (values)
     for i in tuple(values):
         if values[i] != 0: #Corresponding value is not 0, so save it
             if i.endswith('s') and (values[i] == 1):
@@ -227,6 +231,7 @@ confFiles = { #'[name].conf': '[default contents]',
     'serverVersion.conf': 'Configure this in serverVersion.conf!',
     'ramInMB.conf': '1024',
     'chatCommandPrefix.conf': ';',
+    'tempUnit.conf': 'c',
 }
 for i in confFiles:
     if not os.path.exists(confDir+i):
@@ -236,7 +241,7 @@ for i in confFiles:
 #  Read configs
 def loadConfiguration():
     print ('Loading configuration...')
-    global admins, srvrVersionTxt, motds, ramMB, chatComPrefix
+    global admins, srvrVersionTxt, motds, ramMB, chatComPrefix, tempUnit
     with open(confDir+'admins.conf') as f:
         admins = set(f.read().split('\n')) #Usernames of server administrators, who can run "sudo" commands (in a set, since it is faster because sets are unindexed and unordered)
     with open(confDir+'serverVersion.conf') as f:
@@ -247,6 +252,16 @@ def loadConfiguration():
         ramMB = int(f.read().rstrip())
     with open(confDir+'chatCommandPrefix.conf') as f:
         chatComPrefix = f.read().rstrip()
+    with open(confDir+'tempUnit.conf') as f:
+        tempUnit = f.read().lower()
+        if tempUnit == 'c':
+            tempUnit = [0, '°C']
+        elif tempUnit == 'f':
+            tempUnit = [1, '°F']
+        elif tempUnit == 'k':
+            tempUnit = [1, 'K']
+        else:
+            raise Exception('Unknown temperature unit "'+tempUnit+'"! Must be "c"|"f"|"k"!')
     print ('Configuration loaded')
 loadConfiguration()
 
@@ -286,7 +301,7 @@ def makeLogFile(): #Setup the log file
     if not os.path.exists(logDir): #Fix logging directory if it doesn't exist
         os.mkdir(logDir)
     #currentLogDir = logDir+getDTime('%M-%D-%Y_%h-%m')+'--{\\NEXT_TIME/}.zip'
-    logStartTime = getDTime('%M;%D;%Y;%H;%M').split(';')
+    logStartTime = getDTime('%M;%D;%Y;%h;%m').split(';')
     if not os.path.exists(logDir+'latest/'):
         os.mkdir(logDir+'latest/')
 def finalizeLogFile(lost=False): #Finish the log file and save it
@@ -308,13 +323,13 @@ def finalizeLogFile(lost=False): #Finish the log file and save it
     if lost:
         targetDir = logDir+'Lost/FOUND_ON_'+getDTime('%M-%D-%Y_%h-%m-%s')+'.zip'
     else:
-        curTime = getDTime('%M;%D;%Y;%H;%M').split(';')
-        targetDir = logDir+('-'.join(logStartTime[0:3]))+'_'+(' '.join(logStartTime[3:]))+'__'
+        curTime = getDTime('%M;%D;%Y;%h;%m').split(';')
+        targetDir = logDir+('-'.join(logStartTime[0:3]))+'_'+('-'.join(logStartTime[3:]))+'__'
         if logStartTime[2] == curTime[2]: #Year is the same, so delete it
             indx = 2
         else:
             indx = 3
-        targetDir += '-'.join(curTime[0:indx])+'_'+('-'.join(curTime[indx:]))
+        targetDir += '-'.join(curTime[0:indx])+'_'+('-'.join(curTime[indx:]))+'.zip'
     #Don't save something if nothing is logged
     if (loggedAmountIter == {}) and not lost:
         print ('Not saving log file, as there is nothing to save!')
@@ -413,6 +428,8 @@ def parseOutput(line): #Parses the output, running subfunctions for logging and 
         print ('Not parsing empty line (length 0)')
     elif line[0] != '[': #Unusual, means that there is no [HH:MM:SS] in front of message
         logData(line, 'Unusual+Errors')
+    elif (line[9:12] == '] [') and (line[11:].split('/')[1][:5] in {'WARN]', 'ERROR', 'FATAL'}): #It's an error!
+        logData(line, 'Unusual+Errors')
     elif ('*' in line) or ('<' in line): #Check these before parsing chat, since they use up less resources, and any chat message has to have either a < or a *
         if line[33] in {'*', '<'}:
             chatL = parseChat(line)
@@ -437,9 +454,9 @@ def parseOutput(line): #Parses the output, running subfunctions for logging and 
     elif ' '.join(line.split(' ')[2:]) == 'joined the game':
         usrJoined = line.split(' ')[1]
         writeCommand('tellraw @a '+usrJoinMSG.replace('{%USER}', usrJoined))
+        tellRaw('Use "'+chatComPrefix+'help" for a list of ChatCommands!', None, usrJoined)
     if profanity.contains_profanity(line): #Line contains profanity, log to file
         logData(line, 'Profanity')
-    return True #Continue checking output
 def parseChat(line): #Get the chat / /me message and username out of a console line
     #Returns ["0 if not chat, 1 if chat, 2 if /me, 3 if /say", "username (if present)", "message (if present)"]
     #+10:             1         2         3
@@ -474,11 +491,9 @@ chatCommandsLastUsed = {}
 #   Help variables (help text keys in-game will be organized by the order by they are defined)
 chatCommandsHelp = { #Help for regular ChatCommands that any user can run
     'help [command*]': 'Show help (this page) or help about optional [command]',
-    'fan': 'Shows the system\'s fan speed', #I'm a big fan of this one
-    'memory | cpu': 'Shows memory, CPU, and swap usage',
-    'temp': 'Shows the CPU temperature',
     'size': 'Get the total size of the server world folder',
     'speedtest': 'Runs an internet speed test (has a 10 minute cooldown)', #Anything with a cooldown will be bypassed by admins, although the cooldown will also be reset
+    'sysinfo | info': 'Shows some system information, such as memory and cpu usage',
     'tps': 'Shows the TPS (has a 2 minute cooldown)',
     'uptime': 'Show how long the server has been online since last restart',
 }
@@ -499,9 +514,23 @@ chatCommandsHelpRoot = { #Help for root commands that only the server console ca
     'clearlogs': 'Delete all logs, and resets the current log files',
     'py [command]': 'Runs the [command] in Python and returns output',
 }
-#   Remove help variables that are only usable on some systems (to keep order, instead of adding them here)
+
+#    Remove unusable help strings
+if os.name == 'nt':
+    del chatCommandsHelpAdmin['update | upgrade {dist,clean,pip}']
+
+#   Configuration variables
+sysInfoShown = {
+    'cpu': True,
+    'memory': True,
+    'temp': True,
+    'battery': True,
+    'diskrw': True,
+}
+if not hasattr(psutil, 'sensors_battery'):
+    sysInfoShown['battery'] = False
 if not hasattr(psutil, 'sensors_temperatures'):
-    print ('WARNING: Removing "temp" command, as this machine does not support "psutil.sensors_temperatures"')
+    sysInfoShown['temp'] = False
 
 #  Functions
 def parseChatCommand(user, data):
@@ -530,7 +559,8 @@ def parseChatCommand(user, data):
         print (user+' is attempting to run ChatCommand "'+cmd+'" with '+str(len(args))+' arguments')
         chatCommandsLastUsed.setdefault(user, -1)
         if time.monotonic()-chatCommandsLastUsed[user] < 1:
-            tellRaw('Please wait 1 second, '+user, 'SpamProtection', user)
+            writeCommand('kick '+user+' SpamProtection: Please wait 1 second between ChatCommands')
+            #tellRaw('Please wait 1 second, '+user, 'SpamProtection', user)
         else:
             runChatCommand(cmd, args, user)
         if chatCommandsLastUsed[user] != -1: #User is not an admin
@@ -575,20 +605,6 @@ def runChatCommand(cmd, args, user):
     tellRaw('Running ChatCommand '+cmd, '$'+user)
     if cmd == 'help': #Displays a list of commands, or details for a specific command if arguments are specified
         cc_help(chatCommandsHelp, args, user=user)
-    elif cmd == 'fan': #Displays the fan speed
-        if not hasattr(psutil, 'sensors_fan'):
-            tellRaw('Sorry, this command is not availiable on this operating system!', 'Fan', user)
-            tellRaw('(Guess you weren\'t a big fan of that)', None, user)
-        else:
-            
-    elif cmd in {'memory', 'cpu'}: #Displays the resource usage
-        tellRaw(str(psutil.cpu_percent())+'% used', 'CPU', user)
-        tellRaw(str(psutil.virtual_memory().percent)+'% used', 'Memory', user)
-    elif cmd == 'temp': #Displays the temperature of the system
-        if not hasattr(psutil, 'sensors_temperatures'):
-            tellRaw('Sorry, this command is not availiable on this operating system!', 'Temp', user)
-        else:
-            tellRaw() #MAKE THIS THING SOMETIME!!!
     elif cmd == 'size': #Displays the size of the server's world folder
         size = 0
         for path, dirs, files in os.walk(srvrFolder+'world/'):
@@ -608,11 +624,34 @@ def runChatCommand(cmd, args, user):
         else:
             print ('Last speed test: '+str(lastSpeedTest))
             tellRaw('Please wait '+parseMadeValues(makeValues(600-timeSinceLast, 60, timeVals))+' to run another speed test', 'SpeedTest')
+    elif cmd in {'sysinfo', 'info'}:
+        tellRaw('System information for '+platform.node()+':', 'SysInf', user)
+        if sysInfoShown['cpu']:
+            tellRaw(str(psutil.cpu_percent())+'% of CPU used', None, user)
+        if sysInfoShown['memory']:
+            tellRaw(str(psutil.virtual_memory().percent)+'% of memory used', None, user)
+        if sysInfoShown['temp']:
+            temps = psutil.sensors_temperatures()
+            for i in temps:
+                t = 0
+                for j in temps[i]:
+                    t += j.current
+                t = t/len(temps[i])
+                if tempUnit[0] == 2:
+                    t += 273.15
+                elif tempUnit[0] == 1:
+                    t = (t*(9/5))+32
+                tellRaw('Temperature "'+i+'" is '+str(t)+tempUnit[1], None, user)
+        if sysInfoShown['battery']:
+            tellRaw('Battery has '+str(psutil.sensors_battery().percent)+'% charge (Plugged in: '+('yes' if psutil.sensors_battery().power_plugged else 'no')+')', None, user)
+        if sysInfoShown['diskrw']:
+            ioCount = psutil.disk_io_counters()
+            tellRaw('Disk has had a total '+parseMadeValues(makeValues(ioCount.read_bytes, 1024, sizeVals))+' reads and '+parseMadeValues(makeValues(ioCount.write_bytes, 1024, sizeVals))+' writes since the last system restart')
     elif cmd == 'tps': #Gets the server's TPS over 10 seconds
         #*10:          1         2         3         4         5         6
-        #+  :0123456789012345678901234567890123456789012345678901234567890123456789
+        #*1 :0123456789012345678901234567890123456789012345678901234567890123456789
         #    [14:47:22] [Server thread/INFO]: Stopped tick profiling after 10.81 seconds and 217 ticks (20.08 ticks per second)
-        #                                                               62:0     1       2   3   4     5     6     7   8
+        #           9:                                       :48         62:0     1       2   3   4     5     6     7   8
         global lastTickTest
         waitSecs = 120
         timeSinceLast = round(time.monotonic())-lastTickTest
@@ -623,7 +662,7 @@ def runChatCommand(cmd, args, user):
             threading.Thread(target=funcWithDelay, args=(10, writeCommand, ['debug stop']), daemon=True).start()
             while True:
                 out = getOutput(process)
-                if (out[0] == '[') and (out[9:55] == '] [Server thread/INFO]: Stopped tick profiling'):
+                if (out[0] == '[') and (out[9:48] == '] [Server thread/INFO]: Stopped tick pr'):
                     out = out[62:].split(' ')
                     break
             secsTest = out[0]
@@ -642,11 +681,26 @@ def runAdminChatCommand(cmd, args, user):
     if cmd == 'help':
         cc_help(chatCommandsHelpAdmin, args, chatComPrefix+'sudo', user)
     elif cmd == 'ban':
-        print (cmd)
+        if len(args) > 0:
+            tellRaw('Banning '+args[0]+' for '+(' '.join(args[1:])), 'Ban', user)
+        else:
+            tellRaw('Banning '+args[0], 'Ban', user)
+        writeCommand('ban '+(' '.join(args)))
+        if len(args) > 0:
+            tellRaw(args[0]+' was banned for '+(' '.join(args[1]))+' by '+user, 'Ban')
+        else:
+            tellRaw(args[0]+' was banned by '+user, 'Ban')
     elif cmd == 'kick':
-        print (cmd)
+        if len(args) > 0:
+            tellRaw('Kicking '+args[0]+' for '+(' '.join(args[1:])), 'Kick', user)
+        else:
+            tellRaw('Kicking '+args[0], 'Ban', user)
+        writeCommand('kick '+(' '.join(args)))
     elif cmd == 'logs':
-        print (cmd)
+        if 'total' in args:
+            tellRaw('Logged amount over '+str(restarts)+' restarts:\n'+str(loggedAmountTotal), 'Logs', user)
+        else:
+            tellRaw('Logged amount for this iteration:\n'+str(loggedAmountIter), 'Logs', user)
     elif cmd == 'reconfig':
         tellRaw('Reloading configuration...', 'Config', user)
         loadConfiguration()
@@ -668,7 +722,8 @@ def runAdminChatCommand(cmd, args, user):
         print ('Goodbye')
         os.execl(sys.executable, sys.executable, *sys.argv) #Immediately replace the current process with this one, retaining arguments
     elif cmd == 'reload':
-        print (cmd)
+        tellRaw('Reloading!', None, user)
+        writeCommand('reload')
     elif cmd in {'restart', 'stop'}:
         tellRaw('Restarting server...', user)
         for i in range(3, 1, -1): #Countdown to warn users
@@ -682,8 +737,37 @@ def runAdminChatCommand(cmd, args, user):
         writeCommand('stop') #Stop the server
     elif cmd in {'unban', 'pardon'}:
         print (cmd)
-    elif cmd in {'update', 'upgrade'}:
-        print (cmd)
+    elif (os.name != 'nt') and (cmd in {'update', 'upgrade'}):
+        #runWFullOutput(cmd, callbackFunc, callbackFuncXtraArgs=[])
+        tellRaw('Updating package lists...', 'Update')
+        cmd = 'sudo apt-get update'
+        tellRaw(cmd)
+        runWFullOutput(cmd, tellRaw)
+        tellRaw('Done', 'Update')
+        tellRaw('Upgrading packages...', 'Upgrade')
+        cmd = 'yes | sudo apt-get upgrade'
+        tellRaw(cmd)
+        runWFullOutput(cmd, tellRaw)
+        tellRaw('Done', 'Upgrade')
+        if 'dist' in args:
+            tellRaw('Running distribution upgrade...', 'DistUpgr')
+            cmd = 'yes | sudo apt-get dist-upgrade'
+            tellRaw(cmd)
+            runWFullOutput(cmd, tellRaw)
+            tellRaw('Done', 'DistUpgr')
+        if 'clean' in args:
+            tellRaw('Auto-cleaning packages...', 'AutoClean')
+            cmd = 'yes | sudo apt-get autoclean'
+            tellRaw(cmd)
+            runWFullOutput(cmd, tellRaw)
+            tellRaw('Done', 'AutoClean')
+        if 'pip' in args:
+            tellRaw('Updating PIP packages...', 'PIP')
+            cmd = sys.executable+' -m pip list --outdated --format=freeze | grep -v \'^\\-e\' | cut -d = -f 1e'
+            tellRaw(cmd)
+            runWFullOutput(cmd, tellRaw)
+            tellRaw('Done', 'PIP')
+        del cmd
 
 #   Root commands (only server console can run these commands)
 def runRootChatCommand(cmd, args):
@@ -795,6 +879,7 @@ def serverHandler(): #Wed Jul 28 13:53:08 2021
     rehookKeyboard()
     #Main server starting and handling
     startServer() #Start the main server
+    time.sleep(1) #Give it a bit of time to boot
     while True: #Main loop
         try:
             getOutput(process)
@@ -838,6 +923,3 @@ def serverLoopHandler(): #Main program that handles auto-restarting and exceptio
 restarts = 0
 serverLoopHandler()
 keyboard.unhook_all()
-
-# https://stackoverflow.com/questions/2408560/non-blocking-console-input
-# https://stackoverflow.com/questions/5404068/how-to-read-keyboard-input/53344690#53344690
