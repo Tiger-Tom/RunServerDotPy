@@ -381,7 +381,7 @@ def logData(data, category): #Adds data to the specified log
         lfHandle = logFileHandles[category]
         lfHandle.write(getDTime('[%M-%D-%Y %h:%m:%s] ')+data.rstrip()+'\n')
     except (ValueError, KeyError): #File handle never made or does not exist #Make sure not to catch the wrong exceptions
-        lfHandle = open(logDir+'latest/'+category+'.txt', 'a+')
+        lfHandle = open(logDir+'latest/'+category+'.txt', 'a+', encoding='UTF-16')
         logFileHandles[category] = lfHandle
         lfHandle.write(getDTime('>>[NEW HANDLE OPENED]<<\n[%M-%D-%Y %h:%m:%s] ')+data.rstrip()+'\n')
         print ('Initialized log file for "'+category+'"')
@@ -415,12 +415,8 @@ def writeCommand(cmd): #Writes "cmd" to the process' STDIN and adds '\n' to make
     except NameError:
         print ('Cannot write command, as process has been stopped')
 #   Tellraw
-def safeTellRaw(text): #Formats a string to be safe for use in a tellraw command. Escapes \, ', ", etc.
-    toEscape = ['\\', '\'', '"'] #Characters to escape with a \
-    text = str(text)
-    for i in toEscape:
-        text = text.replace(i, '\\'+i)
-    return text.rstrip()
+def safeTellRaw(text): #Formats a string to be safe for use in a tellraw command
+    return json.dumps(text.rstrip())
 def tellRaw(text, frmTxt=None, to='@a'): #Runs the tellraw commands, and adds a "from" text if frmTxt is not None (with a from text would look like: <"frmTxt"> "text")
     if (to == ccRootUsr) or (ccRootUsr in str(frmTxt)) or (ccRootUsr in text):
         if frmTxt != None:
@@ -430,13 +426,12 @@ def tellRaw(text, frmTxt=None, to='@a'): #Runs the tellraw commands, and adds a 
         return
     text = safeTellRaw(text).split('\n')
     if frmTxt != None:
-        frmTxt = safeTellRaw(frmTxt)
         for i in text:
-            writeCommand('tellraw '+to+' "<'+frmTxt+'> '+i+'"')
+            writeCommand('tellraw '+to+' ["<'+frmTxt+'> ",'+i+']')
             print ('"'+frmTxt+'" > "'+i+'" > "'+to+'"')
     else:
         for i in text:
-            writeCommand('tellraw '+to+' "'+i+'"')
+            writeCommand('tellraw '+to+' '+i)
             print (' > "'+i+'" > "'+to+'"')
 
 #  Output parsing
@@ -445,8 +440,10 @@ def parseOutput(line): #Parses the output, running subfunctions for logging and 
         print ('Not parsing empty line (length 0)')
     elif line[0] != '[': #Unusual, means that there is no [HH:MM:SS] in front of message
         logData(line, 'Unusual+Errors')
-    elif (line[9:12] == '] [') and (line[11:].split('/')[1][:5] in {'WARN]', 'ERROR', 'FATAL'}): #It's an error!
+    elif (line[9:12] == '] [') and (line[11:].split('/')[1][:5] in {'ERROR', 'FATAL'}): #It's an error!
         logData(line, 'Unusual+Errors')
+    elif (line[9:12] == '] [') and (line[33:42] == '<--[HERE]'): #Incorrectly typed in command, ignore
+        return
     elif ('*' in line) or ('<' in line): #Check these before parsing chat, since they use up less resources, and any chat message has to have either a < or a *
         if line[33] in {'*', '<'}:
             chatL = parseChat(line)
@@ -562,7 +559,7 @@ def parseChatCommand(user, data):
         comm = args[0].lower()
         args = args[1:]
         if cmd == 'root': #The command is a root-level command (only server console can run)
-            if user == ccRootUser: #User has permissions, run command
+            if user == ccRootUsr: #User has permissions, run command
                 print ('Root access granted, '+user)
                 runRootChatCommand(comm, args)
             else: #User does not have permissions, kick them from the server
@@ -623,7 +620,7 @@ def cc_tellrawEmoticons(user):
     tellRaw('Click on an emoticon to copy it to your clipboard!', ' :) ', user)
     tellRaw('Multi-character emoticons:', ' :) ', user)
     for i in emoticons[1]:
-        writeCommand('tellraw '+user+' {"text":"{%EMOTICON}","clickEvent":{"action":"copy_to_clipboard","value":"{%EMOTICON}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%EMOTICON}","bold":true}]}}'.replace('{%EMOTICON}', i))
+        writeCommand('tellraw '+user+' {"text":{%EMOTICON},"clickEvent":{"action":"copy_to_clipboard","value":{%EMOTICON}},"hoverEvent":{"action":"show_text","contents":[{"text":{%EMOTICON},"bold":true}]}}'.replace('{%EMOTICON}', json.dumps(i)))
         time.sleep(emoticons[0])
     tellRaw('Single-character emoticons:', ' :) ', user)
     for i in emoticons[2]:
@@ -737,7 +734,7 @@ def runAdminChatCommand(cmd, args, user):
             tellRaw('Banning '+args[0], 'Ban', user)
         writeCommand('ban '+(' '.join(args)))
         if len(args) > 1:
-            tellRaw(args[0]+' was banned for '+(' '.join(args[1]))+' by '+user, 'Ban')
+            tellRaw(args[0]+' was banned for '+(' '.join(args[1:]))+' by '+user, 'Ban')
         else:
             tellRaw(args[0]+' was banned by '+user, 'Ban')
     elif cmd == 'crash':
@@ -846,7 +843,7 @@ def runRootChatCommand(cmd, args):
     elif cmd == 'clearlogs':
         global loggedAmountIter, loggedAmountTotal
         print ('Finishing logs so that they can be safely removed...')
-        finalizeLogFiles()
+        finalizeLogFile()
         print ('Removing log directory...')
         shutil.rmtree(logDir)
         loggedAmountIter = {}
@@ -960,7 +957,7 @@ def serverHandler(): #Wed Jul 28 13:53:08 2021
     rehookKeyboard() #The keyboard hook is used for getting input from the server console
     #Main server starting and handling
     startServer() #Start the main server
-    time.sleep(1) #Give it a bit of time to boot
+    time.sleep(0.1) #Give it a bit of time to boot
     while True: #Main loop
         try:
             getOutput(process)
@@ -971,7 +968,7 @@ def serverHandler(): #Wed Jul 28 13:53:08 2021
             try:
                 for i in e.split('\n'):
                     print (safeTellRaw(i))
-                    writeCommand('tellraw @a ["",{"text":"'+safeTellRaw(i)+'","bold":true,"color":"red"}]')
+                    writeCommand('tellraw @a ["",{"text":'+safeTellRaw(i)+',"bold":true,"color":"red"}]')
             except:
                 print (traceback.format_exc())
         if process.poll() != None:
@@ -987,7 +984,7 @@ def serverLoopHandler(): #Main program that handles auto-restarting and exceptio
         except:
             print ('Error!\n'+traceback.format_exc())
         try:
-            print (process.stdout.read().decode('UTF-8', 'replace'))) #Read any leftover messages and flush buffer
+            print (process.stdout.read().decode('UTF-8', 'replace')) #Read any leftover messages and flush buffer
         except:
             pass
         try:
