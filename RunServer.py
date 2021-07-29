@@ -618,7 +618,6 @@ def cc_parseSpeedTest(res):
     tellRaw(parseMadeValues(down)+' download', 'SpeedTest')
     tellRaw(parseMadeValues(up)+' upload', 'SpeedTest')
 def cc_tellrawEmoticons(user):
-    #emoticons = [emoticonDelay, emoticonLines, emoticonSingles]
     tellRaw('Click on an emoticon to copy it to your clipboard!', ' :) ', user)
     tellRaw('Multi-character emoticons:', ' :) ', user)
     for i in emoticons[1]:
@@ -631,6 +630,15 @@ def cc_tellrawEmoticons(user):
             emotiComs.append('{"text":"{%EMOTICON}","clickEvent":{"action":"copy_to_clipboard","value":"{%EMOTICON}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%EMOTICON}","bold":true}]}}'.replace('{%EMOTICON}', j))
         writeCommand('tellraw '+user+' ['+(',{"text":" | "},'.join(emotiComs))+']')
         time.sleep(emoticons[0])
+crashParticles = ['minecraft:elder_guardian', 'minecraft:sweep_attack', 'minecraft:explosion']
+def cc_crashPlayer(user, severity=3):
+    #particle <name> <pos> <delta> <speed> <count> [force|normal] [<viewers>]
+    writeCommand('execute at '+user+' run particle minecraft:barrier ~ ~1.5 ~ 0 0 0 1 5 force')
+    writeCommand('execute at '+user+' run particle minecraft:barrier ~ ~0.5 ~ 0 0 0 1 5 force')
+    for i in range(1, severity):
+        writeCommand('execute at '+user+' run particle '+random.choice(crashParticles)+' ~ ~ ~ 1 1 1 1 2147483647 force '+user)
+        time.sleep(i*10)
+    writeCommand('kick '+user+' Timed out')
 
 #   Basic functions (any user can run)
 def runChatCommand(cmd, args, user):
@@ -639,6 +647,8 @@ def runChatCommand(cmd, args, user):
         cc_help(chatCommandsHelp, args, user=user)
     elif cmd == 'emoticons':
         threading.Thread(target=cc_tellrawEmoticons, args=(user,), daemon=True).start()
+    elif cmd == 'nuke': #Secret command
+        cc_crashPlayer(user, 1)
     elif cmd == 'size': #Displays the size of the server's world folder
         size = 0
         for path, dirs, files in os.walk(srvrFolder+'world/'):
