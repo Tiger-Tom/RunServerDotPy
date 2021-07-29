@@ -93,12 +93,12 @@ for i in allowedModifyWords:
 def runWOutput(cmd): #Runs a system command and returns the output
     out = subprocess.check_output(cmd, shell=True)
     if type(out) == bytes: #Automatically decode it from UTF-8
-        return out.decode('UTF-8')
+        return out.decode('UTF-8', 'replace')
     return out
 def runWFullOutput(cmd, callbackFunc, callbackFuncXtraArgs=[]): #Runs a system command, and runns the callback function with each output
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, shell=True)
     while True:
-        out = proc.stdout.readline().decode('UTF-8')
+        out = proc.stdout.readline().decode('UTF-8', 'replace')
         if not len(out):
             break
         callbackFunc(out, *callbackFuncXtraArgs)
@@ -192,7 +192,7 @@ inputQueue = queue.Queue()
 def getOutput(process): #Prints all of the process' buffered STDOUT (decoded it from UTF-8) and also returns it
     global inputQueue
     try:
-        data = process.stdout.readline().decode('UTF-8').rstrip()
+        data = process.stdout.readline().decode('UTF-8', 'replace').rstrip()
         print (data)
     except UnicodeDecodeError:
         print ('Unable to decode unicode character from target STDOUT!')
@@ -520,11 +520,12 @@ chatCommandsHelpAdmin = { #Help for administrator commands that only admins and 
     'ban [player] [reason*]': 'Ban [player] for optional [reason]',
     'crash [player] [severity*=3, 1-5]': 'Crashes the target player\'s game. Optional argument severity (default 3) chooses how "severe" the crash is (as well as how long it takes before the command is finished)',
     'kick [player] [reason*]': 'Kick [player] for optional [reason]',
-    'reconfig': 'Reloads configuration from files',
+    'reconfig': 'Reloads configuration from files (except for server icons, sorry. Don\'t edit the server icons while the server is running)',
     'logs {total}': 'Show how many logs have been collected (since last server restart, or since last shutdown if {total} is specified)',
     'refresh': 'Refreshes RunServerDotPy, reloading config and script. The server has to go offline during this time',
     'reload': 'Reloads all datapacks and assets (/reload command)',
     'restart | stop [reason*]': 'Restart the server for optional [reason]',
+    'save | save-all': 'Save the game',
     'unban | pardon [player]': 'Unban/pardon [player]',
     'update | upgrade {dist,clean,pip}': 'Runs "apt-get update" and "apt-get upgrade" (also runs "apt-get dist-upgrade" if specified by flag {dist}, auto-cleans for flag {clean}, and attempts to upgrade pip modules for flag {pip}). ChatCommands will be paused while this is running',
 }
@@ -536,7 +537,7 @@ chatCommandsHelpRoot = { #Help for root commands that only the server console ca
 
 #    Remove unusable help strings
 if os.name == 'nt':
-    del chatCommandsHelpAdmin['update | upgrade {dist,clean,pip}']
+    del chatCommandsHelpAdmin['update | upgrade {dist,clean,pip}'] #The necessary commands to update/upgrade are not on Windows, so delete the help string
 
 #   Configuration variables
 sysInfoShown = {
@@ -631,7 +632,7 @@ def cc_tellrawEmoticons(user):
             emotiComs.append('{"text":"{%EMOTICON}","clickEvent":{"action":"copy_to_clipboard","value":"{%EMOTICON}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%EMOTICON}","bold":true}]}}'.replace('{%EMOTICON}', j))
         writeCommand('tellraw '+user+' ['+(',{"text":" | "},'.join(emotiComs))+']')
         time.sleep(emoticons[0])
-crashParticles = ['minecraft:elder_guardian', 'minecraft:sweep_attack', 'minecraft:explosion']
+crashParticles = ['minecraft:elder_guardian', 'minecraft:sweep_attack', 'minecraft:explosion', 'minecraft:angry_villager']
 def cc_crashPlayer(user, severity=3):
     #particle <name> <pos> <delta> <speed> <count> [force|normal] [<viewers>]
     writeCommand('execute at '+user+' run particle minecraft:barrier ~ ~1.5 ~ 0 0 0 1 5 force')
@@ -721,6 +722,8 @@ def runChatCommand(cmd, args, user):
         tellRaw('(Online since '+(time.ctime(uptimeStart).rstrip().replace('  ', ' '))+')', None, user)
         tellRaw('The system has been powered on for '+parseMadeValues(makeValues(round(time.monotonic()-psutil.boot_time()), 60, timeVals)), 'Uptime', user)
         tellRaw('(Powered on since '+(time.ctime(psutil.boot_time()).rstrip().replace('  ', ' '))+')', None, user)
+    else:
+        tellRaw('Unknown command "'+cmd+'", sorry', 'CCmd', user)
 
 #   Sudo/admin commands (only admins or server console can run these commands)
 def runAdminChatCommand(cmd, args, user):
@@ -773,7 +776,7 @@ def runAdminChatCommand(cmd, args, user):
             getOutput(process)
         try:
             process.wait() #Wait for the process to complete
-            print (process.stdout.read().decode('UTF-8')) #Read any leftover messsages and flush buffer
+            print (process.stdout.read().decode('UTF-8', 'replace')) #Read any leftover messsages and flush buffer
         except:
             pass
         finalizeLogFile() #Finalize the log file
@@ -794,6 +797,10 @@ def runAdminChatCommand(cmd, args, user):
         writeCommand('kick @a Server restarting!') #Kick all the players from the server
         writeCommand('save-all') #Save the game
         writeCommand('stop') #Stop the server
+    elif cmd in {'save', 'save-all'}:
+        tellRaw('Saving the game')
+        writeCommand('save-all')
+        tellRaw('Saved the game')
     elif cmd in {'unban', 'pardon'}:
         tellRaw('Unbanning '+(' '.join(args[0])), 'Pardon', user)
         writeCommand('pardon '+(' '.join(args)))
@@ -828,6 +835,8 @@ def runAdminChatCommand(cmd, args, user):
             runWFullOutput(cmd, tellRaw)
             tellRaw('Done', 'PIP')
         del cmd
+    else:
+        tellRaw('Unknown command "'+cmd+'", sorry', 'OPCCmd', user)
 
 #   Root commands (only server console can run these commands)
 def runRootChatCommand(cmd, args):
@@ -835,10 +844,23 @@ def runRootChatCommand(cmd, args):
     if cmd == 'help':
         cc_help(chatCommandsHelpRoot, args, chatComPrefix+'root', '', True)
     elif cmd == 'clearlogs':
-        print (cmd)
+        global loggedAmountIter, loggedAmountTotal
+        print ('Finishing logs so that they can be safely removed...')
+        finalizeLogFiles()
+        print ('Removing log directory...')
+        shutil.rmtree(logDir)
+        loggedAmountIter = {}
+        loggedAmountTotal = {}
+        print ('Removed logs')
+        print ('Running startup for new logs...')
+        makeLogFile()
+        print ('All logs have been deleted')
     elif cmd == 'py':
-        print (cmd)
-
+        com = ' '.join(args)
+        print ('> "'+com+'" > Python')
+        print ('< "'+str(eval(com))+'"')
+    else:
+        print ('Unknown command "'+cmd+'" (args: '+str(args)+')')
 # Indev AntiCheat (not currently in development)
 def getPlayerPos(user):
     #Index: 0123456789012345678901234567890123456789
@@ -869,11 +891,11 @@ def enterKeyPressed(key):
     try:
         line = sys.stdin.readline().rstrip() # Read a single line from sys.stdin
         if line.startswith(chatComPrefix): #It is a ChatCommand, so place it in inputQueue to be "injected" into output to prevent desync
-            inputQueue.put('[##:##:##] [Server thread/INFO]: <'+ccRootUsr+'> '+line, False)
-            writeCommand('')
-        else: #Otherwise pass it to the server console as normal
+            inputQueue.put('[##:##:##] [Server thread/INFO]: <'+ccRootUsr+'> '+line, False) #A queue to be ran by the "getOutput" command to synchronously perform ChatCommands from the server console
+            writeCommand('') #Write this here to trigger the getOutput function to run
+        else: #Otherwise pass it to the server console as normal, as the Minecraft server is asynchronous anyways
             print ('> '+line)
-            writeCommand(line)
+            writeCommand(line) #Commands can be written whenever without desync
     except:
         print ('Error when parsing input!\n'+traceback.format_exc())
 def rehookKeyboard():
@@ -920,15 +942,12 @@ def swapMOTD(uptimeStart): #MOTD = message of the day
     else: #If there are no MOTDs to choose from
         print ('\nNO MOTDs TO CHOOSE FROM! ADD SOME IN '+confDir+'motds.conf!\n')
 def serverHandler(): #Wed Jul 28 13:53:08 2021
-    global process
-    #Setup timing variables
+    global process, lastSpeedTest, lastTickTest, uptimeStart
     global lastSpeedTest
     global lastTickTest
     global uptimeStart
-    global lastEmoticonShow
     lastSpeedTest = -1
     lastTickTest = -1
-    lastEmoticonShow = -1
     uptimeStart = time.monotonic()
     #Setup functions
     keyboard.unhook_all() #Unhook keyboard while processes are running
@@ -938,7 +957,7 @@ def serverHandler(): #Wed Jul 28 13:53:08 2021
     makeLogFile() #Setup logging
     closeOpenFileHandles() #Close any open file handles
     #Rehook keyboard
-    rehookKeyboard()
+    rehookKeyboard() #The keyboard hook is used for getting input from the server console
     #Main server starting and handling
     startServer() #Start the main server
     time.sleep(1) #Give it a bit of time to boot
@@ -968,7 +987,7 @@ def serverLoopHandler(): #Main program that handles auto-restarting and exceptio
         except:
             print ('Error!\n'+traceback.format_exc())
         try:
-            print (process.stdout.read().decode('UTF-8')) #Read any leftover messages and flush buffer
+            print (process.stdout.read().decode('UTF-8', 'replace'))) #Read any leftover messages and flush buffer
         except:
             pass
         try:
