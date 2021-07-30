@@ -1,0 +1,29 @@
+From bugfix 1.1 to release 2.0:
+
+Additions:
+-Added various comments for documentation
+-The script can now automatically update itself on startup (the user only has to answer y/n questions)
+-Users can now click on a ChatCommand in the help page to have it written (or "suggested") on their chat
+-The user join message is now a configurable setting
+-If the EULA hasn't been marked "true", then the Mojang EULA page will be opened in the user's default web browser, and the user will have the option to mark the EULA as "true" through the program
+
+Changes:
+-Compacted single-line if statements
+-Help text is now cached in a file, instead of just being in the program, and checks GitHub to see if a newer version is availiable
+-The copy- and paste-able emoticons are now shown by "page", and can now also be inserted into the user's chat by shift-clicking
+-The time between users being able to use ChatCommands has been changed from 10 seconds down to 1 second
+-Changed auto-restart countdown to 3 seconds, down from 5 seconds
+
+Optimizations:
+-Optimized the pad0s function's "round" function
+-Some configurations (emoticons and user join messages) now have the defaults stored on GitHub intead of in the code
+-Optimized the profanity checker so that it only checks chat messages, instead of wasting time checking everything
+-If a user leaves the games, they will be removed from the dictionary containing when users last used a ChatCommand
+
+Bugfixes:
+-Fixed a logging bug
+-Fixed a bug where user join messages wouldn't be shown
+-Fixed a bug where console commands entered by users would be saved as /say messages in logs
+-Fixed a bug where the ChatCommand spam protection wouldn't work, because it checked if the last time the user used a command was "-1" to see if they were an admin, and the default value is set to "-1"
+-Fixed a bug where ChatCommand help would not show properly if executed from the console
+-Fixed a bug where the server couldn't start if there was no server properties file
