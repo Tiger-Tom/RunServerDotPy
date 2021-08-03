@@ -1,3 +1,10 @@
+From QOL 2.1 to QOL 2.2:
+
+Additions:
+- Help file is automatically refreshed whenever the MC server restarts, instead of whenever the main script restarts
+
+--------------------------------------------------
+
 From release 2.0 to QOL 2.1:
 
 Additions:
