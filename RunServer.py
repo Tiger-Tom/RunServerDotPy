@@ -521,6 +521,7 @@ chatCommandsLastUsed = {}
 
 #   Help variables (help text keys in-game will be organized by the order by they are defined)
 def updateHelp():
+    global chatCommandsHelp,chatCommandsHelpAdmin,chatCommandsHelpRoot
     rewriteHelp = False
     if not os.path.exists(cacheDir+'help/'): os.mkdir(cacheDir+'help/') #Create help cache directory if it doesn't exist
     if not os.path.exists(cacheDir+'help/version.txt'): #Create help version file if it doesn't exist
