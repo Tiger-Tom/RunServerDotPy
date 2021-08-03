@@ -94,7 +94,7 @@ def runWFullOutput(cmd, callbackFunc, callbackFuncXtraArgs=[]): #Runs a system c
     while True:
         out = proc.stdout.readline().decode('UTF-8', 'replace')
         if not len(out): break #If there is no output
-        callbackFunc(out, *callbackFuncXtraArgs)
+        callbackFunc(out.lstrip().rstrip(), *callbackFuncXtraArgs)
 def runWCallback(callbackFunc, cmd): #Runs a system command and waits for it to finish, and then runs "callbackFunc" with the output as an argument
     callbackFunc(runWOutput(cmd))
 def asyncRunWCallback(callbackFunc, cmd): #Runs a system command with a callback, but asynchronously
@@ -212,17 +212,20 @@ if os.name != 'nt': bashUser = runWOutput('logname').rstrip()
 if not os.path.exists(cacheDir): os.mkdir(cacheDir)
 
 # Auto-update
-def autoUpdate():
-    print ('Checking for a new release...')
-    latestRelease = json.loads(getFileFromServer('https://api.github.com/repos/Tiger-Tom/RunServerDotPy/releases/latest'))
-    latestID = float(latestRelease['tag_name'].replace('v', ''))
-    if not os.path.exists(cacheDir+'/version.txt'): currentID = -1.0
+def getVersion():
+    if not os.path.exists(cacheDir+'version.txt'): currentID = -1.0
     else:
-        with open(cacheDir+'/version.txt') as f:
+        with open(cacheDir+'version.txt') as f:
             try:
                 currentID = float(f.read().rstrip())
             except:
                 currentID = -1.0
+    return currentID
+def autoUpdate():
+    print ('Checking for a new release...')
+    latestRelease = json.loads(getFileFromServer('https://api.github.com/repos/Tiger-Tom/RunServerDotPy/releases/latest'))
+    latestID = float(latestRelease['tag_name'].replace('v', ''))
+    currentID = getVersion()
     print ('Current release: '+str(currentID))
     print ('Newest availiable release: '+str(latestID))
     if currentID >= latestID:
@@ -241,7 +244,7 @@ def autoUpdate():
                 f.write(i.decode('UTF-8')+'\n')
     print ('Update written')
     print ('Writing version tag...')
-    with open(cacheDir+'/version.txt', 'w') as f:
+    with open(cacheDir+'version.txt', 'w') as f:
         f.write(str(latestID))
     print ('Closing self to open new version...')
     try:
@@ -518,13 +521,21 @@ chatCommandsLastUsed = {}
 
 #   Help variables (help text keys in-game will be organized by the order by they are defined)
 rewriteHelp = False
-if not os.path.exists(cacheDir+'/help/'): os.mkdir(cacheDir+'/help/') #Create help cache directory if it doesn't exist
+if not os.path.exists(cacheDir+'help/'): os.mkdir(cacheDir+'help/') #Create help cache directory if it doesn't exist
 if not os.path.exists(cacheDir+'help/version.txt'): #Create help version file if it doesn't exist
     with open(cacheDir+'help/version.txt', 'w') as f:
         rewriteHelp = True
 if not rewriteHelp: #Compare current help version with newest help version
     with open(cacheDir+'help/version.txt') as f:
-        if int(f.read()) < int(getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/Version')): rewriteHelp = True
+        newVer = getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/Version').rstrip().split('/')
+        curVer = f.read().rstrip().split('/')[1]
+        print ('Current help version: '+str(getVersion())+'/'+str(curVer)+'\nNewest help version: '+('/'.join(newVer)))
+        if getVersion() < float(newVer[0]):
+            rewriteHelp = False
+            print ('Did not update help file, as current program version is outdated anyways')
+        elif float(curVer) < float(newVer[1]):
+            rewriteHelp = True
+            print ('Help file needs updating, current version is out of date')
 if rewriteHelp: #Update cached help JSON to latest version
     with open(cacheDir+'help/ChatCommandsHelp.json', 'w') as f:
         f.write(getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/ChatCommandsHelp.json'))
@@ -716,6 +727,26 @@ def runChatCommand(cmd, args, user):
 def runAdminChatCommand(cmd, args, user):
     tellRaw('Running SuperUser ChatCommand '+cmd, '$'+user, user)
     if cmd == 'help': cc_help(chatCommandsHelpAdmin, args, chatComPrefix+'sudo', user) #Display a list of admin commands, or information on a specific one if specified in arguments
+    elif cmd in {'antimalware', 'antivirus', 'scan'}:
+        tellRaw('Operating system: '+os.name, 'AntiMal')
+        if os.name == 'nt':
+            tellRaw('Scanner: Windows Defender', 'AntiMal')
+            comm = '"%ProgramFiles%/Windows Defender/MpCmdRun.exe" -Scan'
+        else:
+            tellRaw('Scanner: ClamAV', 'AntiMal')
+            if shutil.which('clamscan') == None: #ClamAV is not installed, so install it
+                comm = 'sudo apt-get install clamav libfreshclam'
+                tellRaw(comm)
+                runWFullOutput(comm, tellRaw)
+                os.system('sudo systemctl stop clamav-freshclam.service')
+                os.system('sudo systemctl disable clamav-freshclam.service')
+            comm = 'sudo freshclam'
+            tellRaw(comm)
+            runWFullOutput(comm, tellRaw)
+            comm = 'sudo clamscan --quiet -r /'
+        tellRaw(comm)
+        asyncRunWCallback(tellRaw, comm)
+        tellRaw('This will last a while. The results will be displayed once the scan is complete', 'AntiMal')
     elif cmd == 'ban': #Bans a user for (optional) reason. Uses the in-game /ban command
         if len(args) > 1: tellRaw('Banning '+args[0]+' for '+(' '.join(args[1:])), 'Ban', user)
         else: tellRaw('Banning '+args[0], 'Ban', user)
@@ -803,13 +834,10 @@ def runAdminChatCommand(cmd, args, user):
             cmd = 'yes | sudo apt-get autoclean'
             tellRaw(cmd)
             runWFullOutput(cmd, tellRaw)
-            tellRaw('Done', 'AutoClean')
-        if 'pip' in args:
-            tellRaw('Updating PIP packages...', 'PIP')
-            cmd = sys.executable+' -m pip list --outdated --format=freeze | grep -v \'^\\-e\' | cut -d = -f 1e'
+            cmd = 'yes | sudo apt-get autoremove'
             tellRaw(cmd)
             runWFullOutput(cmd, tellRaw)
-            tellRaw('Done', 'PIP')
+            tellRaw('Done', 'AutoClean')
         del cmd
     else: tellRaw('Unknown command "'+cmd+'", sorry', 'OPCCmd', user)
 
