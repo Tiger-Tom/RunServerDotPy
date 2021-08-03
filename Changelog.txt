@@ -1,3 +1,10 @@
+From QOL 2.2 to bugfix 2.3:
+
+Bugfixes:
+- Darn errors! (Making the script that updates the help file into a function made it so that the "chatCommandsHelp" (and the admin and root variations) variable weren't actually written
+
+--------------------------------------------------
+
 From QOL 2.1 to QOL 2.2:
 
 Additions:
