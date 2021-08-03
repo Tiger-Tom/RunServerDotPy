@@ -1,3 +1,17 @@
+From release 2.0 to QOL 2.1:
+
+Additions:
+- Help file will now no longer be updated if the newer version is for a newer version of the program
+- Antimalware scan command, using Windows Defender on Windows, and ClamAV on Linux
+
+Changes:
+- "AutoClean" subcommand of the upgrade command now also runs "sudo apt-get autoremove"
+
+Removals:
+- Removed "PIP" subcommand of the upgrade command, because it wasn't useful or needed
+
+--------------------------------------------------
+
 From bugfix 1.1 to release 2.0:
 
 Additions:
