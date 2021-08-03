@@ -520,32 +520,32 @@ def parseChat(line): #Get the chat / /me / /say message and username out of a co
 chatCommandsLastUsed = {}
 
 #   Help variables (help text keys in-game will be organized by the order by they are defined)
-rewriteHelp = False
-if not os.path.exists(cacheDir+'help/'): os.mkdir(cacheDir+'help/') #Create help cache directory if it doesn't exist
-if not os.path.exists(cacheDir+'help/version.txt'): #Create help version file if it doesn't exist
-    with open(cacheDir+'help/version.txt', 'w') as f:
-        rewriteHelp = True
-if not rewriteHelp: #Compare current help version with newest help version
-    with open(cacheDir+'help/version.txt') as f:
-        newVer = getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/Version').rstrip().split('/')
-        curVer = f.read().rstrip().split('/')[1]
-        print ('Current help version: '+str(getVersion())+'/'+str(curVer)+'\nNewest help version: '+('/'.join(newVer)))
-        if getVersion() < float(newVer[0]):
-            rewriteHelp = False
-            print ('Did not update help file, as current program version is outdated anyways')
-        elif float(curVer) < float(newVer[1]):
+def updateHelp():
+    rewriteHelp = False
+    if not os.path.exists(cacheDir+'help/'): os.mkdir(cacheDir+'help/') #Create help cache directory if it doesn't exist
+    if not os.path.exists(cacheDir+'help/version.txt'): #Create help version file if it doesn't exist
+        with open(cacheDir+'help/version.txt', 'w') as f:
             rewriteHelp = True
-            print ('Help file needs updating, current version is out of date')
-if rewriteHelp: #Update cached help JSON to latest version
-    with open(cacheDir+'help/ChatCommandsHelp.json', 'w') as f:
-        f.write(getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/ChatCommandsHelp.json'))
-    with open(cacheDir+'help/version.txt', 'w') as f:
-        f.write(getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/Version'))
-with open(cacheDir+'help/ChatCommandsHelp.json') as f:
-    chatCommandsHelp,chatCommandsHelpAdmin,chatCommandsHelpRoot = json.load(f) #Load ChatCommands help from cached JSON file
-
+    if not rewriteHelp: #Compare current help version with newest help version
+        with open(cacheDir+'help/version.txt') as f:
+            newVer = getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/Version').rstrip().split('/')
+            curVer = f.read().rstrip().split('/')[1]
+            print ('Current help version: '+str(getVersion())+'/'+str(curVer)+'\nNewest help version: '+('/'.join(newVer)))
+            if getVersion() < float(newVer[0]):
+                rewriteHelp = False
+                print ('Did not update help file, as current program version is outdated anyways')
+            elif float(curVer) < float(newVer[1]):
+                rewriteHelp = True
+                print ('Help file needs updating, current version is out of date')
+    if rewriteHelp: #Update cached help JSON to latest version
+        with open(cacheDir+'help/ChatCommandsHelp.json', 'w') as f:
+            f.write(getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/ChatCommandsHelp.json'))
+        with open(cacheDir+'help/version.txt', 'w') as f:
+            f.write(getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/Version'))
+    with open(cacheDir+'help/ChatCommandsHelp.json') as f:
+        chatCommandsHelp,chatCommandsHelpAdmin,chatCommandsHelpRoot = json.load(f) #Load ChatCommands help from cached JSON file
 #    Remove unusable help strings
-if os.name == 'nt': del chatCommandsHelpAdmin['update | upgrade {dist,clean,pip}'] #The necessary commands to update/upgrade are not on Windows, so delete the help string
+    if os.name == 'nt': del chatCommandsHelpAdmin['update | upgrade {dist,clean,pip}'] #The necessary commands to update/upgrade are not on Windows, so delete the help string
 
 #   Configuration variables
 sysInfoShown = {
@@ -953,6 +953,7 @@ def serverHandler(): #Does everything that is needed to start the server and saf
     #Setup functions
     keyboard.unhook_all() #Unhook keyboard while processes are running
     autoBackup() #Automatically backup everything
+    updateHelp() #Update the help cache file
     swapIcon() #Swap the server icon (if there are any present)
     swapMOTD(uptimeStart) #Swap the server MOTD (message of the day) (if there are any present)
     makeLogFile() #Setup logging
