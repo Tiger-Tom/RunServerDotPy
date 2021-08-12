@@ -1,3 +1,16 @@
+From bugfix 2.3 to release 3.0:
+
+Additions:
+- Added mods, which can add custom ChatCommands and help strings, or modify already existing commands and help strings
+
+Changes:
+- Changed the "refresh" ChatCommand help to reflect that it also reloads mods
+
+Bugfixes:
+- Fixed a bug where the program wouldn't boot on Windows, because removing the "update" command returned an error as it was using an outdated name
+
+--------------------------------------------------
+
 From QOL 2.2 to bugfix 2.3:
 
 Bugfixes:
