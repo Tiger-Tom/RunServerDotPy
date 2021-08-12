@@ -64,6 +64,7 @@ autoBckpZip = baseDir+'server-backup/main_backup.zip' # ../server-backup/main_ba
 logDir = srvrFolder+'RunServerDotPy/Logs/' # ./RunServerDotPy/Logs/
 totalLogDir = logDir+'Total/' # ./RunServerDotPy/Logs/Total/
 cacheDir = srvrFolder+'RunServerDotPy/Cache/' # ./RunServerDotPy/Cache/
+modDir = srvrFolder+'RunServerDotPy/Mods/' # ./RunServerDotPy/Mods/
 
 # Fix main RunServerDotPy directory if missing
 if not os.path.exists(srvrFolder+'RunServerDotPy'): os.mkdir(srvrFolder+'RunServerDotPy')
@@ -461,7 +462,7 @@ def parseOutput(line): #Parses the output, running subfunctions for logging and 
                     logData('"'+chatL[1]+'" tried to run "'+chatL[2]+'"', 'ChatCommands')
                     parseChatCommand(chatL[1], chatL[2])
             elif chatL[0] == 2: logData('"'+chatL[1]+'" /me\'d "'+chatL[2]+'"', 'Chat') #Is a /me message, save it in the chat log formatted like: "[User]" /me'd "[Message]"
-            elif chatL[0] == 3: logData('"'+chatL[1]+'" /said "'+chatL[2]+'"', 'Chat') #Is a /say message, save it in the chat log formatted like: "[User]" /said "[Message]"
+            elif (chatL[0] == 3) and (not chatL[1] == 'Server'): logData('"'+chatL[1]+'" /said "'+chatL[2]+'"', 'Chat') #Is a /say message, save it in the chat log formatted like: "[User]" /said "[Message]"
         if profanity.contains_profanity(chatL[1]): #Chat message potentially contains profanity, warn user and log it
             tellRaw('<'+chatL[0]+'> '+profanity.censor(chatL[1], '!'))
             tellRaw('Potential profanity detected and logged', '[Swore!]')
@@ -545,8 +546,10 @@ def updateHelp():
             f.write(getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/Version'))
     with open(cacheDir+'help/ChatCommandsHelp.json') as f:
         chatCommandsHelp,chatCommandsHelpAdmin,chatCommandsHelpRoot = json.load(f) #Load ChatCommands help from cached JSON file
+updateHelp()
+
 #    Remove unusable help strings
-    if os.name == 'nt': del chatCommandsHelpAdmin['update | upgrade {dist,clean,pip}'] #The necessary commands to update/upgrade are not on Windows, so delete the help string
+if os.name == 'nt': del chatCommandsHelpAdmin['update | upgrade {dist,clean}'] #The necessary commands to update/upgrade are not on Windows, so delete the help string
 
 #   Configuration variables
 sysInfoShown = {
@@ -602,11 +605,11 @@ def cc_help(ccHelpDict, args, ccPref=chatComPrefix, user='', toConsole=False): #
     for i in ccHelpDict.keys():
         if showAll:
             if toConsole: print (' • '+i)
-            else: writeCommand('tellraw '+user+(' [" • ",{"text":"{%COMMAND_FULL}","clickEvent":{"action":"suggest_command","value":"{%COMMAND_SUGGEST}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%COMMAND_SUGGEST}","bold":true}]}}]').replace('{%COMMAND_FULL}', i).replace('{%COMMAND_SUGGEST}', ccPref+i.split(' ')[0]))
+            else: writeCommand('tellraw '+user+(' [" • ",{"text":"{%COMMAND_FULL}","clickEvent":{"action":"suggest_command","value":"{%COMMAND_SUGGEST}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%COMMAND_SUGGEST}","bold":true}]}}]').replace('{%COMMAND_FULL}', safeTellRaw(i)).replace('{%COMMAND_SUGGEST}', safeTellRaw(ccPref+i.split(' ')[0])))
         else:
             if command in i:
                 if toConsole: print (' • '+i+': '+ccHelpDict[i])
-                else: writeCommand('tellraw '+user+(' [" • ",{"text":"{%COMMAND_FULL}","clickEvent":{"action":"suggest_command","value":"{%COMMAND_SUGGEST}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%COMMAND_SUGGEST}","bold":true}]}},{"text":": {%COMMAND_DESC}","hoverEvent":{"action":"show_text","contents":[{"text":"{%COMMAND_DESC}","bold":true}]}}]').replace('{%COMMAND_FULL}', i).replace('{%COMMAND_SUGGEST}', ccPref+i.split(' ')[0]).replace('{%COMMAND_DESC}', ccHelpDict[i]))
+                else: writeCommand('tellraw '+user+(' [" • ",{"text":"{%COMMAND_FULL}","clickEvent":{"action":"suggest_command","value":"{%COMMAND_SUGGEST}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%COMMAND_SUGGEST}","bold":true}]}},{"text":": {%COMMAND_DESC}","hoverEvent":{"action":"show_text","contents":[{"text":"{%COMMAND_DESC}","bold":true}]}}]').replace('{%COMMAND_FULL}', safeTellRaw(i)).replace('{%COMMAND_SUGGEST}', safeTellRaw(ccPref+i.split(' ')[0])).replace('{%COMMAND_DESC}', safeTellRaw(ccHelpDict[i])))
 def cc_parseSpeedTest(res):
     res = json.loads(res)
     down = makeValues(res['download'], 1024, sizeVals)
@@ -652,10 +655,74 @@ def cc_parseTagFlag(flag, user):
     else:
         print ('% ERROR: UNKNOWN FLAG "'+str(flag)+'"')
 
+#   Load ChatCommand mods
+modsRegular = {}
+modsAdmin = {}
+modsRoot = {}
+modded = False
+def loadMods():
+    if not os.path.exists(modDir): #Check if the mod directory exists and create it if it doesn't
+        print ('Mods dir doesn\'t exist, creating one now...')
+        os.mkdir(modDir)
+    modFiles = [f for f in os.listdir(modDir) if os.path.isfile(modDir+'/'+f)] #Find all file in the mod directory
+    if not len(modFiles): #If no files/mods were found
+        print ('No mods found')
+        return False
+    mods = []
+    problems = []
+    print ('Loading '+str(len(modFiles))+' mod file(s)...')
+    for i in modFiles: #Load all mods
+        try:
+            with open(modDir+'/'+i) as f:
+                print ('Loading mod file '+i+'...')
+                exec(f.read()) #Read & parse mod
+                global mod_output_
+                mod = mod_output_
+                del mod_output_
+                print ('Checking mod...')
+                if len(mod) != 3: #Check if the mod returns 3 arguments
+                    raise IndexError('Mod doesn\'t return the correct amount of arguments (required: 3, got: '+str(len(mod))+')')
+                if (type(mod[0]) != dict) or (type(mod[1]) != dict) or (type(mod[2]) != int): #Check to make sure that the mod returns the correct type of arguments
+                    raise TypeError('Mod doesn\t return the proper argument types')
+                if (mod[2] < 0) or (mod[2] > 2): #Check if the mod's permission level is within the proper bounds
+                    raise ValueError('Mod doesn\'t returnn the proper permission level (expected: 0-2, got: '+str(mod[2])+')')
+                mods.append(mod) #Everything above didn't run, so the mod should be good
+                print ('Finished loading mod file '+i)
+        except Exception as e:
+            print ('Couldn\'t load mod file '+i+' because:\n'+str(e))
+            problems.append((i, e))
+    print ('Finished loading '+str(len(modFiles))+' mod file(s) ('+str(len(mods))+'/'+str(len(modFiles))+' passed checking)')
+    if not len(mods): #If mod files were found, but they were all invalid
+        print ('No valid mods found')
+        return False
+    global chatCommandsHelp,chatCommandsHelpAdmin,chatCommandsHelpRoot,modsRegular,modsAdmin,modsRoot
+    print ('Applying '+str(len(mods))+' mod(s)...')
+    for indx,mod in enumerate(mods):
+        print ('Applying mod '+str(indx+1)+'/'+str(len(mods))+'...')
+        if mod[2] == 0: #Mod functions have "regular" permission level
+            modsRegular.update(mod[1])
+            chatCommandsHelp.update(mod[0])
+        elif mod[2] == 1: #Mod functions have "admin" permission level (requires sudo)
+            modsAdmin.update(mod[1])
+            chatCommandsHelpAdmin.update(mod[0])
+        elif mod[2] == 2: #Mod functions have "root" permission level (requires root)
+            modsRoot.update(mod[1])
+            chatCommandsHelpRoot.update(mod[0])
+        print ('Applied mod '+str(indx+1)+'/'+str(len(mods))+'\n- Permission level: '+str(mod[2])+'\n- '+str(len(mod[1]))+' new/modified ChatCommands applied\n- '+str(len(mod[0]))+' new/modified help strings applied')
+    print ('Successfully applied '+str(len(mods))+' mod(s)')
+    if len(problems): #Show all problematic mods
+        print ('\n'+str(len(problems))+' mod(s) failed to load:')
+        for i,j in problems:
+            print ('Failed to load mod file '+str(i)+' because '+str(j))
+        print ()
+    return True
+loadMods()
+
 #   Basic functions (any user can run)
 def runChatCommand(cmd, args, user):
     tellRaw('Running ChatCommand '+cmd, '$ '+user)
-    if cmd == 'help': cc_help(chatCommandsHelp, args, user=user) #Displays a list of commands, or details for a specific command if it is specified in the arguments
+    if len(modsRegular) and (cmd in modsRegular): modsRegular[cmd](args, user) #Check if there are any mod commands loaded, and check the command against any mod commands if they are loaded
+    elif cmd == 'help': cc_help(chatCommandsHelp, args, user=user) #Displays a list of commands, or details for a specific command if it is specified in the arguments
     elif (cmd == 'emoticons') and (user != ccRootUsr): threading.Thread(target=cc_tellrawEmoticons, args=(user,args), daemon=True).start() #Shows a list of copyable emoticons, which are configurable by the server owner
     elif (cmd == 'nuke') and (user != ccRootUsr): cc_crashPlayer(user, 1) #Secret command
     elif cmd == 'size': #Displays the size of the server's world folder
@@ -727,7 +794,8 @@ def runChatCommand(cmd, args, user):
 #   Sudo/admin commands (only admins or server console can run these commands)
 def runAdminChatCommand(cmd, args, user):
     tellRaw('Running SuperUser ChatCommand '+cmd, '$'+user, user)
-    if cmd == 'help': cc_help(chatCommandsHelpAdmin, args, chatComPrefix+'sudo', user) #Display a list of admin commands, or information on a specific one if specified in arguments
+    if len(modsAdmin) and (cmd in modsAdmin): modsAdmin[cmd](args, user) #Check if there are any mod commands loaded, and check the command against any mod commands if they are loaded
+    elif cmd == 'help': cc_help(chatCommandsHelpAdmin, args, chatComPrefix+'sudo', user) #Display a list of admin commands, or information on a specific one if specified in arguments
     elif cmd in {'antimalware', 'antivirus', 'scan'}:
         tellRaw('Operating system: '+os.name, 'AntiMal')
         if os.name == 'nt':
@@ -845,7 +913,8 @@ def runAdminChatCommand(cmd, args, user):
 #   Root commands (only server console can run these commands)
 def runRootChatCommand(cmd, args):
     print ('$ Running Root ChatCommand '+cmd)
-    if cmd == 'help': cc_help(chatCommandsHelpRoot, args, chatComPrefix+'root', '', True)
+    if len(modsRoot) and (cmd in modsRoot): modsRoot[cmd](args, user) #Check if there are any mod commands loaded, and check the command against any mod commands if they are loaded
+    elif cmd == 'help': cc_help(chatCommandsHelpRoot, args, chatComPrefix+'root', '', True)
     elif cmd == 'clearlogs':
         global loggedAmountIter, loggedAmountTotal
         print ('Finishing logs so that they can be safely removed...')
@@ -954,7 +1023,6 @@ def serverHandler(): #Does everything that is needed to start the server and saf
     #Setup functions
     keyboard.unhook_all() #Unhook keyboard while processes are running
     autoBackup() #Automatically backup everything
-    updateHelp() #Update the help cache file
     swapIcon() #Swap the server icon (if there are any present)
     swapMOTD(uptimeStart) #Swap the server MOTD (message of the day) (if there are any present)
     makeLogFile() #Setup logging
