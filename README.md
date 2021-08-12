@@ -6,6 +6,8 @@ This script has the following features (besides interfacing with the Minecraft s
 
 >- Support for Linux, and partial support for Windows (most things work on Windows, and things that don't are either disabled or have warnings)
 >
+>- Support for modding to add new or modify existing ChatCommands and help strings
+>
 >- Automatically backing up to a zip file every time the server starts (only on Linux)
 >
 >- Automatically restarting the server if it stops or crashes for whatever reason
