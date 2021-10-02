@@ -1,3 +1,14 @@
+From release 3.0 to QOL 3.1:
+
+Changes:
+- Replaced "getDTime" function with faster STRFTime function
+- Changed default date format from "month-day-year" to "year-month-day"
+
+Bugfixes:
+- Restart counter now updates correctly
+
+--------------------------------------------------
+
 From bugfix 2.3 to release 3.0:
 
 Additions:
