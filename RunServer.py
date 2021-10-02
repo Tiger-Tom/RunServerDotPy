@@ -144,9 +144,6 @@ def pad0s(num, padAmount=1, padOn='left', autoRound=True): #Pads the number with
         padAmount -= 1
     if padOn == 'right': return str(num)+padding
     return padding+str(num)
-def getDTime(format_='%M-%D-%Y %h:%m:%s'): #Format: %M=Month;%D=Day;%Y=Year;%h=Hour;%m=Minute;%s=Second
-    t = time.localtime()
-    return format_.replace('%M', pad0s(t.tm_mon)).replace('%D', pad0s(t.tm_mday)).replace('%Y', str(t.tm_year)).replace('%h', pad0s(t.tm_hour)).replace('%m', pad0s(t.tm_min)).replace('%s', pad0s(t.tm_sec))
 
 #  Filesystem functions
 def writeFileToZip(filePath, zipPath, compressionLevel=9, openMode='a'): #Compresses the file to a zip, using specified mode, and compression levels 0-9
@@ -303,6 +300,7 @@ def loadConfiguration():
         else: raise Exception('Unknown temperature unit "'+tempUnit+'"! Must be "c" or "f" or "k"!')
     with open(confDir+'emoticons.conf', encoding='UTF-16') as f:
         e = f.read().rstrip().split('\n')
+
         emoticons = {}
         e = e[1:]
         pageName = 'Default Page'
@@ -342,7 +340,7 @@ def makeLogFile(): #Setup the log file
     global logStartTime
     t = time.localtime()
     if not os.path.exists(logDir): os.mkdir(logDir) #Fix logging directory if it doesn't exist
-    logStartTime = getDTime('%M;%D;%Y;%h;%m').split(';')
+    logStartTime = time.strftime('Y%;%m;%d;%h;%m').split(';')
 def finalizeLogFile(lost=False): #Finish the log file and save it
     global loggedAmountIter
     global logFileHandles
@@ -357,9 +355,9 @@ def finalizeLogFile(lost=False): #Finish the log file and save it
         except:
             print ('Could not close log file handle for "'+i+'" because\n'+traceback.format_exc())
     #Make file name
-    if lost: targetDir = logDir+'Lost/FOUND_ON_'+getDTime('%M-%D-%Y_%h-%m-%s')+'.zip'
+    if lost: targetDir = logDir+'Lost/FOUND_ON_'+time.strftime('%Y-%m-%d_%H-%M-%S')+'.zip'
     else:
-        curTime = getDTime('%M;%D;%Y;%h;%m').split(';')
+        curTime = time.strftime('%Y;%m;%d;%H;%M').split(';')
         targetDir = logDir+('-'.join(logStartTime[0:3]))+'_'+('-'.join(logStartTime[3:]))+'__'
         if logStartTime[2] == curTime[2]: indx = 2 #Year is the same, so recording it is unneeded
         else: indx = 3
@@ -395,12 +393,12 @@ def logData(data, category): #Adds data to the specified log
     global loggedAmountIter
     try: #Grab the file handle if it's already open for faster I/O times
         lfHandle = logFileHandles[category]
-        lfHandle.write(getDTime('[%M-%D-%Y %h:%m:%s] ')+data.rstrip()+'\n')
+        lfHandle.write(time.strftime('[%Y-%m-%d %H:%M:%S] ')+data.rstrip()+'\n')
     except (ValueError, KeyError): #File handle never made or does not exist #Make sure not to catch the wrong exceptions
         if not os.path.exists(logDir+'latest/'): os.mkdir(logDir+'latest/')
         lfHandle = open(logDir+'latest/'+category+'.txt', 'a+', encoding='UTF-16')
         logFileHandles[category] = lfHandle
-        lfHandle.write(getDTime('>>[NEW HANDLE OPENED]<<\n[%M-%D-%Y %h:%m:%s] ')+data.rstrip()+'\n')
+        lfHandle.write(time.strftime('>>[NEW HANDLE OPENED]<<\n[%Y-%m-%d %H:%M:%S] ')+data.rstrip()+'\n')
         print ('Initialized log file for "'+category+'"')
     lfHandle.flush() #Flush to save the changes
     try:
@@ -1068,6 +1066,7 @@ def serverHandler(): #Does everything that is needed to start the server and saf
     finalizeLogFile()
     keyboard.unhook_all() #Unhook keyboard
 def serverLoopHandler(): #Main program that handles auto-restarting and exception catching and handling
+    global restarts
     while True:
         try:
             serverHandler()
@@ -1081,11 +1080,13 @@ def serverLoopHandler(): #Main program that handles auto-restarting and exceptio
             for i in range(3, 0, -1): #Countdown from 3 seconds
                 print ('Auto-restarting in '+str(i)+' seconds (press CTRL+C to cancel)...')
                 time.sleep(1)
+            restarts += 1
         except KeyboardInterrupt:
             print ('Auto-restart cancelled')
             print ('Auto-restarted '+str(restarts)+' times')
             break
     print ('Logged amount over '+str(restarts)+' restarts:\n'+str(loggedAmountTotal))
+    print ('NEED TO FIX RESTART COUNTER CODE ON GITHUB!')
 
 # Main
 restarts = 0
