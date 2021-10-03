@@ -1086,7 +1086,6 @@ def serverLoopHandler(): #Main program that handles auto-restarting and exceptio
             print ('Auto-restarted '+str(restarts)+' times')
             break
     print ('Logged amount over '+str(restarts)+' restarts:\n'+str(loggedAmountTotal))
-    print ('NEED TO FIX RESTART COUNTER CODE ON GITHUB!')
 
 # Main
 restarts = 0
