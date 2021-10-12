@@ -1,4 +1,4 @@
-From QOL 3.1 to release 4.0
+From QOL 3.1 to release 4.0:
 
 Additions:
 - Major:
