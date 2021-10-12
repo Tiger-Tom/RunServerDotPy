@@ -18,6 +18,7 @@ Changes:
   - ~~Cleaned up modloader function a bit~~ Completely overhauled the modloading system
   - Modding can now have custom runtimes - functions that run at certain times. Current times are firstStart, everyStart, lastStop, and everyStop
   - Help text version checker now fingerprints both the current version and the (potentially newer) online version and compares them, instead of relying on cached help version data
+  - You can now change where RunServerDotPy checks for updates (it still has to be a GitHub repository), and where it checks for and downloads new help texts (which can be any JSON file)
   - The queue.Queue for inputQueue (used for "injecting" ChatCommands synchronously from the console) has been replaced with the more efficient collections.deque
 - Minor:
   - Uptime command now shows in seconds, minutes, hours, days, and weeks format
