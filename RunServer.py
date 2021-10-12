@@ -23,7 +23,7 @@ import zipfile
 #  Etc.
 import random
 import json
-import queue
+from collections import deque
 from hashlib import md5
 
 #  Non-builtin imports
@@ -74,9 +74,14 @@ if not os.path.exists(srvrFolder+'RunServerDotPy'): os.mkdir(srvrFolder+'RunServ
 gc.enable()
 
 # Setup some values
+
+#  "makeValues" values
 sizeVals = ['bytes', 'kibibytes', 'mebibytes', 'gibibytes', 'tebibytes']
 timeVals = ['seconds', 'minutes', 'hours']
-longTimeVals = ['seconds', 'minutes', 'hours', 'days', 'weeks']
+longTimeVals = timeVals+['days', 'weeks']
+
+#  Web interface values
+webInterfaceAuth = keepWebIntAlive = lastRequestForWebInt = None
 
 # Setup profanity filter
 allowedProfaneWords = ['kill'] #Any words or phrases that should not be considered profane
@@ -110,6 +115,8 @@ def asyncRunWCallback(callbackFunc, cmd, onError=None): #Runs a system command w
 def funcWithDelay(delay, func, args=[], kwargs={}):
     time.sleep(delay)
     func(*args, **kwargs)
+def asyncTimeoutFunc(delay, func, args=[], kwargs={}):
+    threading.Thread(target=funcWithDelay, args=[delay, func]+args, kwargs=kwargs, daemon=True).start()
 
 #  String formatting & similar
 def makeValues(startValue, delimiter, values): #"values" is a list of strings (something like "second, minute, hour") in ascending order, "delimiter" is the divider (60 for "second, minute, hour"), and "startValue" is pretty obvious
@@ -121,7 +128,7 @@ def makeValues(startValue, delimiter, values): #"values" is a list of strings (s
         previousVal = nextVal
     return doneVals
 def makeValuesDiffDelimiter(startValue, delimiters, values): #"values" is a list of strings (something like "second, minute, hour", "day", "week") in ascending order, "delimiters" are the dividers ([60, 60, 24, 7] for "second, minute, hour, day, week"), and "startValue" is pretty obvious
-    if len(delimiters) != len(values)-1: raise ValueError('Amount of delimiters is incorrect than amount of values (amount of delimiters should equal amount of values-1)')
+    if len(delimiters) != len(values)-1: raise ValueError('Amount of delimiters is incorrect for amount of values (amount of delimiters should equal amount of values-1)')
     #doneVals = {values[0]: startValue}
     doneVals = {}
     delimiters.append(1)
@@ -153,6 +160,13 @@ def parseMadeValues(values, doReverse=True): #Removes values of 0, removes a tra
         for i in keys[:-1]:
             res += newVals[i]+' '+i+', '
         return res+'and '+newVals[keys[-1]]+' '+keys[-1]
+def encDec(key, val): #Simple XOR bit encryption, used for web interface
+    res = ''
+    i = 0
+    while i<len(val):
+        res += chr(ord(key[i % len(key)])^ord(val[i]))
+        i += 1
+    return res
 
 def pad0s(num, padAmount=1, padOn='left', autoRound=True): #Pads the number with the specified amount of zeroes (pad0s(1, 2) = 001 , pad0s(1, 2, 'right') = 100 (useful for decimals))
     if autoRound: num = int(num+0.5) #Thanks https://stackoverflow.com/questions/44920655/python-round-too-slow-faster-way-to-reduce-precision
@@ -198,9 +212,8 @@ def getFileFromServer(url, encoding=None):
     return r.text
 
 #  Subprocess functions
-inputQueue = queue.Queue()
+inputQueue = deque()
 def getOutput(process): #Prints all of the process' buffered STDOUT (decoded it from UTF-8) and also returns it
-    global inputQueue
     try:
         data = process.stdout.readline().decode('UTF-8', 'replace').rstrip()
         print (data)
@@ -211,14 +224,10 @@ def getOutput(process): #Prints all of the process' buffered STDOUT (decoded it 
         try:
             parseOutput(data)
         except:
-            print ('AN ERROR OCCURED WHEN PARSING!\n'+traceback.format_exc())
-    try:
-        if not inputQueue.empty(): #Inject output & automatically parse it
-            nxt = inputQueue.get(False, 1)
-            print ('{*INJECTED} "'+nxt+'"')
-            parseOutput(nxt)
-    except queue.Empty:
-        pass
+            print ('An error occured while parsing!\n'+traceback.format_exc())
+    if inputQueue: #Inject output & automatically parse it
+        nxt = inputQueue.popleft() #Get the earliest added item
+        parseOutput(nxt)
     sys.stdout.flush()
     return data
 
@@ -277,9 +286,10 @@ autoUpdate()
 
 #  Set config defaults
 if not os.path.exists(confDir): os.mkdir(confDir)
-ccRootUsr = '§server admin__'
+ccRootUsr = '§server console__'
+ccWebIUsr = '§web interface console__'
 confFiles = { #'[name].conf': '[default contents]',
-    'admins.conf': ccRootUsr,
+    'admins.conf': ccRootUsr+'\n'+ccWebIUsr,
     'motds.conf': 'Minecraft Server (Version {%VERSION})',
     'serverVersion.conf': 'Configure this in serverVersion.conf!',
     'ramInMB.conf': '1024',
@@ -319,7 +329,6 @@ def loadConfiguration():
         else: raise Exception('Unknown temperature unit "'+tempUnit+'"! Must be "c" or "f" or "k"!')
     with open(confDir+'emoticons.conf', encoding='UTF-16') as f:
         e = f.read().rstrip().split('\n')
-
         emoticons = {}
         e = e[1:]
         pageName = 'Default Page'
@@ -349,7 +358,7 @@ print ('Server MOTDs:\n'+(', '.join(motds)))
 mainCommand = 'java -jar -Xms'+str(ramMB)+'M -Xmx'+str(ramMB)+'M "'+srvrFolder+'server.jar" nogui'
 
 # Logging
-logFiles = ['Chat', 'RawChat', 'ChatCommands', 'Profanity', 'Unusual+Errors']
+logFiles = ['Chat', 'RawChat', 'ChatCommands', 'Profanity', 'Unusual+Errors', 'WebInterface']
 loggedAmountTotal = {} #Total amount of logs collected
 loggedAmountIter = {} #Amount of logs collected since last finalized log
 logFileHandles = {}
@@ -359,7 +368,7 @@ def makeLogFile(): #Setup the log file
     global logStartTime
     t = time.localtime()
     if not os.path.exists(logDir): os.mkdir(logDir) #Fix logging directory if it doesn't exist
-    logStartTime = time.strftime('%Y;%m;%d;%h;%m').split(';')
+    logStartTime = time.strftime('%Y;%m;%d;%H;%M').split(';')
 def finalizeLogFile(lost=False): #Finish the log file and save it
     global loggedAmountIter
     global logFileHandles
@@ -453,8 +462,12 @@ def safeTellRaw(text, addQuotes=True):
     if addQuotes: return '"'+text+'"'
     return text
 def tellRaw(text, frmTxt=None, to='@a'): #Runs the tellraw commands, and adds a "from" text if frmTxt is not None (with a from text would look like: <"frmTxt"> "text")
-    if (to == ccRootUsr) or (ccRootUsr in str(frmTxt)) or (ccRootUsr in text):
+    if (to == ccRootUsr) or (ccRootUsr in str(frmTxt)):
         if frmTxt != None: print (frmTxt+' > "'+text+'"')
+        else: print (' > "'+text+'"')
+        return
+    elif (to == ccWebIUsr) or (ccWebIUsr in str(frmTxt)):
+        if frmTxt != None: web_data.append(frmTxt+' > "'+text+'"')
         else: print (' > "'+text+'"')
         return
     text = text.split('\n')
@@ -468,7 +481,8 @@ def tellRaw(text, frmTxt=None, to='@a'): #Runs the tellraw commands, and adds a 
             print (' > "'+i+'" > "'+to+'"')
 
 #  Output parsing
-def parseOutput(line): #Parses the output, running subfunctions for logging and parsing chat
+def parseOutput(line): #Parses the output, running subfunctions for logging and parsing chat, as well as setting variables for web interface if it exists
+    if webInterfaceAuth != None: web_data.append(line)
     if len(line) == 0: print ('Not parsing empty line (length 0)') #In case of empty line
     elif line[0] != '[': logData(line, 'Unusual+Errors') #There is no [HH:MM:SS] in front of message, which is unusual
     elif (line[9:12] == '] [') and (line[11:].split('/')[1][:5] in {'ERROR', 'FATAL'}): logData(line, 'Unusual+Errors') #It's an error!
@@ -565,17 +579,6 @@ def loadHelp():
     with open(cacheDir+'ChatCommandsHelp.json') as f:
         chatCommandsHelp,chatCommandsHelpAdmin,chatCommandsHelpRoot = json.load(f) #Load ChatCommands help from cached JSON file
 updateHelp()
-
-#   Configuration variables
-sysInfoShown = {
-    'cpu': True,
-    'memory': True,
-    'temp': True,
-    'battery': True,
-    'diskrw': True,
-}
-if (not hasattr(psutil, 'sensors_battery')) or (psutil.sensors_battery() == None): sysInfoShown['battery'] = False #Don't show battery level, as it can't be read
-if (not hasattr(psutil, 'sensors_temperatures')) or (psutil.sensors_temperatures() == None): sysInfoShown['temp'] = False #Don't show temperature, as it can't be read
 
 #  Functions
 def parseChatCommand(user, data):
@@ -812,6 +815,15 @@ def runSudoCCommand(cmd, user):
         case ['unban' | 'pardon', target]: #Unbans the specified player (equivalent to the in-game /pardon command)
             writeCommand('pardon '+target)
             tellRaw('Pardoned '+target, user)
+        case ['webinterface']: #Starts a web interface on port 8080
+            import socket
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                if s.connect_ex(('localhost', 8080)) == 0: #Test if port 8080 is in use (which means that the web interface is already running)
+                    global webInterfaceAuthUser
+                    webInterfaceAuthUser = user
+                    tellRaw('Please connect to port 8080 in your web browser to this machine', 'WebInterface', user)
+                    threading.Thread(target=runWebInterfaceServer, daemon=True).start()
+                else: tellRaw('The web interface is already in use, sorry. Please try again later', 'WebInterface', user)
         # Catch-all
         case _:
               tellRaw('You did not type in any recognized command. Try "'+chatComPrefix+'sudo help"?', None, user)
@@ -899,6 +911,128 @@ def cc_crashPlayer(user, severity=3):
         time.sleep(i*10)
     writeCommand('kick '+user+' Timed out')
 
+# Web interface
+
+#  Threaded scripts
+
+#   Initial runscript
+def runWebInterfaceServer(port=8080):
+    global httpd, webInterfaceAuth, keepWebIntAlive, LastRequestForWebInt
+    webInterfaceAuth = keepWebIntAlive = LastRequestForWebInt = None
+    httpd = http.server.ThreadingHTTPServer((ip, port), WebInterfaceServer)
+    asyncTimeoutFunc(120, webInterfaceTimeout) #Starting timeout of 120 seconds
+    httpd.serve_forever()
+
+#   Timeouts
+def webInterfaceTimeout():
+    global keepWebIntAlive
+    while True: #Checks every 40 seconds after running if "keepWebIntAlive" is true, if it isn't then it will close the server.
+        if not keepWebIntAlive: break
+        keepWebIntAlive = False
+        time.sleep(40)
+    webInterfaceAuth = None
+    web_data.clear()
+    print ('Web interface timed out - Stopping...')
+    httpd.shutdown()
+    httpd.socket.shutdown()
+
+#  Main class
+class WebInterfaceServer(http.server.BaseHTTPRequestHandler):
+    def do_GET(self): #Overwrite what happens when the client sends a GET request
+        global webInterfaceAuth, LastRequestForWebInt, keepWebIntAlive
+        if LastRequestForWebInt == None: LastRequestForWebInt = time.time()
+        elif time.time() < LastRequestForWebInt+0.1: #Rate limiting
+            self.send_response(429) #Response: 429 Too Many Requests
+            self.end_headers()
+            LastRequestForWebInt = time.time()
+            return
+        LastRequestForWebInt = time.time()
+        logData(time.strftime('[%Y-%m-%d %H:%M:%S]')+' <GET> '+str(self.client_address)+' -> '+self.path, 'WebInterface')
+        keepWebIntAlive = True #Keep the server alive every time a GET request is recieved
+        if (webInterfaceAuth != None) and (webInterfaceAuth[1] != self.client_address[0]):
+            self.send_response(409) #Response: 409 Conflict
+            self.end_headers()
+            self.wfile.write('Error 409: Conflict\nThis interface is currently reserved for another IP address. Please try again later')
+            return
+        if self.path == '/': #Root/main directory, send HTML
+            self.send_response(200) #Response: 200 OK
+            self.send_header('Content-type', 'text/html') #HTML text
+            self.end_headers()
+            self.wfile.write(b'<script>window.onload=function(){fetch(\'https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/WebServer/WebServer.html\').then(r=>r.text()).then(function(d){document.open(\'text/html\', \'replace\').write(d)})}</script>') #Fetch and write HTML text
+        else: #Otherwise, use match..case
+            match self.path.removeprefix('/').split('/'): #Match with the path, split by /, with the first / removed as it is unneeded
+                case ['_data']:
+                    if webInterfaceAuth != None:
+                        self.send_response(200) #Response: 200 OK
+                        self.send_header('Content-type', 'text/plain')
+                        self.end_headers()
+                        self.wfile.write(bytes(encDec(webInterfaceAuth[0], str(list(web_data))), 'UTF-8'))
+                        web_data.clear()
+                    else: #If it is not authenticated
+                        self.send_response(401) #Response: 401 Unauthorized
+                        self.end_headers()
+                case ['_auth', 'init']: #Initialize authentication
+                    if webInterfaceAuth == None:
+                        webInterfaceAuth = (('%030x' % random.randrange(16**30)), self.client_address[0]) #Generate 30 random hexadecimal bits as password
+                        writeCommand('tellraw '+webInterfaceAuthUser+' ["Your password it:\n",{"text":"'+webInterfaceAuth[0]+'","bold":true,"clickEvent":{"action":"copy_to_clipboard","value":"'+webInterfaceAuth[0]+'"},"hoverEvent":{"action":"show_text","contents":["Click to copy to clipboard"]}}]')
+                        self.send_response(200) #Response: 200 OK
+                        self.end_headers()
+                    else:
+                        self.send_response(409) #Response: 409 Conflict
+                        self.end_headers()
+                case ['_auth', 'test']: #Test authentication
+                    if webInterfaceAuth != None:
+                        self.send_response(200) #Response: 200 OK
+                        self.send_header('Content-type', 'text/plain')
+                        self.end_headers()
+                        self.wfile.write(bytes(encDec(webInterfaceAuth[0][::-1], webInterfaceAuth[0]), 'UTF-8'))
+                    else: #If it is not authenticated
+                        self.send_response(401) #Response: 401 Unauthorized
+                        self.end_headers()
+                case _: #Path is unknown, send 404 File not Found
+                    self.send_response(404) #Response: 404 Not found
+                    self.end_headers()
+    def do_POST(self):
+        global webInterfaceAuth, LastRequestForWebInt, keepWebIntAlive
+        if LastRequestForWebInt == None: LastRequestForWebInt = time.time()
+        elif time.time() < LastRequestForWebInt+0.01: #Rate limiting
+            self.send_response(429) #Response: 429 Too Many Requests
+            self.end_headers()
+            LastRequestForWebInt = time.time()
+            return
+        logData(time.strftime('[%Y-%m-%d %H:%M:%S]')+' <GET> '+str(self.client_address)+' -> '+self.path, 'WebInterface')
+        if int(self.headers['Content-Length']) > 500: #If the data/content/"Payload" is too big (more than 500 chars)
+            self.send_response(413) #Response: 413 Payload Too Large
+            self.end_headers()
+            return
+        data = self.rfile.read(int(self.headers['Content-Length'])).decode('UTF-8')
+        if self.path == '/_send/cmd':
+            data = encDec(webInterfaceAuth[0], data)
+            if data:
+                if not data.startswith(chatComPrefix): data = chatComPrefix+data
+                if data.startswith(chatComPrefix+'root'): self.send_response(403) #Response: 403 Forbidden
+                else:
+                    self.send_response(200) #Response: 200 OK
+                    inputQueue.append('[##:##:##] [Server thread/INFO]: <'+ccWebIUsr+'> '+data)
+                self.end_headers()
+            else: self.send_response(400) #Response: 400 Bad Request
+            self.end_headers()
+        elif self.path == '/_send/end':
+            if (webInterfaceAuth != None) and (encDec(webInterfaceAuth[0], data) == 'end'):
+                webInterfaceAuth = None
+                self.send_response(200) #Response: 200 OK
+                self.end_headers()
+                self.server.shutdown()
+                self.server.socket.close()
+                web_data.clear()
+            else:
+                self.send_response(401) #Response: 401 Unauthorized
+                self.end_headers()
+        else:
+            self.send_response(404) #Response: 404 Not Found
+            self.end_headers()
+    def log_message(self, format, *args): return #Silence logging messages
+
 # Minecraft server handling
 def startServer():
     global process #Main server process
@@ -911,7 +1045,7 @@ def enterKeyPressed(key):
     try:
         line = sys.stdin.readline().rstrip() # Read a single line from sys.stdin
         if line.startswith(chatComPrefix): #It is a ChatCommand, so place it in inputQueue to be "injected" into output to prevent desync
-            inputQueue.put('[##:##:##] [Server thread/INFO]: <'+ccRootUsr+'> '+line, False) #A queue to be ran by the "getOutput" command to synchronously perform ChatCommands from the server console
+            inputQueue.append('[##:##:##] [Server thread/INFO]: <'+ccRootUsr+'> '+line) #A queue to be ran by the "getOutput" command to synchronously perform ChatCommands from the server console
             writeCommand('') #Write this here to trigger the getOutput function to run
         else: #Otherwise pass it to the server console as normal, as the Minecraft server is asynchronous anyways
             print ('> '+line)
