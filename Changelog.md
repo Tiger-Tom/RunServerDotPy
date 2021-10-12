@@ -44,6 +44,7 @@ Bugfixes:
   - Fixed a bug which would cause the "sysinfo" command to still check for battery(when it still existed)/temperature, even if these don't actually exist, therefore causing an exception
   - Fixed an issue where an exception would be displayed in console if ";sudo" or ";root" was entered without any commands
   - Fixed an issue where some outputs of the sysinfo command were being broadcast to all user and some weren't. Now all of them just go to the target user
+  - Fixed a bug with the (semi)automatic EULA agree-er
 
 - Typo/misspelling:
   - Fixed a misspelling that caused a log's start time to be "Y%" instead of STRFTimed "%Y"
