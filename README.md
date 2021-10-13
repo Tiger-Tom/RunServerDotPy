@@ -26,6 +26,8 @@ This script has the following features (besides interfacing with the Minecraft s
 >
 >- Ability to reload the configuration at any given time (done using the builtin ChatCommands, although his one can only be run by an admin)
 >
+>- A web interface that uses encryption (the password is given to the user in-game, so that only they can decrypt the data) to send ChatCommands (up to admin/sudo level) and view the server's output as if you were at the console
+>
 >- And more!
 
 _Fun fact: the original RunServer.py script that I made was around 825 lines, and my goal for the new version (this one) was to make it more efficient, but I still ended up with more lines (hopefully the extra lines are just because of better commenting, better spacing, and more features being added)_
