@@ -8,16 +8,9 @@
 # Imports
 
 #  System
-import os
-import sys
-import subprocess
-import gc
-import traceback
+import os, sys, subprocess, platform
+import gc, traceback
 import threading
-import platform
-
-#  Network
-import requests
 
 #  Numbers
 import time
@@ -30,23 +23,32 @@ import zipfile
 #  Etc.
 import random
 import json
-import queue
+import http.server
+from collections import deque
+from hashlib import md5
 
 #  Non-builtin imports
 try:
     import keyboard #For the keyboard "hook", to detect enter key presses
     import psutil #Will be used to close all trailing file handles, as well as getting some system informatino
     from better_profanity import profanity #For censoring and detecting profanity in chat
+    import requests #For network/web requests to download files & data
 except ModuleNotFoundError: #Means that we have to try to install the modules
     if input('Warning: some required modules were not found. Attempt to install? (Y/n) >').lower() == 'n': exit()
-    modulesToInstall = 'keyboard psutil better_profanity pyspectator'
-    print ('Installing...\npip3 -q install '+modulesToInstall)
+    modulesToInstall = 'keyboard psutil better_profanity requests'
+    print ('Installing...\n'+sys.executable+' -m pip install '+modulesToInstall)
     os.system('pip3 -q install '+modulesToInstall) #Install the modules (-q means quiet, to prevent a lot of spam in a console)
     del modulesToInstall # Free up memory, we will be seeing a lot of this
     #Try to import modules again
     import keyboard
     import psutil
     from better_profanity import profanity
+    import requests
+
+# Enforce minimum Python version
+minVer = [3, 10] #[major, minor]
+if (sys.version_info.major < minVer[0]) or ((sys.version_info.major == minVer[0]) and (sys.version_info.minor < minVer[1])):
+    print ('This version is not supported!')
 
 #  Check if speedtest-cli is installed, and install it if it isn't
 if os.system('speedtest-cli --version'): #Return code is not 0
@@ -73,12 +75,18 @@ if not os.path.exists(srvrFolder+'RunServerDotPy'): os.mkdir(srvrFolder+'RunServ
 gc.enable()
 
 # Setup some values
+
+#  "makeValues" values
 sizeVals = ['bytes', 'kibibytes', 'mebibytes', 'gibibytes', 'tebibytes']
 timeVals = ['seconds', 'minutes', 'hours']
+longTimeVals = timeVals+['days', 'weeks']
+
+#  Web interface values
+webInterfaceAuth = keepWebIntAlive = lastRequestForWebInt = None
 
 # Setup profanity filter
 allowedProfaneWords = ['kill'] #Any words or phrases that should not be considered profane
-allowedModifyWords = ['or41'] #Any words or phrases that may be a variation of a profane word, but should actually be allowed, as they are outputted in console
+allowedModifyWords = [] #Any words or phrases that may be a variation of a profane word, but should actually be allowed, as they are outputted in console
 profanity.load_censor_words(whitelist_words=allowedProfaneWords) #whitelist_words - Whitelist some words ("kill" shows up in game, for instance, but is not a swear)
 for i in allowedModifyWords:
     if i in profanity.CENSOR_WORDSET: del profanity.CENSOR_WORDSET[profanity.CENSOR_WORDSET.index(i)]
@@ -96,15 +104,20 @@ def runWFullOutput(cmd, callbackFunc, callbackFuncXtraArgs=[]): #Runs a system c
         out = proc.stdout.readline().decode('UTF-8', 'replace')
         if not len(out): break #If there is no output
         callbackFunc(out.lstrip().rstrip(), *callbackFuncXtraArgs)
-def runWCallback(callbackFunc, cmd): #Runs a system command and waits for it to finish, and then runs "callbackFunc" with the output as an argument
-    callbackFunc(runWOutput(cmd))
-def asyncRunWCallback(callbackFunc, cmd): #Runs a system command with a callback, but asynchronously
-    threading.Thread(target=runWCallback, args=(callbackFunc,cmd), daemon=True).start()
+def runWCallback(callbackFunc, cmd, onError=None): #Runs a system command and waits for it to finish, and then runs "callbackFunc" with the output as an argument
+    try:
+        callbackFunc(runWOutput(cmd))
+    except:
+        if onError != None: onError(callbackFunc, cmd)
+def asyncRunWCallback(callbackFunc, cmd, onError=None): #Runs a system command with a callback, but asynchronously
+    threading.Thread(target=runWCallback, args=(callbackFunc,cmd,onError), daemon=True).start()
 
 #  Function functions
 def funcWithDelay(delay, func, args=[], kwargs={}):
     time.sleep(delay)
     func(*args, **kwargs)
+def asyncTimeoutFunc(delay, func, args=[], kwargs={}):
+    threading.Thread(target=funcWithDelay, args=[delay, func]+args, kwargs=kwargs, daemon=True).start()
 
 #  String formatting & similar
 def makeValues(startValue, delimiter, values): #"values" is a list of strings (something like "second, minute, hour") in ascending order, "delimiter" is the divider (60 for "second, minute, hour"), and "startValue" is pretty obvious
@@ -114,6 +127,19 @@ def makeValues(startValue, delimiter, values): #"values" is a list of strings (s
         nextVal = math.floor(previousVal/delimiter)
         doneVals[values[i]] = previousVal-(nextVal*delimiter)
         previousVal = nextVal
+    return doneVals
+def makeValuesDiffDelimiter(startValue, delimiters, values): #"values" is a list of strings (something like "second, minute, hour", "day", "week") in ascending order, "delimiters" are the dividers ([60, 60, 24, 7] for "second, minute, hour, day, week"), and "startValue" is pretty obvious
+    if len(delimiters) != len(values)-1: raise ValueError('Amount of delimiters is incorrect for amount of values (amount of delimiters should equal amount of values-1)')
+    #doneVals = {values[0]: startValue}
+    doneVals = {}
+    delimiters.append(1)
+    previousVal = round(startValue)
+    for i in range(len(values)-1):
+        nextVal = math.floor(previousVal/delimiters[i])
+        doneVals[values[i]] = previousVal-(nextVal*delimiters[i])
+        previousVal = nextVal
+    #if previousVal != 0:
+    doneVals[values[-1]] = previousVal
     return doneVals
 def parseMadeValues(values, doReverse=True): #Removes values of 0, removes a trailing "s" if the corresponsing value is 1, adds commas and "and"s where appropriate, etc.
     newVals = {}
@@ -135,6 +161,14 @@ def parseMadeValues(values, doReverse=True): #Removes values of 0, removes a tra
         for i in keys[:-1]:
             res += newVals[i]+' '+i+', '
         return res+'and '+newVals[keys[-1]]+' '+keys[-1]
+def encDec(key, val): #Simple XOR bit encryption, used for web interface
+    res = ''
+    i = 0
+    while i<len(val):
+        res += chr(ord(key[i % len(key)])^ord(val[i]))
+        i += 1
+    return res
+
 def pad0s(num, padAmount=1, padOn='left', autoRound=True): #Pads the number with the specified amount of zeroes (pad0s(1, 2) = 001 , pad0s(1, 2, 'right') = 100 (useful for decimals))
     if autoRound: num = int(num+0.5) #Thanks https://stackoverflow.com/questions/44920655/python-round-too-slow-faster-way-to-reduce-precision
     if num == 0: return '0'*(padAmount+1)
@@ -179,9 +213,8 @@ def getFileFromServer(url, encoding=None):
     return r.text
 
 #  Subprocess functions
-inputQueue = queue.Queue()
+inputQueue = deque()
 def getOutput(process): #Prints all of the process' buffered STDOUT (decoded it from UTF-8) and also returns it
-    global inputQueue
     try:
         data = process.stdout.readline().decode('UTF-8', 'replace').rstrip()
         print (data)
@@ -192,14 +225,10 @@ def getOutput(process): #Prints all of the process' buffered STDOUT (decoded it 
         try:
             parseOutput(data)
         except:
-            print ('AN ERROR OCCURED WHEN PARSING!\n'+traceback.format_exc())
-    try:
-        if not inputQueue.empty(): #Inject output & automatically parse it
-            nxt = inputQueue.get(False, 1)
-            print ('{*INJECTED} "'+nxt+'"')
-            parseOutput(nxt)
-    except queue.Empty:
-        pass
+            print ('An error occured while parsing!\n'+traceback.format_exc())
+    if inputQueue: #Inject output & automatically parse it
+        nxt = inputQueue.popleft() #Get the earliest added item
+        parseOutput(nxt)
     sys.stdout.flush()
     return data
 
@@ -209,11 +238,86 @@ if os.name != 'nt': bashUser = runWOutput('logname').rstrip()
 # Fix cache dir (if missing)
 if not os.path.exists(cacheDir): os.mkdir(cacheDir)
 
+# Configuration
+
+#  Set config defaults
+if not os.path.exists(confDir): os.mkdir(confDir)
+ccRootUsr = '§server console__'
+ccWebIUsr = '§web interface console__'
+confFiles = { #'[name].conf': '[default contents]',
+    'admins.conf': ccRootUsr+'\n'+ccWebIUsr,
+    'motds.conf': 'Minecraft Server (Version {%VERSION})',
+    'serverVersion.conf': 'Configure this in serverVersion.conf!',
+    'ramInMB.conf': '1024',
+    'chatCommandPrefix.conf': ';',
+    'tempUnit.conf': 'c',
+    'emoticons.conf': 'https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/DefaultConfig/emoticons.conf',
+    'userJoinMSG.conf': 'https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/DefaultConfig/userJoinMSG.conf',
+    'downloadMirrors.conf': 'https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/DefaultConfig/downloadMirrors.conf',
+}
+for i in confFiles:
+    if not os.path.exists(confDir+i):
+        with open(confDir+i, 'w', encoding='UTF-16') as cf:
+            if (confFiles[i].startswith('https://')) or (confFiles[i].startswith('http://')):
+                r = requests.get(confFiles[i])
+                cf.write(r.text)
+                r.close()
+            else: cf.write(confFiles[i]) #Write defaults if missing
+        
+#  Read configs
+def loadConfiguration():
+    print ('Loading configuration...')
+    global admins, srvrVersionTxt, motds, ramMB, chatComPrefix, tempUnit, emoticons, userJoinMSG, downloadMirrors
+    with open(confDir+'admins.conf', encoding='UTF-16') as f:
+        admins = set(f.read().split('\n')) #Usernames of server administrators, who can run "sudo" commands (in a set, since it is faster because sets are unindexed and unordered)
+    with open(confDir+'serverVersion.conf', encoding='UTF-16') as f:
+        srvrVersionTxt = f.read().rstrip()
+    with open(confDir+'motds.conf', encoding='UTF-16') as f:
+        motds = f.read().rstrip().replace('{%VERSION}', srvrVersionTxt).split('\n') #List of MOTDs (single line only, changes every server restart)
+    with open(confDir+'ramInMB.conf', encoding='UTF-16') as f:
+        ramMB = int(f.read().rstrip())
+    with open(confDir+'chatCommandPrefix.conf', encoding='UTF-16') as f: #Prefix used for ChatCommands (; by default)
+        chatComPrefix = f.read().rstrip()
+    with open(confDir+'tempUnit.conf', encoding='UTF-16') as f: #Temperature unit used. C for Celsius (default), F for Fahrenheit, K for kelvin
+        tempUnit = f.read().lower()
+        if tempUnit.startswith('c'): tempUnit = [0, '°C']
+        elif tempUnit.startswith('f'): tempUnit = [1, '°F']
+        elif tempUnit.startswith('k'): tempUnit = [1, 'K']
+        else: raise Exception('Unknown temperature unit "'+tempUnit+'"! Must be "c" or "f" or "k"!')
+    with open(confDir+'emoticons.conf', encoding='UTF-16') as f: #Emoticons for "emoticons" command
+        e = f.read().rstrip().split('\n')
+        emoticons = {}
+        e = e[1:]
+        pageName = 'Default Page'
+        for i in e:
+            if (len(i) == 0) or i.startswith('#'): pass
+            elif i.startswith('%'):
+                pageName = i[1:].lower()
+                emoticons[pageName] = [i[1:]]
+            elif i.startswith('&'): emoticons[pageName].append(tuple(i)[1:])
+            else: emoticons[pageName].append(i)
+    with open(confDir+'userJoinMSG.conf', encoding='UTF-16') as f: #User join message (used in the "/tellraw" command that greets new users, should be in JSON)
+        userJoinMSG = f.read()
+    with open(confDir+'downloadMirrors.conf', encoding='UTF-16') as f: #URLs to download main updates and help text updates from
+        downloadMirrors = json.load(f)
+    print ('Configuration loaded')
+loadConfiguration()
+
+#  Load icons
+#(icons change every server restart, and must be 64*64 pixel PNGs. They can be named anything)
+if not os.path.exists(iconsDir): os.mkdir(iconsDir) #Fix if missing
+serverIcons = []
+for i,j,k in os.walk(iconsDir): #Find all *.png's in the icon directory
+    for l in k:
+        if l.endswith('.png'): serverIcons.append(i+l)
+        else: print ('Warning: a non-png file is in the icons directory:\n'+i+l)
+print ('Server MOTDs:\n'+(', '.join(motds)))
+
 # Auto-update
 def getVersion():
-    if not os.path.exists(cacheDir+'version.txt'): currentID = -1.0
+    if not os.path.exists(cacheDir+'Version.txt'): currentID = -1.0
     else:
-        with open(cacheDir+'version.txt') as f:
+        with open(cacheDir+'Version.txt') as f:
             try:
                 currentID = float(f.read().rstrip())
             except:
@@ -221,7 +325,7 @@ def getVersion():
     return currentID
 def autoUpdate():
     print ('Checking for a new release...')
-    latestRelease = json.loads(getFileFromServer('https://api.github.com/repos/Tiger-Tom/RunServerDotPy/releases/latest'))
+    latestRelease = json.loads(getFileFromServer(downloadMirrors['main']))
     latestID = float(latestRelease['tag_name'].replace('v', ''))
     currentID = getVersion()
     print ('Current release: '+str(currentID))
@@ -242,7 +346,7 @@ def autoUpdate():
                 f.write(i.decode('UTF-8')+'\n')
     print ('Update written')
     print ('Writing version tag...')
-    with open(cacheDir+'version.txt', 'w') as f:
+    with open(cacheDir+'Version.txt', 'w') as f:
         f.write(str(latestID))
     print ('Closing self to open new version...')
     try:
@@ -254,83 +358,11 @@ def autoUpdate():
     os.execl(sys.executable, sys.executable, *sys.argv)
 autoUpdate()
 
-# Configuration
-
-#  Set config defaults
-if not os.path.exists(confDir): os.mkdir(confDir)
-ccRootUsr = '§server admin__'
-confFiles = { #'[name].conf': '[default contents]',
-    'admins.conf': ccRootUsr,
-    'motds.conf': 'Minecraft Server (Version {%VERSION})',
-    'serverVersion.conf': 'Configure this in serverVersion.conf!',
-    'ramInMB.conf': '1024',
-    'chatCommandPrefix.conf': ';',
-    'tempUnit.conf': 'c',
-    'emoticons.conf': 'https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/DefaultConfig/emoticons.conf',
-    'userJoinMSG.conf': 'https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/DefaultConfig/userJoinMSG.conf',
-}
-for i in confFiles:
-    if not os.path.exists(confDir+i):
-        with open(confDir+i, 'w', encoding='UTF-16') as cf:
-            if (confFiles[i].startswith('https://')) or (confFiles[i].startswith('http://')):
-                r = requests.get(confFiles[i])
-                cf.write(r.text)
-                r.close()
-            else: cf.write(confFiles[i]) #Write defaults if missing
-        
-#  Read configs
-def loadConfiguration():
-    print ('Loading configuration...')
-    global admins, srvrVersionTxt, motds, ramMB, chatComPrefix, tempUnit, emoticons, userJoinMSG
-    with open(confDir+'admins.conf', encoding='UTF-16') as f:
-        admins = set(f.read().split('\n')) #Usernames of server administrators, who can run "sudo" commands (in a set, since it is faster because sets are unindexed and unordered)
-    with open(confDir+'serverVersion.conf', encoding='UTF-16') as f:
-        srvrVersionTxt = f.read().rstrip()
-    with open(confDir+'motds.conf', encoding='UTF-16') as f:
-        motds = f.read().rstrip().replace('{%VERSION}', srvrVersionTxt).split('\n') #List of MOTDs (single line only, changes every server restart)
-    with open(confDir+'ramInMB.conf', encoding='UTF-16') as f:
-        ramMB = int(f.read().rstrip())
-    with open(confDir+'chatCommandPrefix.conf', encoding='UTF-16') as f:
-        chatComPrefix = f.read().rstrip()
-    with open(confDir+'tempUnit.conf', encoding='UTF-16') as f:
-        tempUnit = f.read().lower()
-        if tempUnit.startswith('c'): tempUnit = [0, '°C']
-        elif tempUnit.startswith('f'): tempUnit = [1, '°F']
-        elif tempUnit.startswith('k'): tempUnit = [1, 'K']
-        else: raise Exception('Unknown temperature unit "'+tempUnit+'"! Must be "c" or "f" or "k"!')
-    with open(confDir+'emoticons.conf', encoding='UTF-16') as f:
-        e = f.read().rstrip().split('\n')
-
-        emoticons = {}
-        e = e[1:]
-        pageName = 'Default Page'
-        for i in e:
-            if (len(i) == 0) or i.startswith('#'): pass
-            elif i.startswith('%'):
-                pageName = i[1:].lower()
-                emoticons[pageName] = [i[1:]]
-            elif i.startswith('&'): emoticons[pageName].append(tuple(i)[1:])
-            else: emoticons[pageName].append(i)
-    with open(confDir+'userJoinMSG.conf', encoding='UTF-16') as f:
-        userJoinMSG = f.read()
-    print ('Configuration loaded')
-loadConfiguration()
-
-#  Load icons
-#(icons change every server restart, and must be 64*64 pixel PNGs. They can be named anything)
-if not os.path.exists(iconsDir): os.mkdir(iconsDir) #Fix if missing
-serverIcons = []
-for i,j,k in os.walk(iconsDir): #Find all *.png's in the icon directory
-    for l in k:
-        if l.endswith('.png'): serverIcons.append(i+l)
-        else: print ('Warning: a non-png file is in the icons directory:\n'+i+l)
-print ('Server MOTDs:\n'+(', '.join(motds)))
-
 # Command generation
 mainCommand = 'java -jar -Xms'+str(ramMB)+'M -Xmx'+str(ramMB)+'M "'+srvrFolder+'server.jar" nogui'
 
 # Logging
-logFiles = ['Chat', 'RawChat', 'ChatCommands', 'Profanity', 'Unusual+Errors']
+logFiles = ['Chat', 'RawChat', 'ChatCommands', 'Profanity', 'Unusual+Errors', 'WebInterface']
 loggedAmountTotal = {} #Total amount of logs collected
 loggedAmountIter = {} #Amount of logs collected since last finalized log
 logFileHandles = {}
@@ -340,7 +372,7 @@ def makeLogFile(): #Setup the log file
     global logStartTime
     t = time.localtime()
     if not os.path.exists(logDir): os.mkdir(logDir) #Fix logging directory if it doesn't exist
-    logStartTime = time.strftime('Y%;%m;%d;%h;%m').split(';')
+    logStartTime = time.strftime('%Y;%m;%d;%H;%M').split(';')
 def finalizeLogFile(lost=False): #Finish the log file and save it
     global loggedAmountIter
     global logFileHandles
@@ -428,10 +460,18 @@ def writeCommand(cmd): #Writes "cmd" to the process' STDIN and adds '\n' to make
     except NameError: #If no process exists
         print ('Cannot write command, as process has been stopped')
 #   Tellraw
-def safeTellRaw(text): return json.dumps(text.rstrip()) #Formats a string to be safe for use in a tellraw command
+def safeTellRaw(text, addQuotes=True):
+    #return json.dumps(text.rstrip()) #Formats a string to be safe for use in a tellraw command
+    text = text.replace('\\', '\\\\').replace('"', '\\"').replace('\'', '\\\'')
+    if addQuotes: return '"'+text+'"'
+    return text
 def tellRaw(text, frmTxt=None, to='@a'): #Runs the tellraw commands, and adds a "from" text if frmTxt is not None (with a from text would look like: <"frmTxt"> "text")
-    if (to == ccRootUsr) or (ccRootUsr in str(frmTxt)) or (ccRootUsr in text):
+    if (to == ccRootUsr) or (ccRootUsr in str(frmTxt)):
         if frmTxt != None: print (frmTxt+' > "'+text+'"')
+        else: print (' > "'+text+'"')
+        return
+    elif (to == ccWebIUsr) or (ccWebIUsr in str(frmTxt)):
+        if frmTxt != None: web_data.append(frmTxt+' > "'+text+'"')
         else: print (' > "'+text+'"')
         return
     text = text.split('\n')
@@ -445,8 +485,9 @@ def tellRaw(text, frmTxt=None, to='@a'): #Runs the tellraw commands, and adds a 
             print (' > "'+i+'" > "'+to+'"')
 
 #  Output parsing
-def parseOutput(line): #Parses the output, running subfunctions for logging and parsing chat
-    if len(line) == 0: print ('Not parsing empty line (length 0)') #In case of empty line
+def parseOutput(line): #Parses the output, running subfunctions for logging and parsing chat, as well as setting variables for web interface if it exists
+    if webInterfaceAuth != None: web_data.append(line)
+    if not line: print ('Not parsing empty line (length 0)') #In case of empty line
     elif line[0] != '[': logData(line, 'Unusual+Errors') #There is no [HH:MM:SS] in front of message, which is unusual
     elif (line[9:12] == '] [') and (line[11:].split('/')[1][:5] in {'ERROR', 'FATAL'}): logData(line, 'Unusual+Errors') #It's an error!
     elif (line[9:12] == '] [') and (line[33:42] == '<--[HERE]'): return #Blank command written, ignore
@@ -458,7 +499,7 @@ def parseOutput(line): #Parses the output, running subfunctions for logging and 
                 logData('"'+chatL[1]+'" said "'+chatL[2]+'"', 'Chat') #Save formatted chat to chat log: "[User]" said "[Message]"
                 if chatL[2].startswith(chatComPrefix): #If it is a ChatCommand
                     logData('"'+chatL[1]+'" tried to run "'+chatL[2]+'"', 'ChatCommands')
-                    parseChatCommand(chatL[1], chatL[2])
+                    parseChatCommand(chatL[1], chatL[2][1:])
             elif chatL[0] == 2: logData('"'+chatL[1]+'" /me\'d "'+chatL[2]+'"', 'Chat') #Is a /me message, save it in the chat log formatted like: "[User]" /me'd "[Message]"
             elif (chatL[0] == 3) and (not chatL[1] == 'Server'): logData('"'+chatL[1]+'" /said "'+chatL[2]+'"', 'Chat') #Is a /say message, save it in the chat log formatted like: "[User]" /said "[Message]"
         if profanity.contains_profanity(chatL[1]): #Chat message potentially contains profanity, warn user and log it
@@ -484,8 +525,8 @@ def parseOutput(line): #Parses the output, running subfunctions for logging and 
     #0         1         2         3         4         5         6
     #0123456789012345678901234567890123456789012345678901234567890
     #[16:00:26] [Server thread/INFO]: [TigerTom: Added tag 'test' to TigerTom]
-    elif (line[9:33] == '] [Server thread/INFO]: ') and (line[33] == '[') and ('Added tag \'_rs.py_chatCommand_flag.' in line[34:].split(']')[0]):
-        cc_parseTagFlag(line.split('\'_rs.py_chatCommand_flag.')[1].split('\'')[0], line[34:].split(' ')[0][:-1])
+    #elif (line[9:33] == '] [Server thread/INFO]: ') and (line[33] == '[') and ('Added tag \'_rs.py_chatCommand_flag.' in line[34:].split(']')[0]):
+    #    cc_parseTagFlag(line.split('\'_rs.py_chatCommand_flag.')[1].split('\'')[0], line[34:].split(' ')[0][:-1])
 def parseChat(line): #Get the chat / /me / /say message and username out of a console line
     #Returns ["0 if not chat, 1 if chat, 2 if /me, 3 if /say", "username (if present)", "message (if present)"]
     #+10:             1         2         3
@@ -520,102 +561,331 @@ chatCommandsLastUsed = {}
 
 #   Help variables (help text keys in-game will be organized by the order by they are defined)
 def updateHelp():
+    newHelp = getFileFromServer(downloadMirrors['help'])
+    if os.path.exists(cacheDir+'ChatCommandsHelp.json'): #Compare current help fingerprint with newest help version fingerprint if the current file exists
+        print ('Comparing fingerprint of current version and downloaded version...')
+        with open(cacheDir+'ChatCommandsHelp.json') as f:
+            oldHash = md5(f.read().encode()).hexdigest()
+        newHash = md5(newHelp.encode()).hexdigest()
+        print (oldHash+'\n'+newHash)
+        if oldHash == newHash:
+            print ('Fingerprints match, no update necessary')
+            loadHelp()
+            return
+        else: print ('Fingerprints do not match. An update is necessary')
+    else: print ('Help file does not exist. An update is necessary')
+    with open(cacheDir+'ChatCommandsHelp.json', 'w') as f:
+        f.write(newHelp)
+    print ('Help updated')
+    loadHelp()
+def loadHelp():
     global chatCommandsHelp,chatCommandsHelpAdmin,chatCommandsHelpRoot
-    rewriteHelp = False
-    if not os.path.exists(cacheDir+'help/'): os.mkdir(cacheDir+'help/') #Create help cache directory if it doesn't exist
-    if not os.path.exists(cacheDir+'help/version.txt'): #Create help version file if it doesn't exist
-        with open(cacheDir+'help/version.txt', 'w') as f:
-            rewriteHelp = True
-    if not rewriteHelp: #Compare current help version with newest help version
-        with open(cacheDir+'help/version.txt') as f:
-            newVer = getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/Version').rstrip().split('/')
-            curVer = f.read().rstrip().split('/')[1]
-            print ('Current help version: '+str(getVersion())+'/'+str(curVer)+'\nNewest help version: '+('/'.join(newVer)))
-            if getVersion() < float(newVer[0]):
-                rewriteHelp = False
-                print ('Did not update help file, as current program version is outdated anyways')
-            elif float(curVer) < float(newVer[1]):
-                rewriteHelp = True
-                print ('Help file needs updating, current version is out of date')
-    if rewriteHelp: #Update cached help JSON to latest version
-        with open(cacheDir+'help/ChatCommandsHelp.json', 'w') as f:
-            f.write(getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/ChatCommandsHelp.json'))
-        with open(cacheDir+'help/version.txt', 'w') as f:
-            f.write(getFileFromServer('https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/Help/Version'))
-    with open(cacheDir+'help/ChatCommandsHelp.json') as f:
+    with open(cacheDir+'ChatCommandsHelp.json') as f:
         chatCommandsHelp,chatCommandsHelpAdmin,chatCommandsHelpRoot = json.load(f) #Load ChatCommands help from cached JSON file
 updateHelp()
 
-#    Remove unusable help strings
-if os.name == 'nt': del chatCommandsHelpAdmin['update | upgrade {dist,clean}'] #The necessary commands to update/upgrade are not on Windows, so delete the help string
-
-#   Configuration variables
-sysInfoShown = {
-    'cpu': True,
-    'memory': True,
-    'temp': True,
-    'battery': True,
-    'diskrw': True,
-}
-if not hasattr(psutil, 'sensors_battery'): sysInfoShown['battery'] = False #Don't show battery level, as it can't be read
-if not hasattr(psutil, 'sensors_temperatures'): sysInfoShown['temp'] = False #Don't show temperature, as it can't be read
-
 #  Functions
 def parseChatCommand(user, data):
-    data = data.split(' ')
-    cmd = data[0][1:].lower()
-    args = data[1:]
-    if cmd in {'root', 'sudo'}: #The command is not a normal-level command (a {} is a set, which saves time for something like this because it is unordered and unindexed)
-        print (user+' is trying to run '+cmd+'-level ChatCommand "'+args[0]+'" with '+str(len(args[1:]))+' arguments')
-        comm = args[0].lower()
-        args = args[1:]
-        if cmd == 'root': #The command is a root-level command (only server console can run)
-            if user == ccRootUsr: #User has permissions, run command
-                print ('Root access granted, '+user)
-                runRootChatCommand(comm, args)
-            else: #User does not have permissions, kick them from the server
-                tellRaw('Root access denied, '+user+'. You do not have access level "root"!', 'Firewall')
-                writeCommand('kick '+user+' Root access denied, '+user+'. You do not have access level "root"!')
-        else: #Administrator command, 
-            if user in admins:
-                tellRaw('SuperUser access granted, '+user, 'Firewall')
-                runAdminChatCommand(comm, args, user)
+    data = data.split()
+    chatCommandsLastUsed.setdefault(user, 0)
+    if (not user in admins) and (time.monotonic()-chatCommandsLastUsed[user] < 1): writeCommand('kick '+user+' SpamProtection: Please wait 1 second between ChatCommands')
+    else: runUserCCommand(data, user)
+    if not user in admins: chatCommandsLastUsed[user] = time.monotonic() #User is not an admin, so reset their timer
+
+
+#   Load ChatCommand mods
+def loadMods():
+    global chatCommandsHelp,chatCommandsHelpAdmin,chatCommandsHelpRoot,modsRegular,modsAdmin,modsRoot,customRuntimes
+    modsRegular = {}
+    modsAdmin = {}
+    modsRoot = {}
+    customRuntimes = {'firstStart': [], 'everyStart': [], 'lastStop': [], 'everyStop': []}
+    loadedMods = []
+    if not os.path.exists(modDir): #Check if the mod directory exists and create it if it doesn't
+        print ('Mods dir doesn\'t exist, creating one now...')
+        os.mkdir(modDir)
+    modFiles = [f for f in os.listdir(modDir) if os.path.isfile(modDir+'/'+f)] #Find all files in the mod directory
+    if not len(modFiles): #If no files/mods were found
+        print ('No mods found')
+        return False
+    print ('Loading '+str(len(modFiles))+' mod file(s)...')
+    load_mod = None
+    successes = 0
+    for i in modFiles: #Load all mods
+        try:
+            with open(modDir+'/'+i) as f:
+                print ('Loading mod file '+i+'...')
+                exec(f.read()) #Read & parse mod
+                print ('Checking if mod has an initscript...')
+                if load_mod != None:
+                    print ('Mod has an initialization function. Executing...')
+                    try:
+                        init_mod([chatCommandsHelp, chatCommandsHelpAdmin, chatCommandsHelpRoot], [modsRegular, modsAdmin, modsRoot])
+                        successes += 1
+                    except Exception as e: print ('An error occured while loading initscript for mod of file "'+i+'"\nSome changes to ChatCommands and help texts may have still been applied\n [Exception]: "'+str(e)+'"')
+                print ('Checking if mod has a custom runtime staging script...')
+                if inject_custom_mod_runtime != None:
+                    print ('Mod has a custom runtime stager function. Executing...')
+                    try:
+                        newRuntimeMods = inject_custom_mod_runtime(globals)
+                        for j in newMods:
+                            print ('Adding new mod to runtime "'+j+'"')
+                            if j in customRuntimes: customRuntimes[j] += newRuntimetime[j]
+                        successes += 1
+                    except Exception as e: print ('An error occured while modifying or loading new runtimes for mod of file "'+j+'"\nSome changes to runtime may have still been applied\n [Exception]: "'+str(e)+'"')
+                print ('Finished loading mod file '+i)
+        except Exception as e: print ('Couldn\'t load mod file '+i+' because:\n'+str(e))
+    print ('Finished loading '+str(len(modFiles))+' mod file(s) ('+str(successes)+' successful initscripts and custom runtime applications)')
+loadMods()
+
+#  ChatCommands
+
+#   Basic/User-level ChatCommands (any user can run)
+def runUserCCommand(cmd, user):
+    if modsRegular and (cmd.split()[0] in modsRegular): #Check for any modded ChatCommands, if there are any then check if any of them match the ChatCommand, and execute the modded ChatCommand if so.
+        modsRegular[cmd.split()[0]](cmd.split()[1:], user)
+        return
+    print (cmd)
+    match cmd:
+        # Prefix privelege-escalating commands
+        case ['sudo', *sCmd]: #Runs "super-user" commands that can only be run by players specified in admins.conf
+            if user in admins: runSudoCCommand(sCmd, user)
             else:
                 tellRaw('SuperUser access denied, '+user+'. You do not have access level "admin"!', 'Firewall')
                 writeCommand('kick '+user+' SuperUser access denied, '+user+'. You do not have access level "admin"!')
-    else:
-        print (user+' is attempting to run ChatCommand "'+cmd+'" with '+str(len(args))+' arguments')
-        chatCommandsLastUsed.setdefault(user, 0)
-        if time.monotonic()-chatCommandsLastUsed[user] < 1: writeCommand('kick '+user+' SpamProtection: Please wait 1 second between ChatCommands')
-        else: runChatCommand(cmd, args, user)
-        if not user in admins: chatCommandsLastUsed[user] = time.monotonic() #User is not an admin, so reset their timer
+        case ['root', *rCmd]: #Runs "root" commands that only those with access to the physical server console can run
+            if user == ccRootUsr: runRootCCommand(rCmd)
+            else:
+                tellRaw('Root access denied, '+user+'. You do not have access level "root"!', 'Firewall')
+                writeCommand('kick '+user+' Root access denied, '+user+'. You do not have access level "root"!')
+        # Misc commands
+        case ['help', *args]: #Displays a list of all commands along with aliases and basic syntax, or give information on a single command if an argument is specified
+            cc_help(chatCommandsHelp, args, user=user)
+        case ['emoticons', *args]: #Starts a new thread to show either a list of all emoticon pages to the player, or a list of copyable emoticons that are in a specified page
+            threading.Thread(target=cc_tellrawEmoticons, args=(user,args), daemon=True).start()
+        case ['nuke']: #Basically just crashes the player's game
+            threading.Thread(target=cc_crashPlayer, args=(user, 1), daemon=True).start()
+        # MC server information commands
+        case ['size']: #Displays the size of the server's world folder
+            size = 0
+            for p, d, f in os.walk(srvrFolder+'world/'): #Calculate size
+                for i in f:
+                    try: size += os.path.getsize(p+'/'+i)
+                    except FileNotFoundError as e: print (e)
+            tellRaw('The server world folder is '+parseMadeValues(makeValues(size, 1024, sizeVals))+' large', 'Size', user)
+        case ['tps']: #Run the Minecraft "debug" command for 10 seconds, which outputs the TPS when complete
+            global lastTickTest
+            timeSinceLast = round(time.monotonic())-lastTickTest
+            if (timeSinceLast > 120) or (user in admins and timeSinceLast > 15): #Checks when the last test was run, in order to prevent misuse
+                lastTickTest = round(time.monotonic()) #Reset the timer
+                tellRaw('Beginning asynchronous TPS test...\nThis should take about 10 seconds', 'TPS')
+                writeCommand('debug start') #Initialize the debug
+                threading.Thread(target=funcWithDelay, args=(10, writeCommand, ('debug stop',)), daemon=True).start() #Start a new thread that will inject the command to stop the debugging after 10 seconds
+                while True: #This is required to keep processing output, since this should be on the main thread
+                    out = getOutput(process)
+                    if (out[0] == '[') and (out[9:48] == '] [Server thread/INFO]: Stopped tick pr'): #This text will show up when the above command injects the debug stopping command, and has the information needed
+                        out = out[62:].split(' ')
+                        tellRaw('The test lasted for '+out[0]+' seconds ('+out[3]+' ticks)\nRunning at about '+out[5][1:]+' ticks per second (should be around 20)', 'TPS')
+                        return
+            else: tellRaw('Please wait '+parseMadeValues(makeValues(120-timeSinceLast, 60, timeVals))+' to run another TPS test', 'TPS')
+        # Server system information commands
+        case ['speedtest']: #Runs an internet speed test asynchronously and outputs the result when it's complete
+            global lastSpeedTest
+            timeSinceLast = round(time.monotonic())-lastSpeedTest
+            if lastSpeedTest == -9: tellRaw('A speed test is already running!', 'SpeedTest', user)
+            elif (timeSinceLast > 600) or (user in admins): #Checks when the last was performed in order to prevent misuse
+                tellRaw('Beginning speed test... (This could take a while)', 'SpeedTest')
+                asyncRunWCallback(cc_parseSpeedTest, 'speedtest-cli --json', lambda cbF, cmd: tellRaw('An error occured while running the speed test', 'SpeedTest'))
+                lastSpeedTest = -9
+            else: tellRaw('Please wait '+parseMadeValues(makeValues(600-timeSinceLast, 60, timeVals))+' to run another speed test', 'SpeedTest')
+        case ['sysinfo'] | ['info']: #Get some kinds of system information, such as 
+            tellRaw('System information for '+platform.node()+':', 'SysInf', user)
+            tellRaw(str(psutil.cpu_percent())+'% CPU usage\n'+str(psutil.virtual_memory().percent)+'% memory used', None, user)
+            temps = psutil.sensors_temperatures()
+            for i,j in psutil.sensors_temperatures().items():
+                t = 0
+                for k in j:
+                    try: t += k.current
+                    except KeyError: t += k
+                t = t/len(j)
+                if tempUnit[0] == 2: t += 273.15 #Convert to kelvin if needed
+                elif tempUnit[0] == 1: t = (t*(9/5))+32 #Convert to Fahrenheit if needed
+                tellRaw('Average temperature "'+i+'" is '+str(t)+tempUnit[1], None, user)
+            tellRaw('The disk has had a total of '+parseMadeValues(makeValues(psutil.disk_io_counters().read_bytes, 1024, sizeVals))+' read and '+parseMadeValues(makeValues(psutil.disk_io_counters().write_bytes, 1024, sizeVals))+' written since the last system restart', None, user)
+        case ['uptime']: #Shows how long the server and system have each been running
+            tellRaw('The server has been online for '+parseMadeValues(makeValuesDiffDelimiter(round(time.time()-uptimeStart), [60, 60, 24, 7], longTimeVals)), 'Uptime', user) #How much time the server has been online for since last restart (formatted with makeValues)
+            tellRaw('(Online since '+(time.ctime(uptimeStart).rstrip().replace('  ', ' '))+')', None, user) #The formatted date and time of the last server restart
+            tellRaw('The system has been powered on for '+parseMadeValues(makeValuesDiffDelimiter(round(time.time()-psutil.boot_time()), [60, 60, 24, 7], longTimeVals)), 'Uptime', user) #How much time the system has been powered on (formatted with makeValues)
+            tellRaw('(Powered on since '+(time.ctime(psutil.boot_time()).rstrip().replace('  ', ' '))+')', None, user) #The formatted date and time of the last system power on
+        case ['wiki' | 'github']: #Shows links to the wiki and GitHub page for RunServerDotPy
+            # Commands below display the text that is above them ({x} = link)
+            # GitHub Pages: {GitHub Repository} | {Changelog}
+            # {All Releases} | {Latest Release} | {Credits}
+            writeCommand('tellraw '+user+' ["",{"text":"GitHub Pages","bold":true,"underlined":true},": ",{"text":"GitHub Repository","underlined":true,"color":"dark_blue","clickEvent":{"action":"open_url","value":"https://github.com/Tiger-Tom/RunServerDotPy"},"hoverEvent":{"action":"show_text","contents":["https://github.com/Tiger-Tom/RunServerDotPy"]}}," | ",{"text":"Changelog","underlined":true,"color":"dark_blue","clickEvent":{"action":"open_url","value":"https://github.com/Tiger-Tom/RunServerDotPy/blob/main/Changelog.md"},"hoverEvent":{"action":"show_text","contents":["https://github.com/Tiger-Tom/RunServerDotPy/blob/main/Changelog.md"]}},"\\n",{"text":"All Releases","underlined":true,"color":"dark_blue","clickEvent":{"action":"open_url","value":"https://github.com/Tiger-Tom/RunServerDotPy/releases"},"hoverEvent":{"action":"show_text","contents":["https://github.com/Tiger-Tom/RunServerDotPy/releases"]}}," | ",{"text":"Latest Release","underlined":true,"color":"dark_blue","clickEvent":{"action":"open_url","value":"https://github.com/Tiger-Tom/RunServerDotPy/releases/latest"},"hoverEvent":{"action":"show_text","contents":["https://github.com/Tiger-Tom/RunServerDotPy/releases/latest"]}}," | ",{"text":"Credits","underlined":true,"color":"dark_blue","clickEvent":{"action":"open_url","value":"https://github.com/Tiger-Tom/RunServerDotPy-extras/blob/main/Credits.md"},"hoverEvent":{"action":"show_text","contents":["https://github.com/Tiger-Tom/RunServerDotPy-extras/blob/main/Credits.md"]}}]')
+            # Wiki: {Main Page}
+            # {General ChatCommand Info}
+            # {ChatCommand List+Info}
+            writeCommand('tellraw '+user+' ["",{"text":"Wiki","bold":true,"underlined":true},": ",{"text":"Main Page","underlined":true,"color":"dark_blue","clickEvent":{"action":"open_url","value":"https://github.com/Tiger-Tom/RunServerDotPy/wiki"},"hoverEvent":{"action":"show_text","contents":["https://github.com/Tiger-Tom/RunServerDotPy/wiki"]}},"\\n",{"text":"ChatCommand List+Info","underlined":true,"color":"dark_blue","clickEvent":{"action":"open_url","value":"https://github.com/Tiger-Tom/RunServerDotPy/wiki/ChatCommands"},"hoverEvent":{"action":"show_text","contents":["https://github.com/Tiger-Tom/RunServerDotPy/wiki/ChatCommands"]}},"\\n",{"text":"User-Level ChatCommands","underlined":true,"color":"dark_blue","clickEvent":{"action":"open_url","value":"https://github.com/Tiger-Tom/RunServerDotPy/wiki/ChatCommands-(User-level)"},"hoverEvent":{"action":"show_text","contents":["https://github.com/Tiger-Tom/RunServerDotPy/wiki/ChatCommands-(User-level)"]}}]')
+            # {Sudo-level ChatCommands}   (ONLY SHOWS IF USER IS AN ADMIN!)
+            if user in admins: writeCommand('tellraw '+user+' {"text":"Sudo ChatCommand List+Info","underlined":true,"color":"dark_blue","clickEvent":{"action":"open_url","value":"https://github.com/Tiger-Tom/RunServerDotPy/wiki/ChatCommands-(Sudo-level)"},"hoverEvent":{"action":"show_text","contents":["https://github.com/Tiger-Tom/RunServerDotPy/wiki/ChatCommands-(Sudo-level)"]}}')
+        # Catch-all
+        case _:
+            tellRaw('You did not type in any recognized command. Try "'+chatComPrefix+'help"?', None, user)
 
-#   ChatCommand subfunctions
+#   Sudo/admin ChatCommands (only users specified in admins.conf may run these)
+def runSudoCCommand(cmd, user):
+    if modsAdmin and (cmd[0] in modsAdmin): #Check for any modded ChatCommands, if there are any then check if any of them match the ChatCommand, and execute the modded ChatCommand if so.
+        modsAdmin[cmd.split()[0]](cmd.split()[1:], user)
+        return
+    match cmd:
+        # Misc commands
+        case ['help', *args]: #Displays a list of all super-user commands, or information on matching commands if an argument is given
+            cc_help(chatCommandsHelpAdmin, args, chatComPrefix+'sudo', user)
+        case ['logs', *args]: #Displays how many logs have been taken, either since the last time the program restarted if "total" argument is specified, otherwise shows how many logs have been taken since the last server restart
+            if 'total' in args: tellRaw('Logs collected over '+str(restarts)+' restarts:\n'+str(loggedAmountTotal), 'Logs', user)
+            else: tellRaw('Logged amount since '+time.ctime(uptimeStart).rstrip()+':\n'+str(loggedAmountIter), 'Logs', user)
+        # RunServerDotPy commands
+        case ['reconfig']: #Reloads all of RunServerDotPy's configuration
+            tellRaw('Reloading configuration...', 'Config', user)
+            loadConfiguration()
+            tellRaw('Done', 'Config', user)
+        case ['refresh']: #Restarts RunServerDotPy completely - any changes made to the program will be implemented
+            tellRaw('Refreshing server...', user)
+            runSudoCCommand(['stop'], user) #Manually calls the "stop" admin ChatCommand with
+            print ('Unhooking keyboard...')
+            keyboard.unhook_all()
+            while process.poll() == None: #Get and parse remaining output until the process is done running
+                getOutput(process)
+            try:
+                process.wait() #Wait for the process to complete
+                print (process.stdout.read().decode('UTF-8', 'replace')) #Read and display any leftover messages and flush buffer
+            except: pass
+            finalizeLogFile() #Finalize the log file
+            closeOpenFileHandles() #Important because the process replace command will leave trailing/open file handles
+            print ('Goodbye')
+            os.execl(sys.executable, sys.executable, *sys.argv) #Immediately replace the current process with this one, whilst still retaining any arguments
+        case ['remod']: #Reloads all mods
+            tellRaw('Reloading mods...', 'Mods', user)
+            loadMods() #Unloads all loaded mods and then loads all mods again
+            tellRaw('Done', 'Mods', user)
+        # Server controls
+        case ['reload']: #Reloads the server (equivalent to /reload, reloads all datapacks)
+            tellRaw('Reloading!', None, user)
+            writeCommand('reload')
+        case ['restart' | 'stop']: #Stops the Minecraft server (using /stop) (the program, by default, automatically starts the server again if it closes)
+            tellRaw('Restarting server...', user)
+            for i in range(3, 1, -1): #Countdown from 3-2 to warn users
+                writeCommand('tellraw @a ["",{"text":"The server is going down for a restart in ","color":"red"},{"text":"'+str(i)+'","bold":true,"color":"red"},{"text":" seconds!","color":"red"}]')
+                time.sleep(1)
+            writeCommand('tellraw @a ["",{"text":"The server is going down for a restart in ","color":"red"},{"text":"1","bold":true,"color":"red"},{"text":" second!","color":"red"}]') #Final 1 second of countdown
+            time.sleep(1)
+            writeCommand('tellraw @a ["",{"text":"The server is going down for a restart ","bold":true,"color":"red"},{"text":"NOW!","bold":true,"color":"dark_red"}]')
+            writeCommand('kick @a Server restarting!') #Remove all players from the game
+            writeCommand('save-all') #Save the game
+            writeCommand('stop') #Stop the server
+        case ['save' | 'save-all']: #Saves the game (equivalent to /save-all)
+            tellRaw('Saving the game')
+            writeCommand('save-all')
+        # Player controls
+        case ['ban', target, *reason]: #Bans the specified player for optional reason (equivalent to the in-game /ban command)
+            if reason: #Run this if a reason was given
+                reason = ' '.join(reason)
+                writeCommand('ban '+target+' '+reason)
+                tellRaw('Banned '+target+' for "'+reason, user)
+            else:
+                writeCommand('ban '+target)
+                tellRaw('Banned '+target, user)
+        case ['crash', target, *severity]: #Crash a user's game with excessive amounts of particles that only that user can see (only use if they are being really bad (AKA hacking, or worse)
+            if severity:
+                try:
+                    severity = int(severity[0])
+                    if severity < 1 or severity > 5: raise TypeError
+                except TypeError:
+                    tellRaw('Severity must be an integer between 1 and 5', 'Crasher', user)
+                    return
+            else: severity = 3
+            tellRaw('Crashing '+target+' with severity '+str(severity), 'Crasher', user)
+            threading.Thread(target=cc_crashPlayer, args=(target,severity), daemon=True).start()
+        case ['kick', target, *reason]: #Kicks the specified player for optional reason (equivalent to the in-game /kick command)
+            writeCommand('kick '+target+((' '+' '.join(reason)) if reason else ''))
+            if reason: tellRaw('Kicked '+target+' for '+(' '.join(reason)), user)
+            else: tellRaw('Kicked '+target, user)
+        case ['unban' | 'pardon', target]: #Unbans the specified player (equivalent to the in-game /pardon command)
+            writeCommand('pardon '+target)
+            tellRaw('Pardoned '+target, user)
+        case ['webinterface']: #Starts a web interface on port 8080
+            import socket
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                if s.connect_ex(('localhost', 8080)) != 0: #Test if port 8080 is in use (which means that the web interface is already running)
+                    global webInterfaceAuthUser
+                    webInterfaceAuthUser = user
+                    tellRaw('Please connect to port 8080 in your web browser to this machine', 'WebInterface', user)
+                    threading.Thread(target=runWebInterfaceServer, daemon=True).start()
+                else: tellRaw('The web interface is already in use, sorry. Please try again later', 'WebInterface', user)
+        # Catch-all
+        case _:
+              tellRaw('You did not type in any recognized command. Try "'+chatComPrefix+'sudo help"?', None, user)
+
+#   Root ChatCommands (can only be run from the shell)
+def runRootCCommand(cmd):
+    if modsRoot and (cmd[0] in modsRoot): #Check for any modded ChatCommands, if there are any then check if any of them match the ChatCommand, and execute the modded ChatCommand if so.
+        modsRoot[cmd.split()[0]](cmd.split()[1:], user)
+        return
+    match cmd:
+        case ['help', *args]: #Displays a list of all root commands, or information on matching commands if an argument is given
+            cc_help(chatCommandsHelpRoot, args, chatComPrefix+'root', '', True)
+        case ['clearlogs']: #Removes all logs
+            global loggedAmountIter, loggedAmountTotal #Declare log counters as global so that we can modify them
+            print ('Finishing logs so that they can be safely removed...')
+            finalizeLogFile() #Finish the logs so that they can be safely removed, since this command closes any open file handles, fixes missing directories, and finishes up logs
+            print ('Removing log directory...')
+            shutil.rmtree(logDir) #Deletes everything in the log directory
+            print ('Removing log counters...')
+            loggedAmountIter = {}
+            loggedAmountTotal = {}
+            print ('Logs have been successfully removed\nInitializing new log...')
+            makeLogFile()
+        case ['py', *args]: #Runs a Python command
+            com = ' '.join(args)
+            print ('> "'+com+'"\n< "'+str(eval(com))+'"')
+        case _: #Catch-all
+            print ('You did not type in any recognized command. Try "'+chatComPrefix+'root help"?')
+
+#  ChatCommand supplementary scripts
 def cc_help(ccHelpDict, args, ccPref=chatComPrefix, user='', toConsole=False): #If "toConsole" is True, then this just prints it. Otherwise, it uses a tellraw command
-    if user == ccRootUsr: toConsole = True
+    if user in {ccRootUsr, ccWebIUsr}: toConsole = True
     if not len(args): command = None
     else: command = ' '.join(args)
     if command == None: cHelp = 'List of commands:\n("command" | "variation" ["positional arg(s) *=optional"] {"flags"}\n(Command prefix: '+ccPref+')\n(Use '+ccPref+'help [command] for help on a specific command)'
     else: cHelp = 'Help page for commands matching "'+command+'":'
-    if toConsole: print (cHelp)
+    if toConsole:
+        if user == ccWebIUsr: web_data.append(cHelp)
+        else: print (cHelp)
     else: tellRaw(cHelp, 'Help', user)
     showAll = (command == None) #Save a bit of time from calculations
+    if ccPref != chatComPrefix and not ccPref.endswith(' '): ccPref += ' '
     for i in ccHelpDict.keys():
         if showAll:
-            if toConsole: print (' • '+i)
-            else: writeCommand('tellraw '+user+(' [" • ",{"text":"{%COMMAND_FULL}","clickEvent":{"action":"suggest_command","value":"{%COMMAND_SUGGEST}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%COMMAND_SUGGEST}","bold":true}]}}]').replace('{%COMMAND_FULL}', safeTellRaw(i)).replace('{%COMMAND_SUGGEST}', safeTellRaw(ccPref+i.split(' ')[0])))
+            if toConsole:
+                if user == ccWebIUsr: web_data.append(' • '+i)
+                else: print (' • '+i)
+            else: writeCommand('tellraw '+user+(' [" • ",{"text":"{%COMMAND_FULL}","clickEvent":{"action":"suggest_command","value":"{%COMMAND_SUGGEST}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%COMMAND_SUGGEST}","bold":true}]}}]').replace('{%COMMAND_FULL}', safeTellRaw(i, False)).replace('{%COMMAND_SUGGEST}', safeTellRaw(ccPref+i.split(' ')[0], False)))
         else:
             if command in i:
-                if toConsole: print (' • '+i+': '+ccHelpDict[i])
-                else: writeCommand('tellraw '+user+(' [" • ",{"text":"{%COMMAND_FULL}","clickEvent":{"action":"suggest_command","value":"{%COMMAND_SUGGEST}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%COMMAND_SUGGEST}","bold":true}]}},{"text":": {%COMMAND_DESC}","hoverEvent":{"action":"show_text","contents":[{"text":"{%COMMAND_DESC}","bold":true}]}}]').replace('{%COMMAND_FULL}', safeTellRaw(i)).replace('{%COMMAND_SUGGEST}', safeTellRaw(ccPref+i.split(' ')[0])).replace('{%COMMAND_DESC}', safeTellRaw(ccHelpDict[i])))
+                if toConsole:
+                    if user == ccWebIUsr: web_data.append(' • '+i+': '+ccHelpDict[i])
+                    else: print (' • '+i+': '+ccHelpDict[i])
+                else: writeCommand('tellraw '+user+(' [" • ",{"text":"{%COMMAND_FULL}","clickEvent":{"action":"suggest_command","value":"{%COMMAND_SUGGEST}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%COMMAND_SUGGEST}","bold":true}]}},{"text":": {%COMMAND_DESC}","hoverEvent":{"action":"show_text","contents":[{"text":"{%COMMAND_DESC}","bold":true}]}}]').replace('{%COMMAND_FULL}', safeTellRaw(i, False)).replace('{%COMMAND_SUGGEST}', safeTellRaw(ccPref+i.split(' ')[0], False)).replace('{%COMMAND_DESC}', safeTellRaw(ccHelpDict[i], False)))
 def cc_parseSpeedTest(res):
+    global lastSpeedTest
     res = json.loads(res)
     down = makeValues(res['download'], 1024, sizeVals)
     up = makeValues(res['upload'], 1024, sizeVals)
     tellRaw(parseMadeValues(down)+' download', 'SpeedTest')
     tellRaw(parseMadeValues(up)+' upload', 'SpeedTest')
+    lastSpeedTest = round(time.monotonic()) #Reset timer
 def cc_tellrawEmoticons(user, args):
-    if len(args) > 0:
+    if args:
         tellRaw('Click on an emoticon to copy it to your clipboard, or shift-click on it to add it to your chat', None, user)
         pageName = ' '.join(args).lower()
         tellRaw('Showing emoticon pages matching "'+pageName+'"...', None, user)
@@ -624,14 +894,15 @@ def cc_tellrawEmoticons(user, args):
                 tellRaw('Emoticon page '+emoticons[page][0]+':')
                 for emoticon in emoticons[page][1:]:
                     if type(emoticon) == tuple:
-                        parts = ['{"text":"{%EMOTICON}","insertion":"{%EMOTICON}","clickEvent":{"action":"copy_to_clipboard","value":"{%EMOTICON}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%EMOTICON}","bold":true}]}}'.replace('{%EMOTICON}', i) for i in emoticon]
+                        parts = ['{"text":"{%EMOTICON}","insertion":"{%EMOTICON}","clickEvent":{"action":"copy_to_clipboard","value":"{%EMOTICON}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%EMOTICON}","bold":true}]}}'.replace('{%EMOTICON}', safeTellRaw(i, False)) for i in emoticon]
                         writeCommand('tellraw '+user+' ['+('," | ",'.join(parts))+']')
                     else:
-                        writeCommand('tellraw @a {"text":"{%EMOTICON}","insertion":"{%EMOTICON}","clickEvent":{"action":"copy_to_clipboard","value":"{%EMOTICON}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%EMOTICON}","bold":true}]}}'.replace('{%EMOTICON}', emoticon))
+                        writeCommand('tellraw @a {"text":"{%EMOTICON}","insertion":"{%EMOTICON}","clickEvent":{"action":"copy_to_clipboard","value":"{%EMOTICON}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%EMOTICON}","bold":true}]}}'.replace('{%EMOTICON}', safeTellRaw(emoticon, False)))
     else:
         tellRaw('Click on a page name to view the contents, or use "'+chatComPrefix+'emoticons [page name]"', None, user)
         for page in emoticons:
-            writeCommand(('tellraw '+user+' [{"text":"•{%PAGE}","clickEvent":{"action":"run_command","value":"/tag @s add _rs.py_chatCommand_flag.emoticonPage.'+(page.replace(' ', '_'))+'"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%PAGE}","bold":true,"underlined":true}]}}]').replace('{%PAGE}', emoticons[page][0]))
+            #writeCommand(('tellraw '+user+' [{"text":"•{%PAGE}","clickEvent":{"action":"run_command","value":"/tag @s add _rs.py_chatCommand_flag.emoticonPage.'+(page.replace(' ', '_'))+'"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%PAGE}","bold":true,"underlined":true}]}}]')
+            writeCommand('tellraw @p {"text":"•{%PAGE}","clickEvent":{"action":"suggest_command","value":"{%EMOTICON_COMMAND}"},"hoverEvent":{"action":"show_text","contents":[{"text":"{%PAGE}","bold":true,"underlined":true},{"text":" [{%EMOTICON_COMMAND}]","bold":false,"underlined":false}]}}'.replace('{%EMOTICON_COMMAND}', chatComPrefix+'emoticons {%PAGE}').replace('{%PAGE}', safeTellRaw(emoticons[page][0], False)))
 crashParticles = ['minecraft:elder_guardian', 'minecraft:sweep_attack', 'minecraft:explosion', 'minecraft:angry_villager']
 def cc_crashPlayer(user, severity=3):
     #particle <name> <pos> <delta> <speed> <count> [force|normal] [<viewers>]
@@ -643,311 +914,140 @@ def cc_crashPlayer(user, severity=3):
         writeCommand('execute at '+user+' run particle '+random.choice(crashParticles)+' ~ ~ ~ 1 1 1 1 2147483647 force '+user)
         time.sleep(i*10)
     writeCommand('kick '+user+' Timed out')
-def cc_parseTagFlag(flag, user):
-    # tag [user] add _rs.py_chatCommand_flag.[flag]
-    print ('% "'+user+'" triggered flag "'+flag+'"')
-    writeCommand('tag '+user+' remove _rs.py_chatCommand_flag.'+flag)
-    flag = flag.split('.')
-    if flag[0] == 'emoticonPage':
-        threading.Thread(target=cc_tellrawEmoticons, args=(user,('.'.join(flag[1:])).split('_')), daemon=True).start()
-    else:
-        print ('% ERROR: UNKNOWN FLAG "'+str(flag)+'"')
 
-#   Load ChatCommand mods
-modsRegular = {}
-modsAdmin = {}
-modsRoot = {}
-modded = False
-def loadMods():
-    if not os.path.exists(modDir): #Check if the mod directory exists and create it if it doesn't
-        print ('Mods dir doesn\'t exist, creating one now...')
-        os.mkdir(modDir)
-    modFiles = [f for f in os.listdir(modDir) if os.path.isfile(modDir+'/'+f)] #Find all file in the mod directory
-    if not len(modFiles): #If no files/mods were found
-        print ('No mods found')
-        return False
-    mods = []
-    problems = []
-    print ('Loading '+str(len(modFiles))+' mod file(s)...')
-    for i in modFiles: #Load all mods
-        try:
-            with open(modDir+'/'+i) as f:
-                print ('Loading mod file '+i+'...')
-                exec(f.read()) #Read & parse mod
-                global mod_output_
-                mod = mod_output_
-                del mod_output_
-                print ('Checking mod...')
-                if len(mod) != 3: #Check if the mod returns 3 arguments
-                    raise IndexError('Mod doesn\'t return the correct amount of arguments (required: 3, got: '+str(len(mod))+')')
-                if (type(mod[0]) != dict) or (type(mod[1]) != dict) or (type(mod[2]) != int): #Check to make sure that the mod returns the correct type of arguments
-                    raise TypeError('Mod doesn\t return the proper argument types')
-                if (mod[2] < 0) or (mod[2] > 2): #Check if the mod's permission level is within the proper bounds
-                    raise ValueError('Mod doesn\'t returnn the proper permission level (expected: 0-2, got: '+str(mod[2])+')')
-                mods.append(mod) #Everything above didn't run, so the mod should be good
-                print ('Finished loading mod file '+i)
-        except Exception as e:
-            print ('Couldn\'t load mod file '+i+' because:\n'+str(e))
-            problems.append((i, e))
-    print ('Finished loading '+str(len(modFiles))+' mod file(s) ('+str(len(mods))+'/'+str(len(modFiles))+' passed checking)')
-    if not len(mods): #If mod files were found, but they were all invalid
-        print ('No valid mods found')
-        return False
-    global chatCommandsHelp,chatCommandsHelpAdmin,chatCommandsHelpRoot,modsRegular,modsAdmin,modsRoot
-    print ('Applying '+str(len(mods))+' mod(s)...')
-    for indx,mod in enumerate(mods):
-        print ('Applying mod '+str(indx+1)+'/'+str(len(mods))+'...')
-        if mod[2] == 0: #Mod functions have "regular" permission level
-            modsRegular.update(mod[1])
-            chatCommandsHelp.update(mod[0])
-        elif mod[2] == 1: #Mod functions have "admin" permission level (requires sudo)
-            modsAdmin.update(mod[1])
-            chatCommandsHelpAdmin.update(mod[0])
-        elif mod[2] == 2: #Mod functions have "root" permission level (requires root)
-            modsRoot.update(mod[1])
-            chatCommandsHelpRoot.update(mod[0])
-        print ('Applied mod '+str(indx+1)+'/'+str(len(mods))+'\n- Permission level: '+str(mod[2])+'\n- '+str(len(mod[1]))+' new/modified ChatCommands applied\n- '+str(len(mod[0]))+' new/modified help strings applied')
-    print ('Successfully applied '+str(len(mods))+' mod(s)')
-    if len(problems): #Show all problematic mods
-        print ('\n'+str(len(problems))+' mod(s) failed to load:')
-        for i,j in problems:
-            print ('Failed to load mod file '+str(i)+' because '+str(j))
-        print ()
-    return True
-loadMods()
+# Web interface
 
-#   Basic functions (any user can run)
-def runChatCommand(cmd, args, user):
-    tellRaw('Running ChatCommand '+cmd, '$ '+user)
-    if len(modsRegular) and (cmd in modsRegular): modsRegular[cmd](args, user) #Check if there are any mod commands loaded, and check the command against any mod commands if they are loaded
-    elif cmd == 'help': cc_help(chatCommandsHelp, args, user=user) #Displays a list of commands, or details for a specific command if it is specified in the arguments
-    elif (cmd == 'emoticons') and (user != ccRootUsr): threading.Thread(target=cc_tellrawEmoticons, args=(user,args), daemon=True).start() #Shows a list of copyable emoticons, which are configurable by the server owner
-    elif (cmd == 'nuke') and (user != ccRootUsr): cc_crashPlayer(user, 1) #Secret command
-    elif cmd == 'size': #Displays the size of the server's world folder
-        size = 0
-        for path, dirs, files in os.walk(srvrFolder+'world/'):
-            for f in files:
-                size += os.path.getsize(os.path.join(path, f))
-        for i in os.scandir(srvrFolder):
-            size += os.path.getsize(i)
-        tellRaw('The server world folder is '+parseMadeValues(makeValues(size, 1024, sizeVals))+' large', 'Size', user)
-    elif cmd == 'speedtest': #Runs an internet speed test
-        global lastSpeedTest
-        waitSecs = 600
-        timeSinceLast = round(time.monotonic())-lastSpeedTest
-        if (timeSinceLast > waitSecs) or (user in admins): #Enough time has passed since last ran, or the user is an admin
-            lastSpeedTest = round(time.monotonic()) #Reset timer
-            tellRaw('Beginning asynchronous speed test...\nThis could take a little while', 'SpeedTest')
-            asyncRunWCallback(cc_parseSpeedTest, 'speedtest-cli --json')
+#  Threaded scripts
+
+#   Initial runscript
+def runWebInterfaceServer(port=8080):
+    global httpd, webInterfaceAuth, keepWebIntAlive, LastRequestForWebInt
+    webInterfaceAuth = keepWebIntAlive = LastRequestForWebInt = None
+    httpd = http.server.ThreadingHTTPServer(('localhost', port), WebInterfaceServer)
+    asyncTimeoutFunc(120, webInterfaceTimeout) #Starting timeout of 120 seconds
+    httpd.serve_forever()
+
+#   Timeouts
+def webInterfaceTimeout():
+    import socket
+    global keepWebIntAlive
+    while True: #Checks every 40 seconds after running if "keepWebIntAlive" is true, if it isn't then it will close the server.
+        #Test if port 8080 is in use (which means that the web interface is already running)
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex(('localhost', 8080)) != 0: return #Immediately return if web interface is not active
+        if not keepWebIntAlive: break
+        keepWebIntAlive = False
+        time.sleep(40)
+    webInterfaceAuth = None
+    web_data.clear()
+    print ('Web interface timed out - Stopping...')
+    httpd.shutdown()
+    httpd.socket.close()
+
+#  Main class
+class WebInterfaceServer(http.server.BaseHTTPRequestHandler):
+    def do_GET(self): #Overwrite what happens when the client sends a GET request
+        global webInterfaceAuth, LastRequestForWebInt, keepWebIntAlive
+        if LastRequestForWebInt == None: LastRequestForWebInt = time.time()
+        elif time.time() < LastRequestForWebInt+0.1: #Rate limiting
+            self.send_response(429) #Response: 429 Too Many Requests
+            self.end_headers()
+            LastRequestForWebInt = time.time()
+            return
+        LastRequestForWebInt = time.time()
+        logData(time.strftime('[%Y-%m-%d %H:%M:%S]')+' <GET> '+str(self.client_address)+' -> '+self.path, 'WebInterface')
+        keepWebIntAlive = True #Keep the server alive every time a GET request is recieved
+        if (webInterfaceAuth != None) and (webInterfaceAuth[1] != self.client_address[0]):
+            self.send_response(409) #Response: 409 Conflict
+            self.end_headers()
+            self.wfile.write('Error 409: Conflict\nThis interface is currently reserved for another IP address. Please try again later')
+            logData(time.strftime('[%Y-%m-%d %H:%M:%S]')+' '+str(self.client_address)+' <- [GET/'+self.path+'] "409 Conflict: Another user/IP already connected"', 'WebInterface')
+            return
+        if self.path == '/': #Root/main directory, send HTML
+            self.send_response(200) #Response: 200 OK
+            self.send_header('Content-type', 'text/html') #HTML text
+            self.end_headers()
+            self.wfile.write(b'<script>window.onload=function(){fetch(\'https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy-extras/main/WebServer/WebServer.html\').then(r=>r.text()).then(function(d){document.open(\'text/html\', \'replace\').write(d)})}</script>') #Fetch and write HTML text
+        else: #Otherwise, use match..case
+            match self.path.removeprefix('/').split('/'): #Match with the path, split by /, with the first / removed as it is unneeded
+                case ['_data']:
+                    if webInterfaceAuth != None:
+                        self.send_response(200) #Response: 200 OK
+                        self.send_header('Content-type', 'text/plain')
+                        self.end_headers()
+                        self.wfile.write(bytes(encDec(webInterfaceAuth[0], json.dumps(list(web_data))), 'UTF-8'))
+                        web_data.clear()
+                    else: #If it is not authenticated
+                        self.send_response(401) #Response: 401 Unauthorized
+                        self.end_headers()
+                        logData(time.strftime('[%Y-%m-%d %H:%M:%S]')+' '+str(self.client_address)+' <- [GET/'+self.path+'] "401 Unauthorized: No authentication exists"', 'WebInterface')
+                case ['_auth', 'init']: #Initialize authentication
+                    if webInterfaceAuth == None:
+                        webInterfaceAuth = (('%030x' % random.randrange(16**30)), self.client_address[0]) #Generate 30 random hexadecimal bits as password
+                        writeCommand('tellraw '+webInterfaceAuthUser+' ["Your password is:\\n",{"text":"'+webInterfaceAuth[0]+'","bold":true,"clickEvent":{"action":"copy_to_clipboard","value":"'+webInterfaceAuth[0]+'"},"hoverEvent":{"action":"show_text","contents":["Click to copy to clipboard"]}}]')
+                        logData(time.strftime('[%Y-%m-%d %H:%M:%S]')+' '+str(self.client_address)+' -> [GET/'+self.path+'] Authenticating user "'+webInterfaceAuthUser+'"', 'WebInterface')
+                        self.send_response(200) #Response: 200 OK
+                        self.end_headers()
+                    else:
+                        self.send_response(409) #Response: 409 Conflict
+                        self.end_headers()
+                        logData(time.strftime('[%Y-%m-%d %H:%M:%S]')+' '+str(self.client_address)+' <- [GET/'+self.path+'] "409 Conflict: Authenticating failed because a user was already connected"', 'WebInterface')
+                case ['_auth', 'test']: #Test authentication
+                    if webInterfaceAuth != None:
+                        self.send_response(200) #Response: 200 OK
+                        self.send_header('Content-type', 'text/plain')
+                        self.end_headers()
+                        self.wfile.write(bytes(encDec(webInterfaceAuth[0][::-1], webInterfaceAuth[0]), 'UTF-8'))
+                    else: #If it is not authenticated
+                        self.send_response(401) #Response: 401 Unauthorized
+                        self.end_headers()
+                        logData(time.strftime('[%Y-%m-%d %H:%M:%S]')+' '+str(self.client_address)+' <- [GET/'+self.path+'] "401 Unauthorized: No authentication exists"', 'WebInterface')
+                case _: #Path is unknown, send 404 File not Found
+                    self.send_response(404) #Response: 404 Not found
+                    self.end_headers()
+                    logData(time.strftime('[%Y-%m-%d %H:%M:%S]')+' '+str(self.client_address)+' <- [GET/'+self.path+'(!)] "404 File Not Found', 'WebInterface')
+    def do_POST(self):
+        global webInterfaceAuth, LastRequestForWebInt, keepWebIntAlive
+        if LastRequestForWebInt == None: LastRequestForWebInt = time.time()
+        elif time.time() < LastRequestForWebInt+0.01: #Rate limiting
+            self.send_response(429) #Response: 429 Too Many Requests
+            self.end_headers()
+            LastRequestForWebInt = time.time()
+            return
+        logData(time.strftime('[%Y-%m-%d %H:%M:%S]')+' <POST> '+str(self.client_address)+' -> '+self.path, 'WebInterface')
+        if int(self.headers['Content-Length']) > 500: #If the data/content/"Payload" is too big (more than 500 chars)
+            self.send_response(413) #Response: 413 Payload Too Large
+            self.end_headers()
+            return
+        data = self.rfile.read(int(self.headers['Content-Length'])).decode('UTF-8')
+        if self.path == '/_send/cmd':
+            data = encDec(webInterfaceAuth[0], data)
+            if data:
+                if not data.startswith(chatComPrefix): data = chatComPrefix+data
+                if data.startswith(chatComPrefix+'root'): self.send_response(403) #Response: 403 Forbidden
+                else:
+                    self.send_response(200) #Response: 200 OK
+                    inputQueue.append('[##:##:##] [Server thread/INFO]: <'+ccWebIUsr+'> '+data)
+                    writeCommand('')
+                self.end_headers()
+            else: self.send_response(400) #Response: 400 Bad Request
+            self.end_headers()
+        elif self.path == '/_send/end':
+            if (webInterfaceAuth != None) and (encDec(webInterfaceAuth[0], data) == 'end'):
+                webInterfaceAuth = None
+                self.send_response(200) #Response: 200 OK
+                self.end_headers()
+                self.server.shutdown()
+                self.server.socket.close()
+                web_data.clear()
+            else:
+                self.send_response(401) #Response: 401 Unauthorized
+                self.end_headers()
         else:
-            print ('Last speed test: '+str(lastSpeedTest))
-            tellRaw('Please wait '+parseMadeValues(makeValues(600-timeSinceLast, 60, timeVals))+' to run another speed test', 'SpeedTest')
-    elif cmd in {'sysinfo', 'info'}:
-        tellRaw('System information for '+platform.node()+':', 'SysInf', user)
-        if sysInfoShown['cpu']: tellRaw(str(psutil.cpu_percent())+'% of CPU used', None, user)
-        if sysInfoShown['memory']: tellRaw(str(psutil.virtual_memory().percent)+'% of memory used', None, user)
-        if sysInfoShown['temp']:
-            temps = psutil.sensors_temperatures()
-            for i in temps:
-                t = 0
-                for j in temps[i]:
-                    t += j.current
-                t = t/len(temps[i])
-                if tempUnit[0] == 2: t += 273.15 #Convert to kelvin if needed
-                elif tempUnit[0] == 1: t = (t*(9/5))+32 #Convert to Fahrenheit if needed
-                tellRaw('Temperature "'+i+'" is '+str(t)+tempUnit[1], None, user)
-        if sysInfoShown['battery']: tellRaw('Battery has '+str(psutil.sensors_battery().percent)+'% charge (Plugged in: '+('yes' if psutil.sensors_battery().power_plugged else 'no')+')', None, user)
-        if sysInfoShown['diskrw']:
-            ioCount = psutil.disk_io_counters()
-            tellRaw('The disk has had a total of '+parseMadeValues(makeValues(ioCount.read_bytes, 1024, sizeVals))+' reads and '+parseMadeValues(makeValues(ioCount.write_bytes, 1024, sizeVals))+' writes since the last system restart')
-    elif cmd == 'tps': #Gets the server's TPS over a 10 second period
-        #*10:          1         2         3         4         5         6
-        #*1 :0123456789012345678901234567890123456789012345678901234567890123456789
-        #    [14:47:22] [Server thread/INFO]: Stopped tick profiling after 10.81 seconds and 217 ticks (20.08 ticks per second)
-        #           9:                                       :48         62:0     1       2   3   4     5     6     7   8
-        global lastTickTest
-        waitSecs = 120
-        timeSinceLast = round(time.monotonic())-lastTickTest
-        if (timeSinceLast > waitSecs) or (user in admins): #Enough time has passed since last ran, or the user is an admin
-            lastTickTest = round(time.monotonic()) #Reset timer
-            tellRaw('Beginning asynchronous TPS test...\nThis should take about 10 seconds', 'TPSTest')
-            writeCommand('debug start')
-            threading.Thread(target=funcWithDelay, args=(10, writeCommand, ['debug stop']), daemon=True).start()
-            while True:
-                out = getOutput(process)
-                if (out[0] == '[') and (out[9:48] == '] [Server thread/INFO]: Stopped tick pr'):
-                    out = out[62:].split(' ')
-                    break
-            secsTest = out[0]
-            ticksTest = out[3]
-            tpsTest = out[5][1:]
-            tellRaw('Test lasted '+secsTest+' seconds ('+ticksTest+' ticks)\nRunning at about '+tpsTest+' ticks per second (should be ~20)', 'TPSTest')
-    elif cmd == 'uptime': #Gets the server and system's uptime
-        tellRaw('The server has been online for '+parseMadeValues(makeValues(round(time.monotonic()-uptimeStart), 60, timeVals)), 'Uptime', user)
-        tellRaw('(Online since '+(time.ctime(uptimeStart).rstrip().replace('  ', ' '))+')', None, user)
-        tellRaw('The system has been powered on for '+parseMadeValues(makeValues(round(time.monotonic()-psutil.boot_time()), 60, timeVals)), 'Uptime', user)
-        tellRaw('(Powered on since '+(time.ctime(psutil.boot_time()).rstrip().replace('  ', ' '))+')', None, user)
-    else: tellRaw('Unknown command "'+cmd+'", sorry', 'CCmd', user)
-
-#   Sudo/admin commands (only admins or server console can run these commands)
-def runAdminChatCommand(cmd, args, user):
-    tellRaw('Running SuperUser ChatCommand '+cmd, '$'+user, user)
-    if len(modsAdmin) and (cmd in modsAdmin): modsAdmin[cmd](args, user) #Check if there are any mod commands loaded, and check the command against any mod commands if they are loaded
-    elif cmd == 'help': cc_help(chatCommandsHelpAdmin, args, chatComPrefix+'sudo', user) #Display a list of admin commands, or information on a specific one if specified in arguments
-    elif cmd in {'antimalware', 'antivirus', 'scan'}:
-        tellRaw('Operating system: '+os.name, 'AntiMal')
-        if os.name == 'nt':
-            tellRaw('Scanner: Windows Defender', 'AntiMal')
-            comm = '"%ProgramFiles%/Windows Defender/MpCmdRun.exe" -Scan'
-        else:
-            tellRaw('Scanner: ClamAV', 'AntiMal')
-            if shutil.which('clamscan') == None: #ClamAV is not installed, so install it
-                comm = 'sudo apt-get install clamav libfreshclam'
-                tellRaw(comm)
-                runWFullOutput(comm, tellRaw)
-                os.system('sudo systemctl stop clamav-freshclam.service')
-                os.system('sudo systemctl disable clamav-freshclam.service')
-            comm = 'sudo freshclam'
-            tellRaw(comm)
-            runWFullOutput(comm, tellRaw)
-            comm = 'sudo clamscan --quiet -r /'
-        tellRaw(comm)
-        asyncRunWCallback(tellRaw, comm)
-        tellRaw('This will last a while. The results will be displayed once the scan is complete', 'AntiMal')
-    elif cmd == 'ban': #Bans a user for (optional) reason. Uses the in-game /ban command
-        if len(args) > 1: tellRaw('Banning '+args[0]+' for '+(' '.join(args[1:])), 'Ban', user)
-        else: tellRaw('Banning '+args[0], 'Ban', user)
-        writeCommand('ban '+(' '.join(args)))
-        if len(args) > 1: tellRaw(args[0]+' was banned for '+(' '.join(args[1:]))+' by '+user, 'Ban')
-        else: tellRaw(args[0]+' was banned by '+user, 'Ban')
-    elif cmd == 'crash':
-        target = args[0]
-        if len(args) > 1:
-            severity = int(args[1])
-            if severity < 1 or severity > 5:
-                tellRaw('Severity cannot be more than 5 or less than 1', 'Crasher', user)
-                return
-        else: severity = 3
-        tellRaw('Crashing player '+target+' with severity '+str(severity), 'Crasher', user)
-        threading.Thread(target=cc_crashPlayer, args=(target,severity), daemon=True).start()
-        'crash [player] [severity*=3, 1-5]'
-    elif cmd == 'kick': #Kicks a user for (optional) reason. Uses the in-game /kick command
-        if len(args) > 1: tellRaw('Kicking '+args[0]+' for '+(' '.join(args[1:])), 'Kick', user)
-        else: tellRaw('Kicking '+args[0], 'Ban', user)
-        writeCommand('kick '+(' '.join(args)))
-    elif cmd == 'logs': #Displays how many logs have been collected
-        if 'total' in args: tellRaw('Logged amount over '+str(restarts)+' restarts:\n'+str(loggedAmountTotal), 'Logs', user)
-        else: tellRaw('Logged amount for this iteration:\n'+str(loggedAmountIter), 'Logs', user)
-    elif cmd == 'reconfig': #Reloads RunServerDotPy's configuration
-        tellRaw('Reloading configuration...', 'Config', user)
-        loadConfiguration()
-        tellRaw('Done', 'Config', user)
-    elif cmd == 'refresh': #Restarts RunServerDotPy, implementing any changes that have occured in the code
-        tellRaw('Refreshing server...', user)
-        runAdminChatCommand('stop', [], user) #Manually calls the "stop" admin ChatCommand with the user as the executor
-        print ('Unhooking keyboard...')
-        keyboard.unhook_all()
-        while process.poll() == None: #Get remaining output while the process is still running
-            getOutput(process)
-        try:
-            process.wait() #Wait for the process to complete
-            print (process.stdout.read().decode('UTF-8', 'replace')) #Read any leftover messsages and flush buffer
-        except:
-            pass
-        finalizeLogFile() #Finalize the log file
-        closeOpenFileHandles() #Important, because command below leaves file handles open
-        print ('Goodbye')
-        os.execl(sys.executable, sys.executable, *sys.argv) #Immediately replace the current process with this one, retaining arguments
-    elif cmd == 'reload': #Reloads the server's resources, using the in-game /reload command
-        tellRaw('Reloading!', None, user)
-        writeCommand('reload')
-    elif cmd in {'restart', 'stop'}: #Stops the server, using the in-game /stop command
-        tellRaw('Restarting server...', user)
-        for i in range(3, 1, -1): #Countdown to warn users
-            writeCommand('tellraw @a {"text":"Warning! Server closing for a restart in '+str(i)+' seconds!","bold":true,"color":"red"}')
-            time.sleep(1)
-        writeCommand('tellraw @a {"text":"Warning! Server closing for a restart in 1 second!","bold":true,"color":"red"}')
-        time.sleep(1)
-        writeCommand('tellraw @a ["",{"text":"Warning! Server closing for a restart ","bold":true,"color":"red"},{"text":"NOW!","bold":true,"color":"dark_red"}]')
-        writeCommand('kick @a Server restarting!') #Kick all the players from the server
-        writeCommand('save-all') #Save the game
-        writeCommand('stop') #Stop the server
-    elif cmd in {'save', 'save-all'}: #Saves the game, using the in-game /save-all command
-        tellRaw('Saving the game')
-        writeCommand('save-all')
-        tellRaw('Saved the game')
-    elif cmd in {'unban', 'pardon'}: #Unbans a user, using the in-game /pardon command
-        tellRaw('Unbanning '+(' '.join(args[0])), 'Pardon', user)
-        writeCommand('pardon '+(' '.join(args)))
-    elif (os.name != 'nt') and (cmd in {'update', 'upgrade'}): #Updates system packages, and optionally distribution and pip, and optionally auto-cleans. Linux only
-        tellRaw('Updating package lists...', 'Update')
-        cmd = 'sudo apt-get update'
-        tellRaw(cmd)
-        runWFullOutput(cmd, tellRaw)
-        tellRaw('Done', 'Update')
-        tellRaw('Upgrading packages...', 'Upgrade')
-        cmd = 'yes | sudo apt-get upgrade'
-        tellRaw(cmd)
-        runWFullOutput(cmd, tellRaw)
-        tellRaw('Done', 'Upgrade')
-        if 'dist' in args:
-            tellRaw('Running distribution upgrade...', 'DistUpgr')
-            cmd = 'yes | sudo apt-get dist-upgrade'
-            tellRaw(cmd)
-            runWFullOutput(cmd, tellRaw)
-            tellRaw('Done', 'DistUpgr')
-        if 'clean' in args:
-            tellRaw('Auto-cleaning packages...', 'AutoClean')
-            cmd = 'yes | sudo apt-get autoclean'
-            tellRaw(cmd)
-            runWFullOutput(cmd, tellRaw)
-            cmd = 'yes | sudo apt-get autoremove'
-            tellRaw(cmd)
-            runWFullOutput(cmd, tellRaw)
-            tellRaw('Done', 'AutoClean')
-        del cmd
-    else: tellRaw('Unknown command "'+cmd+'", sorry', 'OPCCmd', user)
-
-#   Root commands (only server console can run these commands)
-def runRootChatCommand(cmd, args):
-    print ('$ Running Root ChatCommand '+cmd)
-    if len(modsRoot) and (cmd in modsRoot): modsRoot[cmd](args, user) #Check if there are any mod commands loaded, and check the command against any mod commands if they are loaded
-    elif cmd == 'help': cc_help(chatCommandsHelpRoot, args, chatComPrefix+'root', '', True)
-    elif cmd == 'clearlogs':
-        global loggedAmountIter, loggedAmountTotal
-        print ('Finishing logs so that they can be safely removed...')
-        finalizeLogFile()
-        print ('Removing log directory...')
-        shutil.rmtree(logDir)
-        loggedAmountIter = {}
-        loggedAmountTotal = {}
-        print ('Removed logs')
-        print ('Running startup for new logs...')
-        makeLogFile()
-        print ('All logs have been deleted')
-    elif cmd == 'py':
-        com = ' '.join(args)
-        print ('> "'+com+'" > Python')
-        print ('< "'+str(eval(com))+'"')
-    else: print ('Unknown command "'+cmd+'" (args: '+str(args)+')')
-
-# Indev AntiCheat (not currently in development)
-def getPlayerPos(user):
-    #Index: 0123456789012345678901234567890123456789
-    #Chat:  [HH:MM:SS] [Server thread/INFO]: <Username> Message
-    #/me:   [HH:MM:SS] [Server thread/INFO]: * Username Message
-    #Death: [HH:MM:SS] [Server thread/INFO]: Username was slain by Entity Name
-    writeCommand('data get entity '+user+' Pos')
-    while True:
-        out = getOutput(process)
-        if out[0] == '[' and out[9] == ']' and out[11:33] == '[Server thread/INFO]: ':
-            out = out[33:]
-            if out.lower().startswith(user.lower()+' has the following entity data: '):
-                pos = out.split('[')[1].split(']')[0].replace('d', '').split(', ')
-                break
-    for i in range(len(pos)):
-        pos[i] = round(float(pos[i]))
-    return pos
+            self.send_response(404) #Response: 404 Not Found
+            self.end_headers()
+            logData(time.strftime('[%Y-%m-%d %H:%M:%S]')+' '+str(self.client_address)+' <- [POST/'+self.path+'(!)] "404 File Not Found', 'WebInterface')
+    def log_message(self, format, *args): return #Silence logging messages
 
 # Minecraft server handling
 def startServer():
@@ -961,7 +1061,7 @@ def enterKeyPressed(key):
     try:
         line = sys.stdin.readline().rstrip() # Read a single line from sys.stdin
         if line.startswith(chatComPrefix): #It is a ChatCommand, so place it in inputQueue to be "injected" into output to prevent desync
-            inputQueue.put('[##:##:##] [Server thread/INFO]: <'+ccRootUsr+'> '+line, False) #A queue to be ran by the "getOutput" command to synchronously perform ChatCommands from the server console
+            inputQueue.append('[##:##:##] [Server thread/INFO]: <'+ccRootUsr+'> '+line) #A queue to be ran by the "getOutput" command to synchronously perform ChatCommands from the server console
             writeCommand('') #Write this here to trigger the getOutput function to run
         else: #Otherwise pass it to the server console as normal, as the Minecraft server is asynchronous anyways
             print ('> '+line)
@@ -987,7 +1087,7 @@ def autoBackup(): #Requires Linux
         os.chdir(cwd) #Go back to previous working directory to prevent conflicts
 def swapIcon():
     print ('Swapping server icon...')
-    if len(serverIcons) > 0:
+    if serverIcons:
         srvrIco = random.choice(serverIcons)
         print ('Selected server icon:\n'+os.path.basename(srvrIco)+'\nSwapping...')
         shutil.copy(srvrIco, srvrFolder+'server-icon.png') #Copy over new server icon
@@ -995,7 +1095,7 @@ def swapIcon():
     else: print ('\nNO *.png SERVER ICONS PRESENT! ADD SOME IN '+iconsDir+'!\n') #If there are no server icons to choose from
 def swapMOTD(uptimeStart): #MOTD = message of the day
     print ('Swapping MOTD...')
-    if len(motds) > 0:
+    if motds:
         motd = random.choice(motds)
         motd += '\\u00A7r\\n\\u00A7o(Last restart: \\u00A7n'+(time.ctime(uptimeStart).rstrip().replace('  ', ' '))+'\\u00A7r\\u00A7o)' #Add timestamp to MOTD
         print ('Selected MOTD:\n'+motd)
@@ -1014,10 +1114,10 @@ def swapMOTD(uptimeStart): #MOTD = message of the day
         print ('Done')
     else: print ('\nNO MOTDs TO CHOOSE FROM! ADD SOME IN '+confDir+'motds.conf!\n') #If there are no MOTDs to choose from
 def serverHandler(): #Does everything that is needed to start the server and safely close it
-    global lastSpeedTest, lastTickTest, uptimeStart
+    global lastSpeedTest, lastTickTest, uptimeStart, web_data
     lastSpeedTest = -1
     lastTickTest = -1
-    uptimeStart = time.monotonic()
+    uptimeStart = time.time()
     #Setup functions
     keyboard.unhook_all() #Unhook keyboard while processes are running
     autoBackup() #Automatically backup everything
@@ -1025,6 +1125,7 @@ def serverHandler(): #Does everything that is needed to start the server and saf
     swapMOTD(uptimeStart) #Swap the server MOTD (message of the day) (if there are any present)
     makeLogFile() #Setup logging
     closeOpenFileHandles() #Close any open file handles
+    web_data = deque(maxlen=20) #Initialize web data queue with a maximum length of 20
     #Rehook keyboard
     rehookKeyboard() #The keyboard hook is used for getting input from the server console
     #Main server starting and handling
@@ -1035,13 +1136,15 @@ def serverHandler(): #Does everything that is needed to start the server and saf
     #0         1         2         3
     #0123456789012345678901234567890
     #[13:15:14] [main/INFO]: You need to agree to the EULA in order to run the server. Go to eula.txt for more info.
-    if out[0] == '[' and out[9:] == '] [main/INFO]: You need to agree to the EULA in order to run the server. Go to eula.txt for more info.':
+    if (out[0] == '[' and out[9:] == '[main/WARN]: Failed to load eula.txt') or (out[0] == '[' and out[9:] == '] [main/INFO]: You need to agree to the EULA in order to run the server. Go to eula.txt for more info.'):
         print ('EULA has not been agreed too')
         with open('eula.txt') as f:
             eula = f.read().split('\n')
-        import webbrowser
-        webbrowser.open(eula[0].split('(')[1].split(')')[0])
-        del webbrowser
+        if os.name == 'nt':
+            import webbrowser
+            webbrowser.open(eula[0].split('(')[1].split(')')[0])
+        else:
+            os.system('sudo -u '+bashUser+' xdg-open '+(eula[0].split('(')[1].split(')')[0]))
         if input('Do you accept the Mojang EULA? (Y/n) >').lower() == 'n': exit()
         else:
             eula[2] = 'eula=true'
@@ -1067,9 +1170,13 @@ def serverHandler(): #Does everything that is needed to start the server and saf
     keyboard.unhook_all() #Unhook keyboard
 def serverLoopHandler(): #Main program that handles auto-restarting and exception catching and handling
     global restarts
+    customRuntimes = {'firstStart': [], 'everyStart': [], 'lastStop': [], 'everyStop': []}
+    for i in customRuntimes['firstStart']: i(globals)
     while True:
         try:
+            for i in customRuntimes['everyStart']: i(globals)
             serverHandler()
+            for i in customRuntimes['everyStop']: i(globals)
         except:
             print ('Error!\n'+traceback.format_exc())
         try:
@@ -1085,6 +1192,7 @@ def serverLoopHandler(): #Main program that handles auto-restarting and exceptio
             print ('Auto-restart cancelled')
             print ('Auto-restarted '+str(restarts)+' times')
             break
+    for i in customRuntimes['lastStop']: i(globals)
     print ('Logged amount over '+str(restarts)+' restarts:\n'+str(loggedAmountTotal))
 
 # Main
