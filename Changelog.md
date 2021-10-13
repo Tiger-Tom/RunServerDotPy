@@ -39,6 +39,7 @@ Bugfixes:
   - Fixed an issue with the time calculations for "uptime" by replacing time.monotonic() with time.time()
   - Fixed an issue where modules would be installed in the wrong version if "pip3" didn't correspond to the correct Python version
   - Fixed an issue where "requests" module wasn't in the "non-standard" group that would be automatically installed if they were missing (I thought that that was build-in...)
+  - Speedtest command now prevents any user from running it again if a speedtest is already running
 
 - Minor:
   - Fixed a bug which would cause the "sysinfo" command to still check for battery(when it still existed)/temperature, even if these don't actually exist, therefore causing an exception
