@@ -1,5 +1,5 @@
 # RunServerDotPy
-A script to run a Java Minecraft server, and can run special ChatCommands, automatically backs up the server, and log important information.
+A script to run a Java Minecraft server, and can run special ChatCommands, automatically back up the server, and log important information.
 > "Incredible. Best program I have ever used. 11/10 stars. (_Note: I was __NOT__ paid to write this review_)" -@Tiger-Tom
 
 This script has the following features (besides interfacing with the Minecraft server as a command line):
