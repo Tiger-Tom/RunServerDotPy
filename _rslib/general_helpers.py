@@ -259,7 +259,7 @@ class FileBackedDict(dict):
         return hasattr(self, 'bgtimer') and self.bgtimer.is_alive()
 
     def close(self):
-        if self.bgtimer: self.stop_bg_loop()
+        if self.bg_loop_running: self.stop_bg_loop()
         self.sync_all()
     
     def __enter__(self): self.start_bg_loop()
