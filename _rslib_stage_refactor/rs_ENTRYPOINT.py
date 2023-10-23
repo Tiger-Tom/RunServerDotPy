@@ -3,7 +3,7 @@
 # The main program, or "entrypoint" #
 
 #> Imports
-from _rslib import general_helpers
+from _rslib import helper_types
 from _rslib.rschatcommand import ChatCommands
 from _rslib.rsconfig import Config
 from _rslib.rsio import RSIO
@@ -16,7 +16,7 @@ from _rslib.rsplugins import PluginManager
 class RunServer:
     __slots__ = (
         'logger',
-        'Helpers', 'H',
+        'HelperTypes', 'HT',
         'Bootstrapper', 'BS',
         'Config', 'C',
         'IO',
@@ -30,7 +30,7 @@ class RunServer:
     def __init__(self, bs: 'Bootstrapper'):
         self.logger = bs.root_logger
         self.logger.info('Initializing entrypoint')
-        self.Helpers = self.H = general_helpers
+        self.HelperTypes = self.HT = helper_types
         self.Bootstrapper = self.BS = bs
         self.Config = self.C = Config(self)
         self.IO = RSIO(self)
