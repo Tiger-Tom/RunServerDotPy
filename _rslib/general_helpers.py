@@ -250,8 +250,10 @@ class FileBackedDict(dict):
     def start_bg_loop(self, interval_secs: float = 60.0):
         self.sync_all_bg_loop(interval_secs)
     @_locked # to avoid edge cases where bg_loop is already running and will set a timer object
-    def stop_bg_loop(self):
+    def stop_bg_loop(self) -> bool:
+        r = self.bg_loop_running()
         self.bgtimer.cancel()
+        return r
     @_locked
     def bg_loop_running(self):
         return hasattr(self, 'bgtimer') and self.bgtimer.is_alive()
