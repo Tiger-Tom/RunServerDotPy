@@ -27,7 +27,7 @@ def setup_logger():
 if __name__ == '__main__':
     setup_logger()
     if 1:#try:
-        from _rslib.rs_BOOTSTRAP import Bootstrapper
+        from _rsruntime.rs_BOOTSTRAP import Bootstrapper
         bs = Bootstrapper() # not the kind you're thinking of!!!
     #except Exception as e:
     #    ...

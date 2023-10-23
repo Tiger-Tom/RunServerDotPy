@@ -20,7 +20,7 @@ import requests
 #> Header >/
 class Bootstrapper:
     __slots__ = ('root_logger', 'logger',)
-    base_dirs = {'rsconf', 'rsplugins/builtin', 'rslib'}
+    base_dirs = {'rsconf', 'rsplugins/builtin', 'rsruntime'}
     #dl_man_base = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e'
     dl_man_base = 'http://0.0.0.0:8000/manifests'
     dl_man_path = lambda self,n: f'{self.dl_man_base}/{n.replace("/", "_")}.json'
@@ -66,7 +66,7 @@ class Bootstrapper:
             except Exception as e:
                 self.logger.fatal(f'execute_manifest failed somewhere: caught {e}; dazed and confused, but trying to continue')
         self.logger.warning('BOOTSTRAPPING COMPLETE; ATTEMPTING TO ACCESS ENTRYPOINT...')
-        from _rslib.rs_ENTRYPOINT import RunServer
+        from _rsruntime.rs_ENTRYPOINT import RunServer
         self.logger.warning('ENTRYPOINT ACCESSED, INITIALIZING ENTRYPOINT...')
         rs = RunServer(self)
         self.logger.warning('ENTRYPOINT INITIALIZED, EXECUTING ENTRYPOINT...')
