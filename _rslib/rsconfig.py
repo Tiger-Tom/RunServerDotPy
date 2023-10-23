@@ -2,12 +2,6 @@
 
 # Sources configuration from files and arguments #
 
-# hack
-import sys
-sys.path.append('..')
-import RunServer
-RunServer.setup_logger()
-
 #> Imports
 import typing
 # File

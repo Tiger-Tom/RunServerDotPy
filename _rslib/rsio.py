@@ -23,9 +23,9 @@ class RSIO_Base(ABC):
     __slots__ = ('rs', 'logger', 'hooks', 'cmdline')
     def __init__(self, rs: 'RunServer'):
         self.rs = rs
-        #self.hooks = helpers.GenericHooks('input', 'output')
-        #self.logger = rs.logger.getChild('RunServer.IO')
-        #self.logger.debug(f'Initialized: {self}')
+        self.hooks = helpers.GenericHooks('input', 'output')
+        self.logger = rs.logger.getChild('RunServer.IO')
+        self.logger.debug(f'Initialized: {self}')
     def register(self, hook: typing.Literal['input', 'output'], callback: typing.Callable):
         self.logger.debug(f'Registering {hook} hook: {callback}')
         self.hooks.register(hook, callback)
