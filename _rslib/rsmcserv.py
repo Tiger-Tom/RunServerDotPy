@@ -220,7 +220,7 @@ class UserManager(dict):
     def priveledge(self, user: str | User):
         if user == self.CONSOLE: return 255
         if isinstance(user, str): user = User[user] # user user user
-        return self.C.get('users/priveledge', {}).get(self.users[user]["uuid"], self.PERMISSION_USER)
+        return self.C.get('users/{user.uuid}/permission', self.PERMISSION_USER)
 # Tellraw helper
 class Tellraw(list):
     '''
