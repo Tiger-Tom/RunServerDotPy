@@ -172,7 +172,6 @@ class UserManager(dict):
             self.connected = False
             self.last_disconnected = time.localtime()
     
-    
     def __init__(self, rs: 'RunServer'):
         self.rs = rs
         self.users = defaultdict(self.User)
