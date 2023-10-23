@@ -221,6 +221,10 @@ class UserManager(dict):
         if user == self.CONSOLE: return 255
         if isinstance(user, str): user = User[user] # user user user
         return self.C.get('users/{user.uuid}/permission', self.PERMISSION_USER)
+    @classmethod
+    def to_permission(cls, perm: typing.Literal['USER', 'ADMIN', 'SUPER', 'ROOT'] | int):
+        if isinstance(perm, int): return perm
+        return self.PERMISSIONS[perm]
 # Tellraw helper
 class Tellraw(list):
     '''
