@@ -23,7 +23,7 @@ class ChatCommands:
         '''
         __slots__ = ('name', 'aliases', 'function', 'permission', 'section', 'help_text', 'cmd_line')
     
-        def __init__(self, command: str | tuple[str], target: typing.Callable, permission: typing.Literal['PERMISSION_USER', 'PERMISSION_ADMIN', 'PERMISSION_SUPER', 'PERMISSION_ROOT'], section='(unset)'):
+        def __init__(self, command: str | tuple[str], target: typing.Callable, permission: typing.Literal['USER', 'ADMIN', 'SUPER', 'ROOT'] | int, section: str = '(unset)'):
             if isinstance(command, str):
                 self.name = command
                 self.aliases = set()
@@ -62,6 +62,14 @@ class ChatCommands:
 
         def help(self, symbol: str):
             return f'{symbol}{self.name}{"" if not self.aliases else "|"+("|".join(self.aliases))} {self.cmd_line}\n{self.help_text}'
+    def __call__(self, command: str | tuple[str], permission: typing.Literal['USER', 'ADMIN', 'SUPER', 'ROOT'] | int, section: str = '(unset)'):
+        '''
+            Offers a quicker way to creat a ChatCommand class from a function and register it immediately via a decorator
+        '''
+        def real_wrapper(func: typing.Callable):
+            self.register(self.ChatCommand(command, permission if isinstance(permission, int) else self.rs.U.PERMISSIONS[permission], section))
+            return func
+        return real_wrapper
     
     def __init__(self, rs: 'RunServer'):
         self.rs = rs
