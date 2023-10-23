@@ -1,0 +1,47 @@
+#> Imports
+import os
+import subprocess
+import json
+import psutil
+import platform
+import time
+import sys
+#</Imports
+
+#> Main >/
+# User-level commands
+@__.ChatCommand('size', 0, 'Displays the size of the world', 'size: Shows the size of the server world and also shows disk space on the server')
+def command_size(user, *args):
+	fs,typ,size,used,avail,perc = (i for i in (subprocess.check_output(('df', '--output=source,fstype,size,used,avail,pcent', '.')).decode().split('\n')[1].split(' ')) if i != '')
+	(print if user == __.console_id else lambda msg: tellraw(user, msg))(f'{subprocess.check_output(("du", "-sh", ".")).decode().split("	")[0]} is taken up by the server\nTotal {round(int(used)/1024, 3)} MiB used ({perc}) of {round(int(size)/1024, 3)} MiB on {fs}({typ}) ({round(int(avail)/1024, 3)} MiB free) of ')
+
+@__.ChatCommand('sysinfo', 0, 'Displays system information', 'sysinfo: Displays information about the system')
+def command_sysinfo(user, *args):
+    (print if user == __.console_id else lambda msg: tellraw(user, msg))(f'{platform.node()}:\n{psutil.cpu_percent()}% CPU usage\\n{psutil.virtual_memory()}% memory used')
+
+@__.ChatCommand('uptime', 0, 'Shows uptime', 'sysinfo: Displays the uptime of the system, the program, and the server')
+def command_uptime(user, *args):
+    (print if user == __.console_id else lambda msg: tellraw(user, msg))(f'System has been online since {time.ctime(psutil.boot_time())}\nServer manager online since {time.ctime(__.uptime[0])}\nServer iteration online since {time.ctime(__.uptime[1])}')
+
+@__.ChatCommand('version', 0, 'Get the version of the server', 'Gets the version of the Minecraft server, Java, the server manager, and Python')
+def command_version(user, *args):
+    jver = subprocess.check_output(('java', '--version')).decode().split('\n')[0]
+    (print if user == __.console_id else lambda msg: tellraw(user, msg))(f'Minecraft {__.LineParser.version} on Java {jver}\nRunServer.py {".".join(__version__)} on Python {sys.version}')
+
+# Console-level commands
+def statemap_dump(mapping, indent=0, indent_step=4):
+    for k,v in mapping.items():
+        if type(v) == dict:
+            yield f'{" "*indent}{k} =>'
+            for i in statemap_dump(v, indent+indent_step, indent_step): yield i
+            continue
+        yield f'{" "*indent}{k} = {v}'
+@__.ChatCommand('statemap', 2, 'Displays a mapping of the module shared state', 'statemap [tree_from]: Shows a map of the module shared state. If tree_from is set, than it attempts to work from that tree')
+def command_statemap(_, *args):
+    target = __.sharedState
+    if len(args):
+        for i,s in enumerate(args[0].split('.')):
+            if (target := target.get(s)) == None:
+                print(f'Error: failed at target {s} ({i} steps down)')
+                return 
+    print('\n'.join(statemap_dump(target.map())))

@@ -1,0 +1,59 @@
+#> Imports
+import time
+import threading
+import speedtest
+#</Imports
+
+#> Main >/
+# User-level commands
+__.sharedState.benchmark.command_tps.secs_interval = 60
+__.sharedState.benchmark.command_tps.debug_duration = 10
+
+@__.ChatCommand('tps', 0, 'Checks the TPS of the server', f'Checks the TPS of the server over a {__.sharedState.get("benchmark.command_tps.debug_duration")}-second duration. Can only be run once every {__.sharedState.benchmark.command_tps.secs_interval} second(s) on a per-user basis')
+def command_tps(user, *args):
+    minInterval = __.sharedState.benchmark.command_tps.secs_interval
+    if (user not in __.mgr.superusers) and (user != __.console_id):
+        timeLeft = minInterval = round(time.time()) - __.sharedState.benchmark.command_tps.users.get(user, 0)
+        if timeLeft > 0:
+            __.tellraw(user, f'Please wait {timeLeft} more second{"" if timeLeft == 1 else "s"}')
+            return
+    __.sharedState.benchmark.command_tps.users.set(user, round(time.time()))
+    __.run('debug start')
+    time.sleep(10)
+    if tps := __.LineParser.parse_command_output(__.run('debug stop'), 'commands.debug.stopped', ('(?P<secs>[0-9\.]+)', '(?P<ticks>[0-9\.]+)', '(?P<tps>[0-9\.]+)')):
+        out = f'Had a TPS of {tps["tps"]} over {tps["secs"]} second{"" if tps["secs"] == 1 else "s"}, AKA {tps["ticks"]} tick{"" if tps["ticks"] == 1 else "s"}\n'
+    else:
+        out = 'Failed to get TPS'
+    if user == __.console_id:
+        print(out)
+    else:
+        __.tellraw(user, out)
+    
+
+__.sharedState.benchmark.command_ist.secs_interval = 600
+__.sharedState.benchmark.command_ist.last_test = 0
+
+def threaded_speedtest(st, onEnd):
+    try:
+        onEnd(f'Download: {round(st.download()/1024/1024, 3)} Mibits/s')
+        onEnd(f'Upload: {round(st.upload()/1024/1024, 3)} Mibits/s')
+    except Exception as e:
+        onEnd(f'Speedtest failed, try again later. Reason: {e}')
+@__.ChatCommand('ist', 0, 'Checks the speed of the server\'s internet', f'ist: Checks the speed of the server\'s connection to the internet. Can only be run once every {__.sharedState.benchmark.command_ist.secs_interval} second(s) on a global basis')
+def command_ist(user, *args):
+    if (user != __.console_id) and (user not in __.mgr.superusers):
+        timeLeft = __.sharedState.benchmark.command_ist.secs_interval - (round(time.time()) - __.sharedState.benchmark.command_ist.last_test)
+        if timeLeft > 0:
+            __.tellraw('@a', f'Another speed test can be run in {timeLeft} second{"" if timeLeft == 1 else "s"}. Please wait')
+            return
+    st = speedtest.Speedtest()
+    best = st.get_best_server()
+    if user != __.console_id:
+        tellraw('@a', 'Running threaded internet speed test. This could take a little while.')
+        tellraw('@a', f'Checking speed to {best["host"].split(":", 1)[0]} by {best["sponsor"]} ({best["name"]}, {best["cc"]} | {best["lat"]}°N, {best["lon"]}°E)')
+        __.sharedState.benchmark.command_ist.last_test = time.time()
+        threading.Thread(target=threaded_speedtest, args=(st, lambda m: __.tellraw('@a', m),), daemon=True)
+    else:
+        print('Running internet speed test')
+        print(f'Checking speed to {best["host"].split(":", 1)[0]} by {best["sponsor"]} ({best["name"]}, {best["cc"]} | {best["lat"]}°N, {best["lon"]}°E)')
+        threaded_speedtest(st, print)

@@ -1,0 +1,11 @@
+#> Imports
+import re
+#</Imports
+
+#> Main >/
+# List players
+def util_listPlayers() -> dict[str, int | dict[str, str]] | None:
+    if mat := __.LineParser.parse_command_output(__.run('list uuids'), 'commands.list.players', ('(?P<count>\d+)', '(?P<max>\d+)', '(?P<players>[\w, \-\(\)]+)')):
+        return {'count': int(mat['count']), 'max': int(mat['max']), 'players': {p: u for p, u in (__.LineParser.parse_command_output(l, 'commands.list.nameAndId', ('(?P<name>\w+)', '(?P<uuid>[\w\-]+)')).values() for l in mat['players'].split(', '))}}
+## Export
+__.sharedState.utils.list = util_listPlayers

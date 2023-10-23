@@ -1,0 +1,49 @@
+#> Imports
+import os
+#</Imports
+
+#> Helper functions
+def _base_help(user, permlvl, *args):
+    modeServer = user == __.console_id
+    if not len(args):
+        for k, v in __.commands.items():
+            if v['level'] != permlvl: continue
+            if modeServer:
+                print(f'- {k}: {v["help"][0]}')
+            else:
+                __.tellraw(user, f'{{"text":"- {k}: {v["help"][0]}","insertion":"{__.prefix}{k}","hoverEvent":{{"action":"show_text","contents":["{k} (level: {v["level"]}) from {v["source"]}","\\n","{v["help"][1]}"]}}}}')
+        return
+    name = args[0].lower()
+    if name not in __.commands:
+        if modeServer:
+            print(f'Command {name} not found. Try "{__.prefix}help"?')
+        else:
+            __.tellraw(user, f'{{"text":"Error: command {name} not recognized. Try \\"{__.prefix}help\\"?","bold":true,"color":"red","insertion":"{__.prefix}help"}}')
+        return
+    cmd = __.commands[name]
+    if modeServer:
+        print(f'{name} (level {cmd["level"]}) from {cmd["source"]}\n{cmd["help"][1]}')
+    else:
+        __.tellraw(user, f'{{"text":"{name} (level {cmd["level"]}) from {cmd["source"]}\\n{cmd["help"][1]}","insertion":"{__.prefix}{name}"}}')
+#</Helper functions
+
+#> Main >/
+# User-level commands
+## Help commands
+@__.ChatCommand('help', 0, 'Displays a list of commands or help on a given command', 'help [command]: Gives extended help on the command [command], or gives a list of all commands with basic help if [command] is not specified')
+def command_help(user, *args):
+    _base_help(user, 0, *args)
+    if user in __.mgr.superusers or user == __.console_id:
+        if user != __.console_id:
+            __.tellraw(user, f'{{"text":"You are a superuser (congrats!). Use {__.prefix}suhelp for super-user help","insertion":"{__.prefix}suhelp"}}')
+        else:
+            print(f'You are a superuser (congrats!). Use {__.prefix}suhelp for super-user help')
+            print(f'Use {__.prefix}chelp for console/root commands')
+@__.ChatCommand('suhelp', 1, 'Displays a list of superuser-level commands or help on a given command', 'help [command]: Gives extended help on the command [command], or gives a list of all superuser-level commands with basic help if [command] is not specified')
+def command_suhelp(user, *args):
+    _base_help(user, 1, *args)
+    if user == __.console_id:
+        print(f'Use {__.prefix}chelp for console/root commands')
+@__.ChatCommand('chelp', 2, 'Displays a list of console-level commands or help on a given command', 'help [command]: Gives extended help on the command [command], or gives a list of all console-level commands with basic help if [command] is not specified')
+def command_chelp(user, *args):
+    _base_help(user, 2, *args)    

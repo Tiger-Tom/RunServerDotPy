@@ -1,0 +1,51 @@
+{
+    "attention_types": [
+        "chat",
+        "join_leave",
+        "entity_death",
+        "rcon",
+        "server",
+        "command",
+        "death"
+    ],
+    "autorestart-after": 12,
+    "cc_prefix": "!",
+    "ignored_logs": [],
+    "join_message": "Welcome to the server, $user! Use $ccprefixhelp for a list of chat commands.",
+    "log_format": "[%Y-%m-%d %H:%M:%S] {message}\n",
+    "motds": [
+        "The server was last restarted at %Y-%m-%d %H:%M:%S %Z"
+    ],
+    "ram_mb": 2048,
+    "rcon": {
+        "password": "105832",
+        "port": 25575
+    },
+    "terminal_colors": {
+        "attention": [
+            null,
+            null,
+            "\u001b[1m"
+        ],
+        "error": [
+            198,
+            16,
+            null
+        ],
+        "fail": [
+            16,
+            198,
+            "\u001b[1m"
+        ],
+        "ok": [
+            null,
+            null,
+            null
+        ],
+        "warn": [
+            11,
+            null,
+            null
+        ]
+    }
+}

@@ -1,0 +1,40 @@
+#> Main >/
+# SU level commands
+@__.ChatCommand('log', 1, 'Interface with the logging interface', 'log: Use "log help" for help')
+def command_log(user, *args):
+    is_server = user == __.console_id
+    out = (print if is_server else lambda m: tellraw(user, m))
+    if len(args) == 0: cmd = 'help'
+    else:
+        cmd = args[0]
+        args = args[1:]
+    if cmd == 'help':
+        out('Logging commands:')
+        cmds = {
+            'help': 'log help: This list',
+            'write': 'log write [message]: Writes [message] to the log file \'manual\'',
+            'flush': 'log flush [category]: Flushes the log in [category]',
+            'count': 'log count [category]: Displays the amount of logs that have been written to [category] this session',
+        }
+        out('([category] can be replaced with \'*\' to affect all open logs')
+        for c,m in cmds.items():
+            if is_server: print(f'{m}')
+            else: __.tellraw(user, f'{{"text":"{m}","insertion":"{__.prefix}log {c}"}}')
+        return
+    elif cmd == 'write':
+        __.log('manual', ' '.join(args))
+        return
+    log = ' '.join(args)
+    print(log)
+    if ((log not in __.logger.log_files) and (log != '*')):
+        out('Please provide a valid logging file, or "*" for all files')
+        return      
+    if cmd == 'flush':
+        __.logger.flush(log)
+        out(f'Flushed {log}')
+    elif cmd == 'count':
+        if log == '*':
+            for l,f in __.logger.log_files.items():
+                out(f'{l} ({f["file"].name}): {f["count"]} logs ({f["written"]} characters)')
+        else:
+            out(f'{log} ({__.logger.log_files[log]["file"].name}): {__.logger.log_files[log]["count"]} logs ({__.logger.log_files[log]["written"]} characters)')

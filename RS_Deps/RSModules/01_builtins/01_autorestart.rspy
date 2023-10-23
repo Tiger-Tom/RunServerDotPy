@@ -1,0 +1,15 @@
+#> Main >/
+@__.TimedFunction(True, __.programConfig['autorestart-after']*60*60)
+def timer_autorestart():
+    for i in range(5, 1, -1):
+        print(f'Server automatically restarting in {i} seconds')
+        __.tellraw('@a', f'[{{"text": "Server going down for a restart in ", "color": "red"}}, {{"text": "{i}", "color": "red", "bold": true}}, {{"text": " seconds", "color": "red"}}]')
+        time.sleep(1)
+    print(f'Server automatically restarting in 1 second!')
+    __.tellraw('@a', f'[{{"text": "Server going down for a restart in ", "color": "red"}}, {{"text": "1", "color": "red", "bold": true}}, {{"text": " second!", "color": "red"}}]')
+    time.sleep(1)
+    print(f'Server automatically restarting NOW!')
+    __.tellraw('@a', f'[{{"text": "Server going down for a restart ", "color": "red"}}, {{"text": "NOW!", "color": "red", "bold": true}}]')
+    __.run('save-all')
+    __.run('stop')
+    
