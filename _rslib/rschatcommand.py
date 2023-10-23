@@ -14,12 +14,14 @@ class ChatCommands:
     class ChatCommand:
         '''
             Help for the command is specified by the doc-string of the target function
+            The target function must have at least an argument for RunServer and for the object of the calling user
             The command-line string (A.E. "test|t [arg0:int] [arg1_1|arg1_2] {arg1:str='abc'} {arg2} {arg3:int} (varargs...)") is generated automatically using the target function's arguments
-                That command-line string would be generated from a function such as: `def test(arg0: int, arg1: typing.Literal['arg1_1', 'arg1_2'], arg2: str = 'abc', arg3=None, arg4: int = None, *varargs)`
+                That command-line string would be generated from a function such as: `def test(rs: 'RunServer', user: 'User', arg0: int, arg1: typing.Literal['arg1_1', 'arg1_2'], arg2: str = 'abc', arg3=None, arg4: int = None, *varargs)`
                 Annotations of multiple possible literal arguments should be given as `typing.Literal[literal0, literal1, ...]`, which results in `[literal0|literal1|...]`
                 Annotations and default values are detected from the function signature, as in: `arg: int = 0`, which results in `{arg:int=0}`
                     A default value of "None" indicates the argument as optional without hinting the default, as in: `arg=None`, which results in `{arg}`
                 Keyword-only args and varargs are ignored
+            
         '''
         __slots__ = ('name', 'aliases', 'function', 'permission', 'section', 'help_text', 'cmd_line')
     
@@ -34,10 +36,10 @@ class ChatCommands:
             self.permission = permission
             self.section = section
             self.help_text = self._func_to_help(target)
-            self.cmd_line = self._sig_to_cmdline(inspect.signature(target))
+            self.cmd_line = self._params_to_cmdline(tuple(inspect.signature(target).parameters)[2:])
 
         @classmethod
-        def _sig_to_cmdline(cls, sig: inspect.Signature):
+        def _params_to_cmdline(cls, params: tuple):
             return ' '.join(cline for cline in (cls._arg_to_cmdline(arg) for arg in sig.parameters.values()) if cline is not None)
         @classmethod
         def _arg_to_cmdline(cls, a: inspect.Parameter) -> str | None:
@@ -66,7 +68,7 @@ class ChatCommands:
         '''
             Offers a quicker way to creat a ChatCommand class from a function and register it immediately via a decorator
         '''
-        def real_wrapper(func: typing.Callable):
+        def real_wrapper(func: typing.Callable[[], None]):
             self.register(self.ChatCommand(command, permission if isinstance(permission, int) else self.rs.U.PERMISSIONS[permission], section))
             return func
         return real_wrapper
@@ -97,8 +99,9 @@ class ChatCommands:
         if cmd not in self.registered_aliases: return
         for c in self.commands.values():
             if cmd in c.aliases: return c
-    #def command(self, user: typing.Union[str, 'CONSOLE'], cmd: ChatCommand):
-    #    self.rs.U.self.rs.U.priveledge(user)
+    def command(self, user: typing.Union[str, 'User'], cmd: ChatCommand):
+        if isinstance(user, str): user = self.rs.U[user]
+        self.rs.U.priveledge(user)
     def help(self, target_command: ChatCommand | None = None) -> str | None:
         symbol = self.rs.C('chat_commands/symbol', '>')
         if target_command is not None:
