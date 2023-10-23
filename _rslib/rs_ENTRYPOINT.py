@@ -6,7 +6,6 @@
 from _rslib import general_helpers
 from _rslib.rschatcommand import ChatCommands
 from _rslib.rsconfig import Config
-from _rslib.rsmcserv import MCServerCLI
 from _rslib.rsio import RSIO
 from _rslib.rsmcserv import MCServerLang, MCServerOutputParser, UserManager, Tellraw
 from _rslib.rschatcommand import ChatCommands
@@ -20,7 +19,6 @@ class RunServer:
         'Helpers', 'H',
         'Bootstrapper', 'BS',
         'Config', 'C',
-        'ServerCLI', 'SCLI',
         'IO',
         'Lang', 'L',
         'Parser', 'Pa',
@@ -35,7 +33,6 @@ class RunServer:
         self.Helpers = self.H = general_helpers
         self.Bootstrapper = self.BS = bs
         self.Config = self.C = Config(self)
-        self.ServerCLI = self.SCLI = MCServerCLI(self)
         self.IO = RSIO(self)
         self.Lang = self.L = MCServerLang(self)
         self.Parser = self.Pa = MCServerOutputParser(self)

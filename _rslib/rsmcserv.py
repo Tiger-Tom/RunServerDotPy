@@ -21,15 +21,6 @@ from _rslib import general_helpers as helpers
 #</Imports
 
 #> Header >/
-# CLI Arg Manager
-class MCServerCLI:
-    __slots__ = ('rs',)
-
-    @property
-    def jar_path(self):
-        return Path(self.rs.C('minecraft/path', './minecraft'), self.rs.C('minecraft/server_jar_filename', 'server.jar'))
-    #@property
-    #def 
 # Server Jar
 class MCServerLang:
     __slots__ = ('rs', 'logger', 'jar_file', 'raw_lang', 'l', 'r')
@@ -42,7 +33,7 @@ class MCServerLang:
 
     def __init__(self, rs):
         self.rs = rs
-        self.jar_path = self.SCLI.jar_file = Path(self.rs.C('minecraft/path', './minecraft') / Path(self.rs.C('minecraft/server_jar_filename', 'server.jar')))
+        self.jar_path = Path(self.rs.C('minecraft/path', './minecraft'), self.rs.C('minecraft/server_jar_filename', 'server.jar'))
         self.logger = rs.logger.getChild('MCLang')
         self.logger.info(f'Extracting lang from {jfile} ...')
         self.raw_lang = self.open_and_extract_lang(self.jar_file)
@@ -150,6 +141,12 @@ class UserManager(dict):
     PERMISSION_ADMIN = 1
     PERMISSION_SUPER = 2
     PERMISSION_ROOT  = 3
+    PERMISSIONS = {
+        'USER':  PERMISSION_USER,
+        'ADMIN': PERMISSION_ADMIN,
+        'SUPER': PERMISSION_SUPER,
+        'ROOT':  PERMISSION_ROOT,
+    }
 
     @dataclass
     class User:
