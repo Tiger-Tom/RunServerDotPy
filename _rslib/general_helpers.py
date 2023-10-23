@@ -252,6 +252,9 @@ class FileBackedDict(dict):
     @_locked # to avoid edge cases where bg_loop is already running and will set a timer object
     def stop_bg_loop(self):
         self.bgtimer.cancel()
+    @_locked
+    def bg_loop_running(self):
+        return hasattr(self, 'bgtimer') and self.bgtimer.is_alive()
 
     def close(self):
         if self.bgtimer: self.stop_bg_loop()
