@@ -32,5 +32,5 @@ class RunServer:
                 super().__init__(self)
         RunServerModule.__slots__ += rs.__slots__
         return RunServerModule
-    def __calL__(self):
+    def __call__(self):
         self.logger.info('Entrypoint starting')
