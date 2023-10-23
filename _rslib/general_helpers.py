@@ -88,7 +88,7 @@ class FileBackedDict(dict):
     __slots__ = ('logger', 'path', 'dirty', 'lock', 'bgtimer', 'watchdog_times')
     _short_key_patt = r'\w\d\-'
     short_key_patt = re.compile(rf'^[{_short_key_patt}]$')
-    key_patt = re.compile(rf'^[{_short_key_patt}]+/[\/{_short_key_patt}]*?[{_short_key_patt}]$')
+    key_patt = re.compile(rf'^[{_short_key_patt}]+/.*?[^/]$')
 
     def __init__(self, path: Path):
         super().__init__()
