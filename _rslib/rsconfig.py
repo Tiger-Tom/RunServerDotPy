@@ -64,14 +64,16 @@ class Config:
         'get_default': get,
         'error': None,
     }
-    def __call__(self, key: str | tuple[str], default = None, on_missing: typing.Literal[*_on_missing_behavior.keys()] = 'set_default'):
+    def __call__(self, key: str | tuple[str], default = None, on_missing: typing.Literal[*_on_missing_behavior.keys()] = 'set_default', err_on_none_default: bool = True):
         '''
             By default, or when on_missing is "set_default", this function acts like get_set_default
             If on_missing is "get_default", this function acts like get
             If on_missing is "error", then a KeyError error is thrown if the value isn't set
+            If you want "get_default" or "set_default" to be able to use "None", set err_on_none_default=False
         '''
         assert on_missing in _on_missing_behavior
         if (f := self._on_missing_behavior[on_missing]) is not None:
+            if err_on_none_default and (default is None): raise KeyError(key, 'and default not supplied')
             if key not in self.return f(self, key, default)
         else: raise KeyError(key)
     def __getitem__(self, key: str | tuple[str]):
