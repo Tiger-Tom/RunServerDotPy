@@ -133,6 +133,11 @@ class FileBackedDict(dict):
             raise TypeError(f'Unsafe direct read of possible subkey at {key}[-1], dicts should not be edited manually (try using "/" notation or allow_unsafe_return=True)')
         return d
     __getitem__ = getitem
+    def get_setdefault(self, key: str | tuple[str], default):
+        key = self._keyify(key)
+        if key in self: return self[key]
+        self[key] = default
+        return default
     def _rawget(self, key: str): return super().__getitem__(key)
     @_locked
     def setitem(self, key: str | tuple[str], val, *, unsafe_write: bool = False):
