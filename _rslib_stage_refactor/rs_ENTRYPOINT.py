@@ -2,11 +2,15 @@
 
 # The main program, or "entrypoint" #
 
+#hacky
+import sys
+sys.path.append('..')
+
 #> Imports
-from _rslib import helper_types
+from _rslib_stage_refactor import *
 #</Imports
 
-#> Header
+#> Header >/
 class RunServer:
     __slots__ = (
         'logger',
@@ -14,10 +18,19 @@ class RunServer:
         'HelperTypes', 'HT',
     )
     def __init__(self, bs: 'Bootstrapper'):
-        self.logger = bs.root_logger
-        self.logger.info('Initializing entrypoint')
+        # Init
         self.Bootstrapper = self.BS = bs
-        self.HelperTypes = self.HT = helper_types
+        #self.logger = self.bs.root_logger
+        #self.logger.info('Initializing entrypoint')
+        # Helper types
+        self.HelperTypes = self.HT = base.helper_types
+    def __class_wrapper(rs, cls):
+        class RunServerModule(cls):
+            __slots__ = ('logger',)
+            def __init__(self, rs: 'RunServer'):
+                self.logger = rs.logger.getChild(self.__class__.__qualname__)
+                super().__init__(self)
+        RunServerModule.__slots__ += rs.__slots__
+        return RunServerModule
     def __calL__(self):
         self.logger.info('Entrypoint starting')
-#</Header
