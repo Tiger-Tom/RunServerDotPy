@@ -131,7 +131,7 @@ class FileBackedDict(dict):
             if not isinstance(d, dict): raise TypeError(f'Key {key}[{i+1}] tried to reference non-subkey {k} as a subkey')
             d = d[k]
         if isinstance(d, dict) and not allow_unsafe_return:
-            raise TypeError(f'Unsafe read direct dict at {key}[-1], dicts should not be edited manually (try using "/" notation or allow_unsafe_return=True)')
+            raise TypeError(f'Unsafe direct read of possible subkey at {key}[-1], dicts should not be edited manually (try using "/" notation or allow_unsafe_return=True)')
         return d
     __getitem__ = getitem
     def _rawget(self, key: str): return super().__getitem__(key)
