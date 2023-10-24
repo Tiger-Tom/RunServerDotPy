@@ -4,3 +4,7 @@
 #</Imports
 
 #> Header >/
+class MCLang:
+    ...
+class LineParser:
+    ...

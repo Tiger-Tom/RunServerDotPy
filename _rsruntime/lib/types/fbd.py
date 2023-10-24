@@ -4,3 +4,5 @@
 #</Imports
 
 #> Header >/
+class FileBackedDict(dict):
+    ...
