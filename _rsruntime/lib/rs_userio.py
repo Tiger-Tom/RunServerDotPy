@@ -3,6 +3,9 @@
 #> Imports
 #</Imports
 
+# RunServer Module
+RunServer = RS = NotImplemented
+
 #> Header >/
 class UserManager(dict):
     ...

@@ -4,6 +4,9 @@
 import abc
 #</Imports
 
+# RunServer Module
+RunServer = RS = NotImplemented
+
 #> Header >/
 # Base classes
 class BaseServerManager(abc.ABC):
