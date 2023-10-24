@@ -1,0 +1,90 @@
+Dependencies chain:
+
++ = supplies
+- = demands
+
+lib/
+* rs_config.py:
+    + Config
+        - FileBackedDict
+* rs_plugins.py
+    + Plugins
+        + Plugin
+            - [all]
+        + early_load_plugin()
+            - Config
+        - Config
+* rs_lineparser.py
+    + MCLang
+        - Config
+    + LineParser
+        - Config
+        - Hooks
+* rs_servmgr.py
+    + ServerManager
+        + BaseServerManager
+            + BasePopenManager
+                + SelectManager
+        + ScreenManager
+        + RConManager
+        - Config
+        - Hooks
+        - LineParser
+* rs_userio.py
+    + TellRaw
+        + TextFormat
+        - ServerManager
+    + ChatCommands
+        + ChatCommand
+        - Config
+        - Tellraw
+    + UserManager
+        + User
+        - Config
+        - MCLang
+        - LineParser
+        - Hooks
+* rstypes/
+ * fbd.py:
+    + FileBackedDict
+    - Timer
+ * hooks.py
+    + Hooks
+    + ReHooks
+    + SubHooks
+ * timer.py
+    + Timer
+        + Interval
+        + After
+
+--
+
+Best possible load order:
+
+Load: 0
+[fbd.py hooks.py timer.py]
+Have: {FileBackedDict} {Hooks ReHooks SubHooks} {Timer Interval After}
+
+Load: 1
+[rs_config.py:Config]
+Have: {Config}
+
+Load: 2
+[rs_lineparser.py:MCLang,LineParser rs_plugins.py:Plugins:early_load_plugin()]
+Have: {MCLang, LineParser}
+
+Load: 3
+[rs_servmgr.py:ServerManager rs_userio.py:UserManager]
+Have: {ServerManager} {UserManager}
+
+Load: 4
+[rs_userio.py:TellRaw]
+Have: {TellRaw}
+
+Load: 5
+[rs_userio.py:ChatCommands]
+Have: {ChatCommands}
+
+Load: 6
+[rs_plugins.py:Plugins:Plugin]
+Have: {Plugin}
