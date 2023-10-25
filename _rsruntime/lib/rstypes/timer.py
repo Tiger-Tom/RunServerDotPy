@@ -63,6 +63,10 @@ class Timer:
             self.stop()
             if start: self.start()
             return self
+        @locked
+        def is_alive(self) -> bool:
+            if self.thread is None: return False
+            return self.thread.is_alive()
     class Interval(After):
         __slots__ = ()
 
