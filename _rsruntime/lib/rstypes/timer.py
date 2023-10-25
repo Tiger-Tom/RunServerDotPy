@@ -6,62 +6,58 @@ import functools
 # Types
 import typing
 from abc import ABC, abstractmethod
+from .locked_resource import LockedResource, locked
 #</Imports
 
 #> Header >/
 class Timer:
     __slots__ = ()
 
-    class BaseTimer(ABC):
+    class BaseTimer(ABC, LockedResource):
         __slots__ = ('callable', 'length')
 
-        def __init__(self, func: typing.Callable, length: float):
+        def __init__(self, func: typing.Callable, length: float, *, lock_class=threading.RLock):
+            super().__init__(lock_class=lock_class)
             self.callable = func
             self.length = length
 
         @abstractmethod
+        @locked
         def start(self) -> typing.Self: pass
         @abstractmethod
+        @locked
         def stop(self) -> typing.Self: pass
         cancel = stop
         @abstractmethod
+        @locked
         def reset(self) -> typing.Self: pass
     
     class After(BaseTimer):
-        __slots__ = ('thread', 'lock', 'callable', 'length')
+        __slots__ = ('thread', 'callable', 'length')
         
         def __init__(self, func: typing.Callable, time: float):
             super().__init__(func, time)
             self.thread = None
-            self.lock = threading.RLock()
-            
-        @staticmethod
-        def _locked(func: typing.Callable):
-            @functools.wraps(func)
-            def locked_func(self, *a, **kw):
-                with self.lock:
-                    return func(self, *a, **kw)
-            return locked_func
 
-        @_locked
+        @locked
         def _trigger(self):
             self.callable()
             self.thread = None
-        @_locked
+        @locked
         def start(self):
             if self.thread is not None:
                 raise RuntimeError(f'Timer {self} tried to start twice or did not clear properly')
             self.thread = threading.Timer(self.length, self._trigger)
             self.thread.start()
             return self
-        @_locked
+        @locked
         def stop(self):
             if self.thread is None: return
             self.thread.cancel()
             self.thread = None
             return self
         cancel = stop
-        @_locked
+        @locked
         def reset(self, start = False):
             self.cancel()
             self.thread = None
@@ -70,10 +66,10 @@ class Timer:
     class Interval(After):
         __slots__ = ()
 
+        @locked
         def _trigger(self):
-            with self.lock:
-                super()._trigger()
-                self.reset(True)
+            super()._trigger()
+            self.reset(True)
 
     @staticmethod
     def set_timer(timer_type: BaseTimer, func: typing.Callable, secs: float, activate_now: bool = True) -> BaseTimer:
