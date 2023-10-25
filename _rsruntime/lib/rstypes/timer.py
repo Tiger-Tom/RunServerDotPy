@@ -48,6 +48,7 @@ class Timer:
             if self.thread is not None:
                 raise RuntimeError(f'Timer {self} tried to start twice or did not clear properly')
             self.thread = threading.Timer(self.length, self._trigger)
+            self.thread.daemon = True
             self.thread.start()
             return self
         @locked
@@ -59,8 +60,7 @@ class Timer:
         cancel = stop
         @locked
         def reset(self, start = False):
-            self.cancel()
-            self.thread = None
+            self.stop()
             if start: self.start()
             return self
     class Interval(After):
