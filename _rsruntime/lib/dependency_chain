@@ -8,7 +8,7 @@ lib/
     + Config
         - FileBackedDict
 * rs_plugins.py
-    + Plugins
+    + PluginManager
         + Plugin
             - [all]
         + early_load_plugin()
@@ -47,7 +47,7 @@ lib/
 * rstypes/
  * fbd.py:
     + FileBackedDict
-    - Timer
+    - Timer [through relative import]
  * hooks.py
     + Hooks
     + ReHooks
@@ -86,5 +86,5 @@ Load: 5
 Have: {ChatCommands}
 
 Load: 6
-[rs_plugins.py:Plugins:Plugin]
+[rs_plugins.py:PluginManager:Plugin]
 Have: {Plugin}
