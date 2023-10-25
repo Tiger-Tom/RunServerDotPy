@@ -19,7 +19,7 @@ import requests
 
 #> Header >/
 class Bootstrapper:
-    __slots__ = ('root_logger', 'logger',)
+    __slots__ = ('root_logger', 'logger')
     base_dirs = {'rsconf', 'rsplugins/builtin', 'rsruntime'}
     #dl_man_base = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e'
     dl_man_base = 'http://0.0.0.0:8000/manifests'
@@ -27,18 +27,10 @@ class Bootstrapper:
     version_extract = re.compile(r'^__version__\s*=\s*(.*)$')
     algorithm = hashlib.sha1
     
-    def __init__(self, loglvl):
-        self.root_logger = self.set_root_logger(loglvl)
+    def __init__(self):
+        self.root_logger = logging.getLogger('RunServer')
         self.logger = self.root_logger.getChild('Bootstrapper')
         self.logger.info(f'Initialized: {self}')
-    # Root logger
-    def set_root_logger(self, loglvl):
-        lpath = Path.cwd() / '_rslog'; lpath.mkdir(exist_ok=True)
-        logging.basicConfig(filename=lpath / 'RunServer.log', level=loglvl, format=lfmt)
-        logger = logging.getLogger('RunServer')
-        lstrh = logging.StreamHandler(); lstrh.setFormatter(logging.Formatter(lfmt))
-        logger.addHandler(lstrh)
-        return logger
     # Check for base directories
     def _bootstrap_basedir(self, name: str):
         self.logger.debug(f'Checking base directory: {name}')
@@ -66,8 +58,8 @@ class Bootstrapper:
             except Exception as e:
                 self.logger.fatal(f'execute_manifest failed somewhere: caught {e}; dazed and confused, but trying to continue')
         self.logger.warning('BOOTSTRAPPING COMPLETE; ATTEMPTING TO ACCESS ENTRYPOINT...')
-        from _rsruntime.rs_ENTRYPOINT import RunServer
-        self.logger.warning('ENTRYPOINT ACCESSED, INITIALIZING ENTRYPOINT...')
+        from .rs_ENTRYPOINT import RunServer
+        self.logger.warning(f'ENTRYPOINT ACCESSED, INITIALIZING ENTRYPOINT...')
         rs = RunServer(self)
         self.logger.warning('ENTRYPOINT INITIALIZED, EXECUTING ENTRYPOINT...')
         rs()
