@@ -6,7 +6,7 @@ import typing
 #</Imports
 
 #> Header >/
-class GenericHook[HookType, FuncType]:
+class GenericHooks[HookType, FuncType]:
     __slots__ = ('hooks',)
 
     def __init__(self):
@@ -25,9 +25,9 @@ class GenericHook[HookType, FuncType]:
         if hook not in self.hooks: return
         for h in self.hooks[hook]: h(*args, **kwargs)
 
-class Hooks(GenericHook[typing.Hashable, typing.Callable]): __slots__ = ()
-Hooks.GenericHook = GenericHook
-class FuncHooks[FuncTakes, FuncReturns](GenericHook[typing.Callable[[FuncTakes], FuncReturns], typing.Callable[[FuncReturns], ...]]):
+class Hooks(GenericHooks[typing.Hashable, typing.Callable]): __slots__ = ()
+Hooks.GenericHooks = GenericHooks
+class FuncHooks[FuncTakes, FuncReturns](GenericHooks[typing.Callable[[FuncTakes], FuncReturns], typing.Callable[[FuncReturns], ...]]):
     __slots__ = ()
 
     def __call__(self, inp: FuncTakes, *args, **kwargs):
@@ -35,7 +35,7 @@ class FuncHooks[FuncTakes, FuncReturns](GenericHook[typing.Callable[[FuncTakes],
             if m := f(inp):
                 super().__call__(f, m, *args, **kwargs)
 Hooks.FuncHooks = FuncHooks
-class ReHooks(GenericHook[re.Pattern, typing.Callable[[re.Match], ...]]):
+class ReHooks(GenericHooks[re.Pattern, typing.Callable[[re.Match], ...]]):
     __slots__ = ('type',)
 
     def __init__(self, type: typing.Literal['search', 'match', 'fullmatch'] = 'search', *, no_check: bool = False):
@@ -47,7 +47,7 @@ class ReHooks(GenericHook[re.Pattern, typing.Callable[[re.Match], ...]]):
             if m := getattr(p, self.type)(line):
                 super().__call__(p, m, *args, **kwargs)
 Hooks.ReHooks = ReHooks
-class SubHooks[HookType, SubHookType, FuncType](GenericHook[SubHookType, FuncType]):
+class SubHooks[HookType, SubHookType, FuncType](GenericHooks[SubHookType, FuncType]):
     __slots__ = ('hook',)
 
     def __init__(self, cls=Hooks):
