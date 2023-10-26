@@ -12,7 +12,7 @@ from .locked_resource import LockedResource, locked
 #</Imports
 
 #> Header >/
-class FileBackedDict(LockedResource, collections.UserDict):
+class FileBackedDict(LockedResource, UserDict):
     '''
         A dictionary backed by an on-disk JSON file
         Asynchronously syncronizes entries with a file on disk when enabled
