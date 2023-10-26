@@ -38,6 +38,7 @@ lib/
         + ChatCommand
         - Config
         - Tellraw
+        - UserManager
     + UserManager
         + User
         - Config
