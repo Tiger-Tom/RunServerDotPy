@@ -27,3 +27,9 @@ class ServerManager:
     @classmethod
     def preferred_order(cls) -> tuple[BaseServerManager]:
         raise NotImplementedError
+
+ServerManager.BaseServerManager = BaseServerManager
+ServerManager.BasePopenManager = BasePopenManager
+ServerManager.ScreenManager = ScreenManager
+ServerManager.RConManager = RConManager
+ServerManager.SelectManager = SelectManager
