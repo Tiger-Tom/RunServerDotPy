@@ -5,7 +5,6 @@
 #> Imports
 import logging
 import typing
-from packaging import version
 # File
 from pathlib import Path
 import json
@@ -24,7 +23,6 @@ class Bootstrapper:
     #dl_man_base = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e'
     dl_man_base = 'http://0.0.0.0:8000/manifests'
     dl_man_path = lambda self,n: f'{self.dl_man_base}/{n.replace("/", "_")}.json'
-    version_extract = re.compile(r'^__version__\s*=\s*(.*)$')
     algorithm = hashlib.sha1
     
     def __init__(self):
@@ -144,7 +142,7 @@ class Bootstrapper:
         return manif
     def execute_manifest(self, manif: dict, path: Path, verifyer_and_redownloader: typing.Callable[[dict, Path, str], None] | None = None):
         self.logger.info(f'Executing manifest {manif["_metadata"]["name"]}')
-        assert manif['_metadata'].get('method', 'hash') in {'hash', 'version'}
+        #assert manif['_metadata'].get('method', 'hash') in {'hash', 'version'}
         if manif['_metadata'].get('ignore', False):
             self.logger.warning(f'Manifest {manif["_metadata"]["name"]} would like to be ignored, not checking')
             return
