@@ -13,7 +13,7 @@ import re
 # Optimization
 import multiprocessing
 # Web
-import requests
+from urllib import request
 #</Imports
 
 #> Header >/
@@ -84,14 +84,14 @@ class Bootstrapper:
             else:
                 raise FileNotFoundError(f'Local manifest for {name} missing')
         # Get upstream manifest
-        with requests.get(man_upstream or manif['_metadata']['manifest_upstream']) as r:
-            if r.status_code != 200:
-                self.logger.error(f'Could not fetch manifest for {name}, got HTTP status code: {r.status_code}')
+        with request.urlopen(man_upstream or manif['_metadata']['manifest_upstream']) as r:
+            if r.status != 200:
+                self.logger.fatal(f'Could not fetch manifest for {name}, got HTTP status code: {r.status_code}')
                 return None
             try:
-                uman = r.json()
+                uman json.load(r)
             except json.JSONDecodeError as e:
-                self.logger.error(f'Upstream manifest for {name} appears to be corrupted: {e}')
+                self.logger.fatal(f'Upstream manifest for {name} appears to be corrupted: {e}')
                 return None
         # Compare manifests
         if manif == uman:
