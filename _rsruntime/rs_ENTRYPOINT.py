@@ -24,7 +24,7 @@ class RunServer(types.ModuleType):
         # Load: 2
         'MCLang', 'L',
         'LineParser', 'LP',
-        'PluginManager': 'PM',
+        'PluginManager', 'PM',
         # Load: 3
         'ServerManager', 'SM',
         'UserManager', 'UM',

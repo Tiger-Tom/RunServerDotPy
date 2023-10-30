@@ -89,7 +89,7 @@ class Bootstrapper:
                 self.logger.fatal(f'Could not fetch manifest for {name}, got HTTP status code: {r.status_code}')
                 return None
             try:
-                uman json.load(r)
+                uman = json.load(r)
             except json.JSONDecodeError as e:
                 self.logger.fatal(f'Upstream manifest for {name} appears to be corrupted: {e}')
                 return None
