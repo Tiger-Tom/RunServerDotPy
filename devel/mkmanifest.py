@@ -17,12 +17,12 @@ match sys.argv:
         print(name, path, mupstream, fupstream)
         path = Path(path) # path path path
         man = bmeta(name, mupstream, fupstream)
-        for p in path.glob('*.py'):
+        for p in path.glob('**/*.py'):
             eprint(f'Adding manifest entry for {p.name}')
             with p.open('rb') as f:
                 hd = hashlib.file_digest(f, hashlib.sha1).hexdigest()
             eprint(f'"{p.name}": "{hd}"')
-            man[p.name] = hd
+            man[p.relative_to(path).as_posix()] = hd
         print(json.dumps(man, indent=4))
     case [_, 'update', path]:
         path = Path(path)
