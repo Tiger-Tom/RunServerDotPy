@@ -176,3 +176,5 @@ class Bootstrapper:
         self.download_file(base / file, f'{manif["_metadata"]["file_upstream"]}/{file}')
     def download_file(self, f: Path, u: str):
         self.logger.warning(f'Downloading {u} to {f}')
+        request.urlretrieve(u, f)
+        
