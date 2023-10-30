@@ -5,7 +5,7 @@ import abc
 #</Imports
 
 # RunServer Module
-RunServer = RS = NotImplemented
+import RunServer as RS
 
 #> Header >/
 # Base classes

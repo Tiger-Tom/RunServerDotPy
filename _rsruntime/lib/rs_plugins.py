@@ -4,7 +4,7 @@
 #</Imports
 
 # RunServer Module
-RunServer = RS = NotImplemented
+import RunServer as RS
 
 #> Header >/
 class PluginManager(dict):
