@@ -5,6 +5,7 @@
 #> Imports
 import logging
 import typing
+import sys
 # File
 from pathlib import Path
 import json
@@ -24,11 +25,16 @@ class Bootstrapper:
     dl_man_base = 'http://0.0.0.0:8000/manifests'
     dl_man_path = lambda self,n: f'{self.dl_man_base}/{n.replace("/", "_")}.json'
     algorithm = hashlib.sha1
+    minimum_vers = (3, 12, 0)
     
     def __init__(self):
         self.root_logger = logging.getLogger('RunServer')
         self.logger = self.root_logger.getChild('Bootstrapper')
         self.logger.info(f'Initialized: {self}')
+        self.ensure_python_version()
+    def ensure_python_version(self):
+        if sys.version_info >= self.minimum_vers: return
+        raise NotImplementedError(f'Python version {sys.version_info[:3]} is not supported, perhaps try updating? (expected >= {self.minimum_vers})')
     # Check for base directories
     def _bootstrap_basedir(self, name: str):
         self.logger.debug(f'Checking base directory: {name}')
@@ -170,4 +176,3 @@ class Bootstrapper:
         self.download_file(base / file, f'{manif["_metadata"]["file_upstream"]}/{file}')
     def download_file(self, f: Path, u: str):
         self.logger.warning(f'Downloading {u} to {f}')
-        
