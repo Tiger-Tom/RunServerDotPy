@@ -121,7 +121,6 @@ class Bootstrapper:
             manif['_metadata']['file_upstream'] = uman['_metadata']['file_upstream']
             known_differs = True
         ## Update local manifest
-        m = manif['_metadata'].get('method', 'hash')
         for f,h in uman.items():
             if f.startswith('_'): continue
             if f in manif:
@@ -129,9 +128,9 @@ class Bootstrapper:
                     self.logger.warning(f'Local manifest for {name} would like file {f} to be ignored ("SKIP"), not checking')
                     continue
                 if manif[f] == h:
-                    self.logger.info(f'Local manifest for {name} has up-to-date {m} for file {f}')
+                    self.logger.info(f'Local manifest for {name} has up-to-date hash for file {f}')
                     continue
-                self.logger.info(f'Local manifest for {name} has an outdated {m} for file {f}')
+                self.logger.info(f'Local manifest for {name} has an outdated hash for file {f}')
             else: self.logger.warning(f'Local manifest for {name} is missing file {f}')
             self.logger.info(f'Updating file {f} in local manifest for {name}')
             manif[f] = h
@@ -148,14 +147,13 @@ class Bootstrapper:
         return manif
     def execute_manifest(self, manif: dict, path: Path, verifyer_and_redownloader: typing.Callable[[dict, Path, str], None] | None = None):
         self.logger.info(f'Executing manifest {manif["_metadata"]["name"]}')
-        #assert manif['_metadata'].get('method', 'hash') in {'hash', 'version'}
         if manif['_metadata'].get('ignore', False):
             self.logger.warning(f'Manifest {manif["_metadata"]["name"]} would like to be ignored, not checking')
             return
         if not len(tuple(k for k in manif.keys() if not k.startswith('_'))):
             self.logger.warning(f'Manifest {manif["_metadata"]["name"]} seems to be empty?')
             return
-        self.logger.info(f'Distributing threads to verify manifest {manif["_metadata"]["name"]}, checking by {manif["_metadata"].get("method", "hash")}')
+        self.logger.info(f'Distributing threads to verify manifest {manif["_metadata"]["name"]} hashes')
         with multiprocessing.Pool() as p:
             p.starmap(verifyer_and_redownloader or self.verify_hash_or_redownload, ((manif, path, file) for file in manif if not file.startswith('_')))
     def verify_hash_or_redownload(self, manif: dict, base: Path, file: str):
@@ -163,11 +161,8 @@ class Bootstrapper:
             self.logger.warning(f'Manifest {manif["_metadata"]["name"]} would like file {file} to be ignored ("SKIP"), not checking')
             return
         self.logger.debug(f'Checking hash for {manif["_metadata"]["name"]}\'s {file} [{self.algorithm}]')
-        if manif['_metadata'].get('method', 'hash') == 'hash':
-            with (path / file).open('rb') as f:
-                hd = hashlib.file_digest(f, self.algorithm).hexdigest()
-        else:
-            raise NotImplementedError('This function should only ever be for used for hash-based manifests!')
+        with (path / file).open('rb') as f:
+            hd = hashlib.file_digest(f, self.algorithm).hexdigest()
         self.logger.debug(f'{name} local {file}: {local}\n{name} manif {file}: {manif[file]}')
         if local == manif[f]:
             self.logger.info(f'{name} local {file} matches manifest')
