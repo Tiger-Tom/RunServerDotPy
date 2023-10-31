@@ -17,7 +17,6 @@ class Config(FileBackedDict):
     __slots__ = ('logger',)
     conf_path = Path('./_rsconfig/')
 
-
     def __init__(self):
         self.logger = RS.logger.getChild('Config')
         self.conf_path.mkdir(parents=True, exist_ok=True)
