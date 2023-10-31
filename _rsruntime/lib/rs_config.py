@@ -4,8 +4,9 @@
 #</Imports
 
 # RunServer Module
-import RunServer as RS
+from RS import FileBackedDict
+from RS.Types import LockedResource, locked
 
 #> Header >/
-class Config(dict):
+class Config(FileBackedDict):
     ...
