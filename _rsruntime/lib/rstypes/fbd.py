@@ -125,6 +125,9 @@ class FileBackedDict(UserDict, LockedResource):
                 If the key resolves to a subkey, then TypeError is raised unless unsafe_no_error_on_subkey is truthy
         '''
         key = self.key(key) # key key key
+        if key[0] not in self.data:
+            if not self.key_path(key).exists(): return False
+            self.readin_data(key[0])
         d = self._get_(key[:-1], no_raise=True)
         if (d is None) or (key[-1] not in d): return False
         if (not unsafe_no_error_on_subkey) and isinstance(d[key[-1]], dict):
