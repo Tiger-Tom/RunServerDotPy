@@ -239,9 +239,12 @@ class FileBackedDict(UserDict, LockedResource):
         self.writeback_dirty()
         self.readin_watchdog()
     ## Sync timer
+    @locked
     def start_autosync(self):
         self.watchdog.start()
+    @locked
     def stop_autosync(self):
         self.watchdog.stop()
+    @locked
     def is_autosyncing(self) -> bool:
         return self.watchdog.is_alive()
