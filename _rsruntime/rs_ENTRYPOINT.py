@@ -83,7 +83,7 @@ class RunServer(types.ModuleType):
         })
         # Load: 6
         self.Config.sync_all()
-        print('fixme::rs_plugins.py:Plugins:early_load_plugin()')
+        print('fixme::rs_plugins.py:Plugins:load_plugins()')
     def __setup_frommod(self, module: str, keys: dict[tuple[str, str], str], *, call: bool = True):
         self.logger.info(f'Importing module: .lib.{module}')
         m = importlib.import_module(f'.lib.{module}', __package__)

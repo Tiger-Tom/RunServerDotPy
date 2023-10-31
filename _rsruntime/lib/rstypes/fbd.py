@@ -194,7 +194,7 @@ class FileBackedDict(UserDict, LockedResource):
             Reads in data from files that have been modified since the last read
             If a file is missing, it is removed from the watchdog list
         '''
-        self.logger.debug(f'Readin watchdog ticked: checking {len(self.watchdog_times)} key')
+        self.logger.debug(f'Readin watchdog ticked: checking {len(self.watchdog_times)} key(s)')
         for k,t in tuple(self.watchdog_times.items()):
             p = self.key_path(k)
             if not p.exists():
