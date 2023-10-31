@@ -4,14 +4,15 @@
 from pathlib import Path
 # Types
 from enum import Enum
+import typing
 #</Imports
 
 # RunServer Module
 import RS
-from RS.Types import LockedResource, locked
+from RS.Types import FileBackedDict, LockedResource, locked
 
 #> Header >/
-class Config(RS.FileBackedDict):
+class Config(FileBackedDict):
     '''A thin wrapper around FileBackedDict'''
     __slots__ = ('logger',)
     conf_path = Path('./_rsconfig/')
