@@ -69,7 +69,7 @@ class RunServer(types.ModuleType):
         # Load: 3
         self.__setup_frommod('rs_servmgr', {
             ('ServerManager', 'SM'): 'ServerManager',
-        })
+        }, call=False)
         self.__setup_frommod('rs_userio', {
             ('UserManager', 'UM'): 'UserManager',
         })
@@ -93,3 +93,5 @@ class RunServer(types.ModuleType):
             setattr(self, s, getattr(self, l))
     def __call__(self):
         self.logger.info('Entrypoint starting')
+        self.ServerManager = self.SM = self.ServerManager()
+        
