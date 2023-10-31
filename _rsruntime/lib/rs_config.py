@@ -21,6 +21,7 @@ class Config(FileBackedDict):
         self.logger = RS.logger.getChild('Config')
         self.conf_path.mkdir(parents=True, exist_ok=True)
         super().__init__(self.conf_path, 60.0)
+        self.start_autosync()
 
     on_missing = Enum('OnMissing', ('RETURN_DEFAULT', 'SET_RETURN_DEFAULT', 'SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE', 'ERROR'))
     def __call__(self, key: str | tuple[str], default: None | typing.Any = None, on_missing: on_missing = on_missing.SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE):

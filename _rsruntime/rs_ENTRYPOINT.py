@@ -82,6 +82,7 @@ class RunServer(types.ModuleType):
             ('ChatCommands', 'CC'): 'ChatCommands',
         })
         # Load: 6
+        self.Config.sync_all()
         print('fixme::rs_plugins.py:Plugins:early_load_plugin()')
     def __setup_frommod(self, module: str, keys: dict[tuple[str, str], str], *, call: bool = True):
         self.logger.info(f'Importing module: .lib.{module}')
