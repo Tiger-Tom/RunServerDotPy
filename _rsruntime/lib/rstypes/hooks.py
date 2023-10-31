@@ -24,9 +24,19 @@ class GenericHooks[HookType, FuncType]:
     def __call__(self, hook: HookType, *args, **kwargs):
         if hook not in self.hooks: return
         for h in self.hooks[hook]: h(*args, **kwargs)
-
 class Hooks(GenericHooks[typing.Hashable, typing.Callable]): __slots__ = ()
 Hooks.GenericHooks = GenericHooks
+class SingleHook(GenericHooks[None, typing.Callable]):
+    __slots__ = ()
+
+    def __init__(self):
+        self.hooks = set()
+    def register(self, callback: typing.Callable): self.hooks.add(callback)
+    def unregister(self, callback: typing.Callable): self.hooks.remove(callback)
+    unregister_hook = NotImplemented
+    def __call__(self, *args, **kwargs):
+        for c in self.hooks: c(*args, **kwargs)
+Hooks.SingleHook = SingleHook
 class FuncHooks[FuncTakes, FuncReturns](GenericHooks[typing.Callable[[FuncTakes], FuncReturns], typing.Callable[[FuncReturns], ...]]):
     __slots__ = ()
 
