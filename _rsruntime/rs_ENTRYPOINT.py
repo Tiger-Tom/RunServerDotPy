@@ -76,19 +76,19 @@ class RunServer(types.ModuleType):
         # Load: 4
         self.__setup_frommod('rs_userio', {
             ('TellRaw', 'TR'): 'TellRaw',
-        })
+        }, call=False)
         # Load: 5
         self.__setup_frommod('rs_userio', {
             ('ChatCommands', 'CC'): 'ChatCommands',
         })
         # Load: 6
         print('fixme::rs_plugins.py:Plugins:early_load_plugin()')
-    def __setup_frommod(self, module: str, keys: dict[tuple[str, str], str]):
+    def __setup_frommod(self, module: str, keys: dict[tuple[str, str], str], *, call: bool = True):
         self.logger.info(f'Importing module: .lib.{module}')
         m = importlib.import_module(f'.lib.{module}', __package__)
         self.logger.info(f'.lib.{module} imported into {m}')
         for (l,s),n in keys.items():
-            setattr(self, l, getattr(m, n))
+            setattr(self, l, getattr(m, n)() if call else getattr(m, n))
             setattr(self, s, getattr(self, l))
     def __call__(self):
         self.logger.info('Entrypoint starting')
