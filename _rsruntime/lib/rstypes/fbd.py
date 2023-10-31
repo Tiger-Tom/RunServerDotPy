@@ -243,3 +243,5 @@ class FileBackedDict(UserDict, LockedResource):
         self.watchdog.start()
     def stop_autosync(self):
         self.watchdog.stop()
+    def is_autosyncing(self) -> bool:
+        return self.watchdog.is_alive()
