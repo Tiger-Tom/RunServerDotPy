@@ -14,7 +14,6 @@ bmeta = lambda n,mu,fu: {'_metadata': {'name': n, 'manifest_upstream': mu, 'file
 
 match sys.argv:
     case [_, 'add', name, path, mupstream, fupstream]:
-        print(name, path, mupstream, fupstream)
         path = Path(path) # path path path
         man = bmeta(name, mupstream, fupstream)
         for p in path.glob('**/*.py'):
