@@ -110,5 +110,5 @@ class LineParser:
         pfx, lin = RS.MCLang.strip_prefix(line)
         if pfx is None: return self.hooks_no_prefix(lin) # returns nothing!
         self.hooks_prefix(lin, *pfx)
-        if (m := self.chat_patt) is not None:
+        if (m := self.chat_patt.fullmatch(lin)) is not None:
             self.hooks_chat(RS.UserManager[m.group('username')], m.group('message'), bool(m.group('not_secure')))
