@@ -4,6 +4,7 @@
 from functools import cache
 from pathlib import Path
 import shlex
+from getpass import getpass
 # Types
 import typing
 from abc import ABC, abstractmethod, abstractproperty
@@ -87,11 +88,18 @@ class ScreenManager(BaseServerManager):
         return 10.0
 class RConManager(BaseServerManager):
     __slots__ = ()
-    _type = ('rcon',)
+    _type = ('remote', 'passwd')
     def __init__(self):
         super().__init__()
         if RCONClient is None:
             raise ModuleNotFoundError('RCon module is required for RConManager!')
+        if not Config('minecraft/rcon/enabled', False): raise RuntimeError('RCon is not enabled! (set it up in config: minecraft/rcon/enabled)')
+        self.remote = f'{Config("minecraft/rcon/host", "127.0.0.1")}:{Config("minecraft/rcon/port", 25575)}'
+        self.logger.warning(f'RCon remote: {self.remote} (can be set in config minecraft/rcon/)')
+        self.rconpwd = Config('minecraft/rcon/password', None)
+        if self.rconpwd is None:
+            self.rconpwd = getpass('Enter RCon password >')
+            self.logger.warning('RCon password can be permanently set in config minecraft/rcon/password')
         raise NotImplementedError
         
     @classmethod
@@ -99,7 +107,9 @@ class RConManager(BaseServerManager):
     @cache
     def bias(cls) -> float:
         if RCONClient is None: return -float('inf')
-        return 5.0
+        if Config('minecraft/rcon/enabled', False):
+            return 10
+        return -255.0 #RConManager should be manually selected
 class SelectManager(BasePopenManager):
     __slots__ = ()
     _type = ('select',)
