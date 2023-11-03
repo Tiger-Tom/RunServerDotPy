@@ -3,9 +3,10 @@
 #> Imports
 # Parsing
 import re
+import json
 # Types
 import time # struct_time
-from dataclasses import dataclass
+import dataclasses
 import typing
 from pathlib import Path
 #</Imports
@@ -19,7 +20,7 @@ from RS.Types import FileBackedDict
 class UserManager:
     __slots__ = ('logger', 'users', 'fbd')
 
-    @dataclass(slots=True)
+    @dataclasses.dataclass(slots=True)
     class User:
         name: str
         old_name: str | None = None
@@ -38,7 +39,7 @@ class UserManager:
             return RS.UserManager.fbd(f'{self.uuid}/ChatCommand Permission Level', 0)
         @permission.setter
         def permission(self, val: int):
-            return RS.UserManager.fbd[f'{self.uuid}/ChatCommand Permission Level'] = val
+            RS.UserManager.fbd[f'{self.uuid}/ChatCommand Permission Level'] = val
 
         store_attrs: typing.ClassVar = {
             'name': ('Username', None),
@@ -91,9 +92,90 @@ class UserManager:
         if username in self.users: return self.users[username]
         else: return self.User(username)
 
-class TellRaw:
-    ...
+class TellRaw(list):
+    '''
+        Generates a TellRaw JSON
+            Praise be to https://www.minecraftjson.com !
+        Who doesn't want object-oriented TellRaws???
+    '''
+    __slots__ = ()
+    
+    @dataclasses.dataclass(slots=True)
+    class TextFormat:
+        color: str | typing.Literal[False] = False
+        bold: bool = False
+        italic: bool = False
+        underlined: bool = False
+        strikethrough: bool = False
+        obfuscated: bool = False
+        def __call__(self):
+            return {k: v for k,v in dataclasses.asdict(self).items() if v is not False}
 
+    def render(self):
+        return json.dumps(self)
+
+    click_events = {'open_url', 'run_command', 'suggest_command', 'copy'}
+    hover_events = {'show_text', 'show_item', 'show_entity'}
+    text_types = {'text', 'selector', 'score', 'keybind'}
+    def text(self, text: str, fmt: TextFormat | dict = TextFormat(), *,
+             insertion: str | None = None,
+             type: typing.Literal[*text_types] = 'text', objective: None | str = None,
+             click_event: typing.Literal[None, *click_events] = None, click_contents: None | str = None,
+             hover_event: typing.Literal[None, *hover_events] = None, hover_contents: None | typing.Union['TellRaw', tuple] | typing.Union[dict, tuple] | typing.Union[dict, tuple] = None):
+        '''
+            Appends a tellraw text to self
+                text is the text to show unless type is:
+                    selector, in which case text is the selector type
+                    score, in which case text is the name of the player
+                    keybind, in which case text is the ID of the keybind
+                fmt is the format to formatting to apply to the text
+                insertion is text that is entered into the user's chat-box when the text is shift-clicked
+                type is one of text_types, which should be self-explanitory
+                objective is None unless type is "score", in which case objective is the scoreboard objective
+                click_event is one of click_events (or None for nothing), they should be self-explanatory
+                    click_contents is the text to use for the click_event (the URL to open, text to copy, etc.)
+                hover_event is one of hover_events (or None for nothing), they should be self-explanatory
+                    hover_contents is the data to use for the hover_event (the entity to display, the TellRaw to show [as text])
+        '''
+        # type, text, objective
+        assert type in {'text', 'selector', 'score'}
+        assert isinstance(text, str)
+        assert not ((type == 'score') ^ isinstance(objective, str))
+        obj = {'score': {'name': text, 'objective': objective}} if (type == 'score') else {type: text}
+        # fmt
+        if fmt is not None:
+            assert isinstance(fmt, (self.TextFormat, dict))
+            if isinstance(fmt, self.TextFormat): obj |= fmt()
+            else: obj |= fmt
+        # insertion
+        if insertion is not None:
+            assert isinstance(insertion, str)
+            obj['insertion'] = insertion
+        # click_event, click_contents
+        if click_event is not None:
+            assert click_event in self.click_events
+            assert isinstance(click_contents, str)
+            obj['clickEvent'] = {'action': click_event, 'value': click_contents}
+        # hover_event, hover_contents
+        if hover_event is not None:
+            assert hover_event in self.hover_events
+            obj['hoverEvent'] = {'action': hover_event}
+            if hover_event == 'show_text':
+                if isinstance(hover_value, self.__class__): obj['hoverEvent']['contents'] = hover_value.render()
+                else:
+                    assert isinstance(hover_value, tuple, list)
+                    obj['hoverEvent']['contents'] = hover_value
+            else:
+                assert isinstance(hover_value, (dict, tuple, list))
+                obj['hoverEvent']['contents'] = hover_value
+        # finish
+        self.append(obj); return self
+    def line_break(self, count: int = 1):
+        '''Append n newlines to self (where n >= 0)'''
+        if count < 0: raise ValueError('Cannot append a negative amount of newlines')
+        for _ in range(count): self.append('\n')
+        return self
+    
 class ChatCommands:
     ...
     class ChatCommand:
