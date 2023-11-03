@@ -93,6 +93,8 @@ class RunServer(types.ModuleType):
             setattr(self, s, getattr(self, l))
     def __call__(self):
         self.logger.info('Entrypoint starting')
+        # Start ServerManager
         self.ServerManager = self.SM = self.ServerManager()
+        # Finalize config
         self.Config.stop_autosync()
         self.Config.sync_all()
