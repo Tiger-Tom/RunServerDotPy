@@ -8,6 +8,7 @@ import json
 import zipfile
 from pathlib import Path
 # Types
+import time
 import typing
 #</Imports
 
@@ -28,8 +29,10 @@ class MCLang:
 
     # Lang interaction
     ## Lines
-    def strip_prefix(self, line: str) -> tuple[re.Match | None, str]:
-        if (m := self.prefix.fullmatch(line)) is not None: return (m, m.group('line'))
+    def strip_prefix(self, line: str) -> tuple[tuple[re.Match, time.struct_time] | None, str]:
+        if (m := self.prefix.fullmatch(line)) is not None:
+            # almost as bad as my first idea: `time.strptime(f'{m.time}|{time.strftime("%x")}', '%H:%M:%S|%x')`
+            return ((m, time.struct_time(time.localtime()[:3] + time.strptime(m.group('time'), '%H:%M:%S')[3:6] + time.localtime()[6:])), m.group('line'))
         return (None, line)
     ## Patterns
     def lang_to_pattern(self, lang: str, group_names: tuple[str] | None = None, *, prefix_suffix: str = '^{}$') -> re.Pattern:
@@ -90,11 +93,11 @@ class LineParser:
         self.hooks_no_prefix = Hooks.ReHooks('fullmatch')
         self.hooks_chat = Hooks.SingleHook()
         self.chat_patt = RS.MCLang.lang_to_pattern(RS.MCLang.lang['chat.type.text'], ('username', 'message'), prefix_suffix=r'^(?P<not_secure>(?:\[Not Secure\] )?){}$')
-    def register_callback(self, patt: re.Pattern, callback: typing.Callable[[re.Match, re.Match], None] | typing.Callable[[re.Match], None], with_prefix: bool = True):
+    def register_callback(self, patt: re.Pattern, callback: typing.Callable[[re.Match, re.Match, time.struct_time], None] | typing.Callable[[re.Match], None], with_prefix: bool = True):
         '''
             Registers a callback
-                If keep_prefix, then lines that have the prefix are passed along with the prefix (the match is the first argument, followed by the prefix)
-                Otherwise, lines that don't have a prefix are passed
+                If keep_prefix, then lines that have the prefix are passed. callback should have the signature: `callback(match: re.Match, prefix: re.Match, t: time.struct_time)`
+                Otherwise, lines that don't have a prefix are passed; the callback should have the signature: `callback(match: re.Match)`
         '''
         (self.hooks_prefix if with_prefix else self.hooks_no_prefix).register(patt, callback)
     def register_chat_callback(self, callback: typing.Callable[['User', str, bool], None]):
@@ -104,8 +107,8 @@ class LineParser:
         '''
         self.hooks_chat.register(callback)
     def handle_line(self, line: str):
-        pfx, lin = RS.MCLang.strip_prefix(line)
+        (pfx, t), lin = RS.MCLang.strip_prefix(line)
         if pfx is None: return self.hooks_no_prefix(lin) # returns nothing!
-        self.hooks_prefix(lin, pfx)
+        self.hooks_prefix(lin, pfx, t)
         if (m := self.chat_patt) is not None:
             self.hooks_chat(RS.UserManager[m.group('username')], m.group('message'), bool(m.group('not_secure')))
