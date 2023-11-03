@@ -99,10 +99,20 @@ class SelectManager(BasePopenManager):
     bias = 2.0
 class DummyServerManager(BaseServerManager):
     __slots__ = ()
+    _type = ('manual', 'dummy')
+    def __init__(self):
+        super().__init__()
+        print('-----DUMMY SERVER MODE-----')
+    def start(self):
+        self.hooks(input('>DUMMY SERVER INPUT >'))
+    def write(self, line: str):
+        print(f'>DUMMY SERVER WRITE > {line}')
+    
+    bias = -50.0
 
 # Manager
 class ServerManager:
-    server_manager_types = {ScreenManager, RConManager, SelectManager}
+    server_manager_types = {ScreenManager, RConManager, SelectManager, DummyServerManager}
     def __new__(cls):
         RS.logger.getChild('ServerManager').debug(f'Instantiating server manager; preferred order: {tuple(f"{c.__qualname__}:<{c.type}>,[{c.bias}+{c._bias_config()}]" for c in cls.preferred_order())}')
         return cls.preferred_order()[0]()
