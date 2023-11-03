@@ -97,8 +97,6 @@ class RunServer(types.ModuleType):
             setattr(self, s, getattr(self, l))
     def __call__(self):
         self.logger.info('Entrypoint starting')
-        # Setup MCLang
-        self.MCLang.extract_lang()
         # Start ServerManager
         self.ServerManager = self.SM = self.ServerManager()
         # Finalize config

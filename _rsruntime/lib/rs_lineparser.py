@@ -24,12 +24,15 @@ class MCLang:
     
     def __init__(self):
         self.logger = RS.logger.getChild('Lang')
+        self.extract_lang()
 
     # Lang interaction
-    def strip_prefix(line: str) -> tuple[re.Match | None, str]:
+    ## Lines
+    def strip_prefix(self, line: str) -> tuple[re.Match | None, str]:
         if (m := self.prefix.fullmatch(line)) is not None: return (m, m.group('line'))
         return (None, line)
-    def lang_to_pattern(self, lang: str, group_names: tuple[str] | None = None) -> re.Pattern:
+    ## Patterns
+    def lang_to_pattern(self, lang: str, group_names: tuple[str] | None = None, *, prefix_suffix: str = '^{}$') -> re.Pattern:
         l = enumerate(lang)
         patt = []; held_groups = set(); next_group = 1
         pattern_gen = lambda t: f'{r"\d+" if t == "d" else ".+"}?'
@@ -63,7 +66,7 @@ class MCLang:
             held_groups.add(n)
             patt.append(capture_gen(n, t))
         self.logger.debug(f'{lang!r} -> {patt}')
-        return re.compile(f'^{"".join(patt)}$')
+        return re.compile(prefix_suffix.format(''.join(patt)))
     # Lang extraction
     def extract_lang(self) -> dict[str, str]:
         '''Extracts the language file from a server JAR file, sets and returns self.lang'''
@@ -79,20 +82,30 @@ class MCLang:
                     return self.lang
             
 class LineParser:
-    __slots__ = ('logger', 'hooks_prefix', 'hooks_no_prefix')
+    __slots__ = ('logger', 'hooks_prefix', 'hooks_no_prefix', 'hooks_chat', 'chat_patt')
 
     def __init__(self):
         self.logger = RS.logger.getChild('LineParser')
         self.hooks_prefix = Hooks.ReHooks('fullmatch')
         self.hooks_no_prefix = Hooks.ReHooks('fullmatch')
+        self.hooks_chat = Hooks.SingleHook()
+        self.chat_patt = RS.MCLang.lang_to_pattern(RS.MCLang.lang['chat.type.text'], ('username', 'message'), prefix_suffix=r'^(?P<not_secure>(?:\[Not Secure\] )?){}$')
     def register_callback(self, patt: re.Pattern, callback: typing.Callable[[re.Match, re.Match], None] | typing.Callable[[re.Match], None], with_prefix: bool = True):
         '''
-            Registers a callback.
+            Registers a callback
                 If keep_prefix, then lines that have the prefix are passed along with the prefix (the match is the first argument, followed by the prefix)
                 Otherwise, lines that don't have a prefix are passed
         '''
         (self.hooks_prefix if with_prefix else self.hooks_no_prefix).register(patt, callback)
+    def register_chat_callback(self, callback: typing.Callable[['User', str, bool], None]):
+        '''
+            Registers a callback for when chat is recieved
+                The callback should have the signature `callback(user: RS.UserManager.User, message: str, insecure: bool)`
+        '''
+        self.hooks_chat.register(callback)
     def handle_line(self, line: str):
         pfx, lin = RS.MCLang.strip_prefix(line)
-        if pfx is None: self.hooks_no_prefix(lin)
-        else: self.hooks_prefix(lin, pfx)
+        if pfx is None: return self.hooks_no_prefix(lin) # returns nothing!
+        self.hooks_prefix(lin, pfx)
+        if (m := self.chat_patt) is not None:
+            self.hooks_chat(RS.UserManager[m.group('username')], m.group('message'), bool(m.group('not_secure')))
