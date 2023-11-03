@@ -15,7 +15,7 @@ except ModuleNotFoundError: screenutils = None
 
 # RunServer Module
 import RS
-from RS import Config
+from RS import Config, LineParser
 from RS.Types import Hooks
 
 #> Header >/
@@ -25,6 +25,8 @@ class BaseServerManager(ABC):
     def __init__(self):
         self.logger = RS.logger.getChild(self.__class__.__qualname__)
         self.hooks = Hooks.SingleHook()
+        self.hooks.register(print)
+        self.hooks.register(LineParser.handle_line)
 
     # Non-abstract methods
     @classmethod
