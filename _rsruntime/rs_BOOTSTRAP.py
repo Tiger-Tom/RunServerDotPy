@@ -26,6 +26,7 @@ class Bootstrapper:
     dl_man_path = lambda self,n: f'{self.dl_man_base}/{n.replace("/", "_")}.json'
     algorithm = hashlib.sha1
     minimum_vers = (3, 12, 0)
+    dl_timeout = 10
     
     def __init__(self):
         self.root_logger = logging.getLogger('RunServer')
@@ -90,7 +91,7 @@ class Bootstrapper:
             else:
                 raise FileNotFoundError(f'Local manifest for {name} missing')
         # Get upstream manifest
-        with request.urlopen(man_upstream or manif['_metadata']['manifest_upstream']) as r:
+        with request.urlopen(man_upstream or manif['_metadata']['manifest_upstream'], timeout=self.timeout) as r:
             if r.status != 200:
                 self.logger.fatal(f'Could not fetch manifest for {name}, got HTTP status code: {r.status_code}')
                 return None
@@ -172,5 +173,5 @@ class Bootstrapper:
     def download_file(self, f: Path, u: str):
         self.logger.warning(f'Downloading {u} to {f}')
         f.parent.mkdir(parents=True, exist_ok=True)
-        request.urlretrieve(u, f)
+        request.urlretrieve(u, f, timeout=self.timeout)
         
