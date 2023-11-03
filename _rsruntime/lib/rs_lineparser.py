@@ -107,8 +107,8 @@ class LineParser:
         '''
         self.hooks_chat.register(callback)
     def handle_line(self, line: str):
-        (pfx, t), lin = RS.MCLang.strip_prefix(line)
+        pfx, lin = RS.MCLang.strip_prefix(line)
         if pfx is None: return self.hooks_no_prefix(lin) # returns nothing!
-        self.hooks_prefix(lin, pfx, t)
+        self.hooks_prefix(lin, *pfx)
         if (m := self.chat_patt) is not None:
             self.hooks_chat(RS.UserManager[m.group('username')], m.group('message'), bool(m.group('not_secure')))
