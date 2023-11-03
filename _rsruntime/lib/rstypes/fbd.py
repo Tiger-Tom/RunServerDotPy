@@ -10,6 +10,7 @@ import re
 # Types
 import typing
 from collections import UserDict
+from enum import Enum
 from .timer import Timer
 from .locked_resource import LockedResource, locked
 #</Imports
@@ -20,7 +21,7 @@ serializable = (dict, list, str, int, float, bool, type(None))
 class FileBackedDict(UserDict, LockedResource):
     '''
         A dictionary backed by an on-disk JSON file
-        Asynchronously syncronizes entries with a file on disk when enabled
+        Asynchronously synchronizes entries with a file on disk when enabled
         Detects file changes by checking its modification time
         Detects dict changes by adding keys to a "dirty" flag
         Sub-dictionaries can be accessed with "/" notation
@@ -101,6 +102,13 @@ class FileBackedDict(UserDict, LockedResource):
         if (not unsafe_allow_get_subkey) and isinstance(d[key[-1]], dict): raise TypeError(f'{key} refers to a subkey, pass unsafe_allow_get_subkey=True to bypass')
         return d[key[-1]]
     __getitem__ = get_item
+    def get_set_default(self, key: str | tuple[str], default):
+        '''
+            Gets an item.
+            If the item doesn't exist, tries to set "default" as its value and returns default with set_default
+        '''
+        self.set_default(key, default)
+        return self[key]
     ## Setting
     def set_item(self, key: str | tuple[str], val: typing.Any | dict, *, unsafe_allow_set_subkey: bool = False, unsafe_allow_assign_dict: bool = False):
         '''	
@@ -117,6 +125,9 @@ class FileBackedDict(UserDict, LockedResource):
         d[key[-1]] = val
         self.dirty.add(key[0])
     __setitem__ = set_item
+    def set_default(self, key: str | tuple[str], default):
+        '''If the item corresponding to key doesn't exist, then sets it to default. Has no effect otherwise'''
+        if key not in self: self[key] = default
     ## Containing
     @locked
     def contains(self, key: str | tuple[str], *, unsafe_no_error_on_subkey: bool = False) -> bool:
@@ -180,7 +191,30 @@ class FileBackedDict(UserDict, LockedResource):
     def prune(self, start_key: str | None = None):
         '''Recursively removes empty dictionaries, starting with start_key (or from root if start_key is None)'''
         self.__prune(self.data if start_key is None else self._get_(self.key(start_key, allow_top_lvl_key=True)))
-    
+
+    # Augmented get
+    on_missing = Enum('OnMissing', ('RETURN_DEFAULT', 'SET_RETURN_DEFAULT', 'SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE', 'ERROR'))
+    def __call__(self, key: str | tuple[str], default: None | typing.Any = None, on_missing: on_missing = on_missing.SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE):
+        '''
+            Behavior of on_missing when the key isn't found:
+                RETURN_DEFAULT: returns the default field
+                SET_RETURN_DEFAULT: same as the get_set_default method
+                SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE: (the default) same as SET_RETURN_DEFAULT unless default is None, in which case ExceptionGroup(KeyError, TypeError) is raised
+                ERROR: raises KeyError
+        '''
+        assert isinstance(on_missing, self.on_missing)
+        if key in self: return self[key]
+        match on_missing:
+            case self.on_missing.RETURN_DEFAULT: return default
+            case self.on_missing.SET_RETURN_DEFAULT:
+                self[key] = default
+                return default
+            case self.on_missing.SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE:
+                if default is None: raise ExceptionGroup('Key was not found, on_missing is SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE, and default=None', (KeyError(key), TypeError('Default is None')))
+                self[key] = default
+                return default
+            case self.on_missing.ERROR: raise KeyError(key)
+
     # Data sync functions
     ## Reading in
     @locked

@@ -1,7 +1,6 @@
 #!/bin/python3
 
 #> Imports
-from functools import cache
 from pathlib import Path
 import shlex
 from getpass import getpass
@@ -17,7 +16,7 @@ except ModuleNotFoundError: screenutils = None
 
 # RunServer Module
 import RS
-from RS import Config
+from RS import Config, LineParser
 from RS.Types import Hooks
 
 #> Header >/
@@ -27,6 +26,8 @@ class BaseServerManager(ABC):
     def __init__(self):
         self.logger = RS.logger.getChild(self.__class__.__qualname__)
         self.hooks = Hooks.SingleHook()
+        self.hooks.register(print)
+        self.hooks.register(LineParser.handle_line)
 
     # Non-abstract methods
     @classmethod
@@ -80,12 +81,7 @@ class ScreenManager(BaseServerManager):
             raise ModuleNotFoundError('Screenutils module is required for ScreenManager!')
         raise NotImplementedError
         
-    @classmethod
-    @property
-    @cache
-    def bias(cls) -> float:
-        if screenutils is None: return -float('inf')
-        return 10.0
+    bias = -float('inf') if screenutils is None else 10.0
 class RConManager(BaseServerManager):
     __slots__ = ()
     _type = ('remote', 'passwd')
@@ -101,10 +97,9 @@ class RConManager(BaseServerManager):
             self.rconpwd = getpass('Enter RCon password >')
             self.logger.warning('RCon password can be permanently set in config minecraft/rcon/password')
         raise NotImplementedError
-        
+
     @classmethod
     @property
-    @cache
     def bias(cls) -> float:
         if RCONClient is None: return -float('inf')
         if Config('minecraft/rcon/enabled', False):
@@ -117,14 +112,23 @@ class SelectManager(BasePopenManager):
         super().__init__()
         raise NotImplementedError
     
-    @classmethod
-    @property
-    @cache
-    def bias(cls) -> float: return 2.0
+    bias = 2.0
+class DummyServerManager(BaseServerManager):
+    __slots__ = ()
+    _type = ('manual', 'dummy')
+    def __init__(self):
+        super().__init__()
+        print('-----DUMMY SERVER MODE-----')
+    def start(self):
+        self.hooks(input('>DUMMY SERVER INPUT >'))
+    def write(self, line: str):
+        print(f'>DUMMY SERVER WRITE > {line}')
+    
+    bias = -50.0
 
 # Manager
 class ServerManager:
-    server_manager_types = {ScreenManager, RConManager, SelectManager}
+    server_manager_types = {ScreenManager, RConManager, SelectManager, DummyServerManager}
     def __new__(cls):
         RS.logger.getChild('ServerManager').debug(f'Instantiating server manager; preferred order: {tuple(f"{c.__qualname__}:<{c.type}>,[{c.bias}+{c._bias_config()}]" for c in cls.preferred_order())}')
         return cls.preferred_order()[0]()
@@ -132,7 +136,6 @@ class ServerManager:
     def register(cls, manager_type: typing.Type[BaseServerManager]):
         cls.server_manager_types.add(manager_type)
     @classmethod
-    @cache
     def preferred_order(cls) -> list[typing.Type[BaseServerManager]]:
         return sorted(cls.server_manager_types, key=lambda t: t.bias+t._bias_config(), reverse=True)
 ServerManager.BaseServerManager = BaseServerManager

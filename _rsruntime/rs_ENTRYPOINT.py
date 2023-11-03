@@ -20,6 +20,7 @@ class RunServer(types.ModuleType):
         'Types', 'T',
         # Load: 1
         'Config', 'C',
+        'ExceptionHandlers', 'EH',
         # Load: 2
         'MCLang', 'L',
         'LineParser', 'LP',
@@ -57,6 +58,9 @@ class RunServer(types.ModuleType):
         self.__setup_frommod('rs_config', {
             ('Config', 'C'): 'Config',
         })
+        self.__setup_frommod('rs_exceptionhandlers', {
+            ('ExceptionHandlers', 'EH'): 'ExceptionHandlers',
+        })
         # Load: 2
         self.__setup_frommod('rs_lineparser', {
             ('MCLang', 'L'): 'MCLang',
@@ -93,6 +97,8 @@ class RunServer(types.ModuleType):
             setattr(self, s, getattr(self, l))
     def __call__(self):
         self.logger.info('Entrypoint starting')
+        # Start ServerManager
         self.ServerManager = self.SM = self.ServerManager()
+        # Finalize config
         self.Config.stop_autosync()
         self.Config.sync_all()
