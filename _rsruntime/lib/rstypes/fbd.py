@@ -127,9 +127,7 @@ class FileBackedDict(UserDict, LockedResource):
     __setitem__ = set_item
     def set_default(self, key: str | tuple[str], default):
         '''If the item corresponding to key doesn't exist, then sets it to default. Has no effect otherwise'''
-        if key not in self:
-            self.logger.warn(f'Setting default for {key}')
-            self[key] = default
+        if key not in self: self[key] = default
     ## Containing
     @locked
     def contains(self, key: str | tuple[str], *, unsafe_no_error_on_subkey: bool = False) -> bool:
