@@ -1,7 +1,6 @@
 #!/bin/python3
 
 #> Imports
-from functools import cache
 from pathlib import Path
 import shlex
 # Types
@@ -79,12 +78,7 @@ class ScreenManager(BaseServerManager):
             raise ModuleNotFoundError('Screenutils module is required for ScreenManager!')
         raise NotImplementedError
         
-    @classmethod
-    @property
-    @cache
-    def bias(cls) -> float:
-        if screenutils is None: return -float('inf')
-        return 10.0
+    bias = -float('inf') if screenutils is None else 10.0
 class RConManager(BaseServerManager):
     __slots__ = ()
     _type = ('rcon',)
@@ -94,12 +88,7 @@ class RConManager(BaseServerManager):
             raise ModuleNotFoundError('RCon module is required for RConManager!')
         raise NotImplementedError
         
-    @classmethod
-    @property
-    @cache
-    def bias(cls) -> float:
-        if RCONClient is None: return -float('inf')
-        return 5.0
+    bias = -float('inf') if RCONClient is None else 5.0
 class SelectManager(BasePopenManager):
     __slots__ = ()
     _type = ('select',)
@@ -107,10 +96,9 @@ class SelectManager(BasePopenManager):
         super().__init__()
         raise NotImplementedError
     
-    @classmethod
-    @property
-    @cache
-    def bias(cls) -> float: return 2.0
+    bias = 2.0
+class DummyServerManager(BaseServerManager):
+    __slots__ = ()
 
 # Manager
 class ServerManager:
@@ -122,7 +110,6 @@ class ServerManager:
     def register(cls, manager_type: typing.Type[BaseServerManager]):
         cls.server_manager_types.add(manager_type)
     @classmethod
-    @cache
     def preferred_order(cls) -> list[typing.Type[BaseServerManager]]:
         return sorted(cls.server_manager_types, key=lambda t: t.bias+t._bias_config(), reverse=True)
 ServerManager.BaseServerManager = BaseServerManager
