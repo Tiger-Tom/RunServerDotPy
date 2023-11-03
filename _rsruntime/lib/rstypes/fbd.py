@@ -20,7 +20,7 @@ serializable = (dict, list, str, int, float, bool, type(None))
 class FileBackedDict(UserDict, LockedResource):
     '''
         A dictionary backed by an on-disk JSON file
-        Asynchronously syncronizes entries with a file on disk when enabled
+        Asynchronously synchronizes entries with a file on disk when enabled
         Detects file changes by checking its modification time
         Detects dict changes by adding keys to a "dirty" flag
         Sub-dictionaries can be accessed with "/" notation
