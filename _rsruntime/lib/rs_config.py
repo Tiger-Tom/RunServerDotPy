@@ -40,7 +40,7 @@ class Config(FileBackedDict):
                 self[key] = default
                 return default
             case self.on_missing.SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE:
-                if default is None: raise ExceptionGroup(KeyError(key), TypeError('Default is None'))
+                if default is None: raise ExceptionGroup('Key was not found, on_missing is SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE, and default=None', (KeyError(key), TypeError('Default is None')))
                 self[key] = default
                 return default
             case self.on_missing.ERROR: raise KeyError(key)
