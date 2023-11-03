@@ -20,6 +20,7 @@ class RunServer(types.ModuleType):
         'Types', 'T',
         # Load: 1
         'Config', 'C',
+        'ExceptionHandlers', 'EH',
         # Load: 2
         'MCLang', 'L',
         'LineParser', 'LP',
@@ -56,6 +57,9 @@ class RunServer(types.ModuleType):
         # Load: 1
         self.__setup_frommod('rs_config', {
             ('Config', 'C'): 'Config',
+        })
+        self.__setup_frommod('rs_exceptionhandlers', {
+            ('ExceptionHandlers', 'EH'): 'ExceptionHandlers',
         })
         # Load: 2
         self.__setup_frommod('rs_lineparser', {
