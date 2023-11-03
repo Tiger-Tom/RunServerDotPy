@@ -68,7 +68,7 @@ class Bootstrapper:
         self.logger.warning('ENTRYPOINT INITIALIZED, EXECUTING ENTRYPOINT...')
         rs()
     # Manifest utilities
-    def check_manifest(self, name: str, path: Path, man_upstream: str | None=None, man_upstream_base: str | None=None, known_differs=False, past_upstreams={}) -> None | dict:
+    def check_manifest(self, name: str, path: Path, man_upstream: str | None = None, man_upstream_base: str | None = None, known_differs: bool = False, past_upstreams: dict = {}) -> None | dict:
         iman = {'_metadata': {'name': name, 'manifest_upstream': man_upstream, 'file_upstream': None}}
         # Get local manifest
         if (path / 'MANIFEST.json').exists():
