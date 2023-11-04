@@ -55,10 +55,20 @@ class BaseServerManager(ABC):
     @abstractproperty
     def _type(): pass
 
-    # Abstract methods
-    #@abstractmethod
-    #def supports_abstract_read():
-    #    ...
+    # Capabilities
+    @abstractproperty
+    def cap_arbitrary_read() -> bool: pass
+    @abstractproperty
+    def cap_arbitrary_write() -> bool: pass
+    ## With defaults
+    cap_detachable: bool = False
+    cap_attachable: bool = False
+    cap_stoppable: bool = True # we usually have control via /stop
+    cap_restartable: bool = False # we cannot always restart it
+
+    # Misc. attributes
+    is_dummy: bool = False
+    
         
 class BasePopenManager(BaseServerManager):
     __slots__ = ('popen',)
@@ -66,9 +76,14 @@ class BasePopenManager(BaseServerManager):
     def __init__(self):
         super().__init__()
         import subprocess
+
+    cap_arbitrary_write = True
+    cap_restartable = True
+    
     def start(self):
         #Config('minecraft/path/base', './minecraft')
         ...
+
             
         
 # Implementations
@@ -80,7 +95,13 @@ class ScreenManager(BaseServerManager):
         if screenutils is None:
             raise ModuleNotFoundError('Screenutils module is required for ScreenManager!')
         raise NotImplementedError
-        
+    
+    cap_arbitrary_read = True
+    cap_arbitrary_write = True
+    cap_detachable = True
+    cap_attachable = True
+    cap_restartable = True
+    
     bias = -float('inf') if screenutils is None else 10.0
 class RConManager(BaseServerManager):
     __slots__ = ()
@@ -98,6 +119,12 @@ class RConManager(BaseServerManager):
             self.logger.warning('RCon password can be permanently set in config minecraft/rcon/password')
         raise NotImplementedError
 
+    cap_arbitrary_read = False
+    cap_arbitrary_write = True
+    cap_detachable = True
+    cap_attachable = True
+    cap_restartable = True
+    
     @classmethod
     @property
     def bias(cls) -> float:
@@ -111,6 +138,8 @@ class SelectManager(BasePopenManager):
     def __init__(self):
         super().__init__()
         raise NotImplementedError
+
+    cap_arbitrary_read = True
     
     bias = 2.0
 class DummyServerManager(BaseServerManager):
@@ -123,6 +152,12 @@ class DummyServerManager(BaseServerManager):
         self.hooks(input('>DUMMY SERVER INPUT >'))
     def write(self, line: str):
         print(f'>DUMMY SERVER WRITE > {line}')
+
+    cap_arbitrary_read = True
+    cap_arbitrary_write = True
+    cap_restartable = True
+
+    is_dummy = True
     
     bias = -50.0
 
