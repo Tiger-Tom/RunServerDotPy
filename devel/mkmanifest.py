@@ -33,7 +33,9 @@ def parse_args(args=None):
         parse_args(('add', old['_metadata']['name'], str(args.old_manifest.parent), old['_metadata']['manifest_upstream'], old['_metadata']['file_upstream']) \
                    +(('--output', str(args.output)) if args.output is not None else ()))
         return
-    if args.cmd != 'add': raise RuntimeError(args.cmd, args)
+    if args.cmd != 'add':
+        p.print_help()
+        exit(1)
     manifest = {
         '_metadata': {
             'name': args.name,
