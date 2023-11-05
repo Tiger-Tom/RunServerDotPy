@@ -4,6 +4,8 @@
 from pathlib import Path
 import shlex
 from getpass import getpass
+from inspect import isabstract
+from traceback import format_exception
 # Types
 import typing
 from abc import ABC, abstractmethod, abstractproperty
@@ -165,8 +167,40 @@ class DummyServerManager(BaseServerManager):
 class ServerManager:
     server_manager_types = {ScreenManager, RConManager, SelectManager, DummyServerManager}
     def __new__(cls):
-        RS.logger.getChild('ServerManager').debug(f'Instantiating server manager; preferred order: {tuple(f"{c.__qualname__}:<{c.type}>,[{c.bias}+{c._bias_config()}]" for c in cls.preferred_order())}')
-        return cls.preferred_order()[0]()
+        logger = RS.logger.getChild('ServerManager._staging')
+        order = cls.preferred_order()
+        logger.debug(f'Instantiating server manager; preferred order: {tuple(f"{c.__qualname__}:<{c.type}>,[{c.bias}+{c._bias_config()}]" for c in order)}')
+        if not len(order): raise NotImplementedError('No ServerManagers found')
+        for i,c in enumerate(order):
+            if c.bias <= 0:
+                raise RuntimeError(f'No suitable ServerManagers found (biases are all <= {c.bias}, which is <= 0)')
+            # Debugging
+            logger.info(f'Staging ServerManager {c.__qualname__} from {c.__module__} (type {c.type}) (bias {c.bias}, index {i})...')
+            ## Print out typing
+            logger.debug(f'{c.__qualname__} typing:')
+            logger.debug(f' _type: {c._type}')
+            logger.debug(f' Chain (MRO):')
+            for i,m in enumerate(c.__mro__[:(c.__mro__.index(ABC) if ABC in c.__mro__ else c.__mro__.index(object))]):
+                logger.debug(f'  {"^" if i else ">"} {m}{" <abstract>" if isabstract(m) else ""}')
+            ## Capabilities
+            logger.debug(f'{c.__qualname__} capabilites:')
+            for a,v in ((a, getattr(c, a)) for a in dir(c) if a.startswith('cap_')):
+                logger.debug(f' [{"Y" if v else "N"}] {a}')
+            ## Attributes
+            logger.debug(f'{c.__qualname__} attributes:')
+            for a,v in ((a, getattr(c, a)) for a in dir(c) if a.startswith('is_')):
+                logger.debug(f'  {a}: {"<empty>" if v is None else ("[Y]" if v else "[N]") if isinstance(v, bool) else repr(v)}')
+            # Try to instantiate
+            try:
+                inst = c()
+                logger.debug(f'Successfully instantiated {c.__qualname__} as {inst}')
+                return inst
+            except Exception as e:
+                logger.error(f'Could not instantiate {c.__qualname__}:\n{"".join(format_exception(e))}')
+                if i < len(order):
+                    logger.warning('Trying the next possible choice...')
+                    
+        raise RuntimeError('None of the ServerManagers could be staged, cannot continue')
     @classmethod
     def register(cls, manager_type: typing.Type[BaseServerManager]):
         cls.server_manager_types.add(manager_type)
