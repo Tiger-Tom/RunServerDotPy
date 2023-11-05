@@ -25,6 +25,12 @@ def setup_logger():
         datefmt=date_fmt_long,
         style='$'
     )
+    ## Set loglevel names
+    logging.addLevelName(logging.DEBUG, 'DBG')
+    logging.addLevelName(logging.INFO, 'INF')
+    logging.addLevelName(logging.WARNING, 'WRN')
+    logging.addLevelName(logging.ERROR, 'ERR')
+    logging.addLevelName(logging.CRITICAL, 'CRT')
     # Create logger
     logger = logging.getLogger()
     # Stream handler
