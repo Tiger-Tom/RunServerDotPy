@@ -23,7 +23,7 @@ def setup_logger():
             else logging.WARNING,
         format=log_fmt_long,
         datefmt=date_fmt_long,
-        style='$'
+        style='$',
     )
     ## Set loglevel names
     logging.addLevelName(logging.DEBUG, 'DBG')
