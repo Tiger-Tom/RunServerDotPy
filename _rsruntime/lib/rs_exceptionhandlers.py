@@ -28,7 +28,7 @@ class ExceptionHandlers:
     
     def __init__(self):
         import logging
-        self.logger = RS.logger.getChild('ExceptionHandlers')
+        self.logger = RS.logger.getChild('EH')
         self.exceptionhooks = Hooks.SingleHook()
         self.unraisablehooks = Hooks.SingleHook()
         self.threadexceptionhooks = Hooks.SingleHook()

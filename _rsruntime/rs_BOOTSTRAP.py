@@ -29,8 +29,8 @@ class Bootstrapper:
     dl_timeout = 10
     
     def __init__(self):
-        self.root_logger = logging.getLogger('RunServer')
-        self.logger = self.root_logger.getChild('Bootstrapper')
+        self.root_logger = logging.getLogger('RS')
+        self.logger = self.root_logger.getChild('BS')
         self.logger.info(f'Initialized: {self}')
         self.ensure_python_version()
     def ensure_python_version(self):

@@ -65,7 +65,7 @@ class UserManager:
             return self
 
     def __init__(self):
-        self.logger = RS.logger.getChild('UserManager')
+        self.logger = RS.logger.getChild('UM')
         self.users = {}
         # FileBackedDict
         path = Path(Config('users/fbd/path', './_rsusers/'))

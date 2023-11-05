@@ -24,7 +24,7 @@ class MCLang:
     prefix = re.compile(r'^\[(?P<time>[0-9:]{8})\] \[(?P<thread>[^/]+)/(?P<level>[A-Z]+)\]: (?P<line>.*?)$')
     
     def __init__(self):
-        self.logger = RS.logger.getChild('Lang')
+        self.logger = RS.logger.getChild('L')
         self.extract_lang()
 
     # Lang interaction
@@ -88,7 +88,7 @@ class LineParser:
     __slots__ = ('logger', 'hooks_prefix', 'hooks_no_prefix', 'hooks_chat', 'chat_patt')
 
     def __init__(self):
-        self.logger = RS.logger.getChild('LineParser')
+        self.logger = RS.logger.getChild('LP')
         self.hooks_prefix = Hooks.ReHooks('fullmatch')
         self.hooks_no_prefix = Hooks.ReHooks('fullmatch')
         self.hooks_chat = Hooks.SingleHook()

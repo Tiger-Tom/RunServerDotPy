@@ -35,7 +35,7 @@ class FileBackedDict(UserDict, LockedResource):
         LockedResource.__init__(self)
         UserDict.__init__(self)
         self.path = Path(path) # path path path
-        self.logger = logging.getLogger(f'FileBackedDict[{self.path.name.replace(".", "_")}]')
+        self.logger = logging.getLogger(f'FBD[{self.path.name.replace(".", "_")}]')
         self.dirty = set()
         self.watchdog = Timer.set_interval(self.sync_all, interval, False); self.watchdog_times = {}
     def __hash__(self):

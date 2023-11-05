@@ -15,7 +15,7 @@ class Config(FileBackedDict):
     conf_path = Path('./_rsconfig/')
 
     def __init__(self):
-        self.logger = RS.logger.getChild('Config')
+        self.logger = RS.logger.getChild('C')
         self.conf_path.mkdir(parents=True, exist_ok=True)
         super().__init__(self.conf_path, 60.0)
         self.start_autosync()

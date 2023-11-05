@@ -26,7 +26,7 @@ from RS.Types import Hooks
 class BaseServerManager(ABC):
     __slots__ = ('logger', 'hooks')
     def __init__(self):
-        self.logger = RS.logger.getChild(self.__class__.__qualname__)
+        self.logger = RS.logger.getChild(f'SM<{self.__class__.__qualname__}>')
         self.hooks = Hooks.SingleHook()
         self.hooks.register(print)
         self.hooks.register(LineParser.handle_line)
@@ -167,7 +167,7 @@ class DummyServerManager(BaseServerManager):
 class ServerManager:
     server_manager_types = {ScreenManager, RConManager, SelectManager, DummyServerManager}
     def __new__(cls):
-        logger = RS.logger.getChild('ServerManager._staging')
+        logger = RS.logger.getChild('SM._staging')
         order = cls.preferred_order()
         logger.debug(f'Instantiating server manager; preferred order: {tuple(f"{c.__qualname__}:<{c.type}>,[{c.bias}+{c._bias_config()}]" for c in order)}')
         if not len(order): raise NotImplementedError('No ServerManagers found')
