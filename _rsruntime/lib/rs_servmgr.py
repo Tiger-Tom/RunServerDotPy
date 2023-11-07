@@ -75,7 +75,10 @@ class BaseServerManager(ABC):
             server_jar_path = (Path(Config('minecraft/path/base', './minecraft')) / Config('minecraft/path/server_jar', 'server.jar')).absolute(),
             server_args = Config('minecraft/server_args', '--nogui'),
         ))
-    
+
+    # Abstract methods
+    @abstractmethod
+    def start(self): pass
     # Abstract properties
     @classmethod
     @abstractproperty
@@ -166,7 +169,6 @@ class ServerManager:
         setattr(cls.managers, manager_type.name, manager_type)
     @classmethod
     def preferred_order(cls) -> list[typing.Type[BaseServerManager]]:
-        print(cls.managers.__dict__)
         return sorted(cls.managers.__dict__.values(), key=lambda t: t.real_bias, reverse=True)
 # Implementations
 class ScreenManager(BaseServerManager):
@@ -197,6 +199,7 @@ class ScreenManager(BaseServerManager):
             os.mkfifo(path)
             self.run_screen_cmd('logfile', path)
             self.run_screen_cmd('logfile', 'flush', str(Config('server_manager/screen/log_flush_secs', 1)))
+    def start(self): raise NotImplementedError
     
     cap_arbitrary_read = True
     cap_arbitrary_write = True
@@ -220,6 +223,7 @@ class RConManager(BaseServerManager):
             self.rconpwd = getpass('Enter RCon password >')
             self.logger.warning('RCon password can be permanently set in config minecraft/rcon/password')
         raise NotImplementedError
+    def start(self): raise NotImplementedError
 
     cap_arbitrary_read = False
     cap_arbitrary_write = True
@@ -240,6 +244,7 @@ class SelectManager(BasePopenManager):
     def __init__(self):
         super().__init__()
         raise NotImplementedError
+    def start(self): raise NotImplementedError
 
     cap_arbitrary_read = True
     
