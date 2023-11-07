@@ -98,6 +98,7 @@ class BaseServerManager(ABC):
     cap_attachable: bool = False
     cap_stoppable: bool = True # we usually have control via /stop
     cap_restartable: bool = False # we cannot always restart it
+    cap_read_from_write: bool = False # most places cannot separate normal output from command output immediately
 
     # Misc. attributes
     attr_is_dummy: bool = False
@@ -234,6 +235,7 @@ class RConManager(BaseServerManager):
     cap_detachable = True
     cap_attachable = True
     cap_restartable = True
+    cap_read_from_write = True
     
     @classmethod
     @property
