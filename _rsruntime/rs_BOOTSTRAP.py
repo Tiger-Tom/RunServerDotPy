@@ -21,17 +21,21 @@ from urllib import request
 #> Header >/
 class Bootstrapper:
     __slots__ = ('root_logger', 'logger')
+    # Paths
     base_dirs = {'rsruntime', 'rsplugins/builtin'}
+    # Remotes
     #dl_man_base = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e'
     dl_man_base = 'http://0.0.0.0:8000/manifests'
     dl_man_path = lambda self,n: f'{self.dl_man_base}/{n.replace("/", "_")}.json'
-    algorithm = hashlib.sha1
-    minimum_vers = (3, 12, 0)
-    dl_timeout = 10
+    # Logger formats
     log_fmt_short = '[$asctime] [$name/$threadName/$levelname] $message'
     log_fmt_long = '[$asctime] [$name/$processName:$threadName<$module.$funcName[$lineno]>/$levelname] $message'
     date_fmt_short = '%H:%M:%S'
     date_fmt_long = '%Y-%m-%d %H:%M:%S'
+    # Misc. config
+    algorithm = hashlib.sha1
+    minimum_vers = (3, 12, 0)
+    dl_timeout = 10
     
     def __init__(self):
         self.root_logger = self.setup_logging()
