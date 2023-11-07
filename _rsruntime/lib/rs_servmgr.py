@@ -27,7 +27,7 @@ from RS.Types import Hooks, PerfCounter
 #> Header >/
 # Base classes
 class BaseServerManager(ABC):
-    __slots__ = ('logger', 'hooks')
+    __slots__ = ('logger', 'hooks', 'managers')
     basemanagers = SimpleNamespace()
     def __init__(self):
         self.logger = RS.logger.getChild(f'SM<{self.name}>')
@@ -154,6 +154,7 @@ class ServerManager:
             try:
                 inst = c()
                 logger.debug(f'Successfully instantiated {c.name} as {inst} in {current_pc} (total of {total_pc})')
+                inst.managers = cls.managers
                 return inst
             except Exception as e:
                 logger.error(f'Could not instantiate {c.name}:\n{"".join(format_exception(e))}\n (failed after {current_pc}, total of {total_pc})')
