@@ -3,7 +3,6 @@
 #> Imports
 from inspect import isabstract
 from traceback import format_exception
-import time
 # Shell
 import shlex
 from getpass import getpass
