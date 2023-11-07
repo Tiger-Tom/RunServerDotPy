@@ -12,6 +12,7 @@ from pathlib import Path
 import shutil
 # Types
 import typing
+from types import SimpleNamespace
 from abc import ABC, abstractmethod, abstractproperty
 # Manager-specific modules
 try: from rcon.source import Client as RCONClient
@@ -27,18 +28,34 @@ from RS.Types import Hooks, PerfCounter
 # Base classes
 class BaseServerManager(ABC):
     __slots__ = ('logger', 'hooks')
+    basemanagers = SimpleNamespace()
     def __init__(self):
         self.logger = RS.logger.getChild(f'SM<{self.__class__.__qualname__}>')
         self.hooks = Hooks.SingleHook()
         self.hooks.register(print)
         self.hooks.register(LineParser.handle_line)
-
+    def __init_subclass__(cls):
+        logger = RS.logger.getChild('SM._base')
+        logger.debug(f'subclassed by {"" if isabstract(cls) else "non-"}abstract {cls.name}')
+        if isabstract(cls):
+            cls.register()
+            return
+        logger.debug(f'registering {cls.name} in ServerManager')
+        ServerManager.register(cls)
+        
     # Non-abstract methods
     @classmethod
     def _bias_config(cls) -> float:
-        return Config(f'override/server_manager/bias_mod/{cls.__qualname__}', 0.0) + \
-               (-float('inf') if Config(f'server_manager/blacklist/{cls.__qualname__}', False) else 0.0) + \
-               (100.0 if Config(f'server_manager/prefer/{cls.__qualname__}', False) else 0.0)
+        return Config(f'override/server_manager/bias_mod/{cls.name}', 0.0) + \
+               (-float('inf') if Config(f'server_manager/blacklist/{cls.name}', False) else 0.0) + \
+               (100.0 if Config(f'server_manager/prefer/{cls.name}', False) else 0.0)
+    @classmethod
+    def register(cls):
+        setattr(cls.basemanagers, cls.name, cls)
+    @classmethod
+    @property
+    def name(cls) -> str:
+        return f'{"[builtin]" if cls.__module__ == BaseServerManager.__module__ else cls.__module__}.{cls.__qualname__}'.replace('/', '.')
     @classmethod
     @property
     def type(cls) -> str:
@@ -72,7 +89,6 @@ class BaseServerManager(ABC):
 
     # Misc. attributes
     attr_is_dummy: bool = False
-    
         
 class BasePopenManager(BaseServerManager):
     __slots__ = ('popen',)
@@ -87,9 +103,52 @@ class BasePopenManager(BaseServerManager):
     def start(self):
         #Config('minecraft/path/base', './minecraft')
         ...
-
-            
-        
+# Manager
+class ServerManager:
+    managers = SimpleNamespace()
+    def __new__(cls):
+        logger = RS.logger.getChild('SM._staging')
+        order = cls.preferred_order()
+        logger.debug(f'Instantiating server manager; preferred order: {tuple(f"{c.name}:<{c.type}>,[{c.bias}+{c._bias_config()}]" for c in order)}')
+        total_pc = PerfCounter()
+        if not len(order): raise NotImplementedError('No ServerManagers found')
+        for i,c in enumerate(order):
+            if c.bias <= 0:
+                raise RuntimeError(f'No suitable ServerManagers found (biases are all <= {c.bias}, which is <= 0) (tried for total of {total_pc})')
+            # Debugging
+            logger.info(f'Staging ServerManager {c.name} (type {c.type}) (bias {c.bias}, index {i}) (T+{total_pc})...')
+            ## Print out typing
+            logger.debug(f'{c.name} typing:')
+            logger.debug(f' _type: {c._type}')
+            logger.debug(f' Chain (MRO):')
+            for i,m in enumerate(c.__mro__[:(c.__mro__.index(ABC) if ABC in c.__mro__ else c.__mro__.index(object))]):
+                logger.debug(f'  {"^" if i else ">"} {m}{" <abstract>" if isabstract(m) else ""}')
+            ## Capabilities
+            logger.debug(f'{c.name} capabilites:')
+            for a,v in ((a, getattr(c, a)) for a in dir(c) if a.startswith('cap_')):
+                logger.debug(f' [{"Y" if v else "N"}] {a}')
+            ## Attributes
+            logger.debug(f'{c.name} attributes:')
+            for a,v in ((a, getattr(c, a)) for a in dir(c) if a.startswith('attr_')):
+                logger.debug(f'  {a}: {"<empty>" if v is None else ("[Y]" if v else "[N]") if isinstance(v, bool) else repr(v)}')
+            # Try to instantiate
+            current_pc = PerfCounter()
+            try:
+                inst = c()
+                logger.debug(f'Successfully instantiated {c.name} as {inst} in {current_pc} (total of {total_pc})')
+                return inst
+            except Exception as e:
+                logger.error(f'Could not instantiate {c.name}:\n{"".join(format_exception(e))}\n (failed after {current_pc}, total of {total_pc})')
+                if i < len(order):
+                    logger.warning('Trying the next possible choice...')
+        raise RuntimeError('None of the ServerManagers could be staged (tried for total of {total_pc}, cannot continue')
+    @classmethod
+    def register(cls, manager_type: typing.Type[BaseServerManager]):
+        setattr(cls.managers, manager_type.name, manager_type)
+    @classmethod
+    def preferred_order(cls) -> list[typing.Type[BaseServerManager]]:
+        print(cls.managers.__dict__)
+        return sorted(cls.managers.__dict__.values(), key=lambda t: t.bias+t._bias_config(), reverse=True)
 # Implementations
 class ScreenManager(BaseServerManager):
     __slots__ = ()
@@ -196,54 +255,3 @@ class PyInterpreterServerManager(DummyServerManager):
     - RS is the RunServer instance
     - self is the {self.__class__} instance
     Use CTRL+D to exit subinterpreter, as exit() exits both the sub and main interpreters''', local=globals()+locals())
-
-# Manager
-class ServerManager:
-    server_manager_types = {ScreenManager, RConManager, SelectManager, DummyServerManager, PyInterpreterServerManager}
-    def __new__(cls):
-        logger = RS.logger.getChild('SM._staging')
-        order = cls.preferred_order()
-        logger.debug(f'Instantiating server manager; preferred order: {tuple(f"{c.__qualname__}:<{c.type}>,[{c.bias}+{c._bias_config()}]" for c in order)}')
-        total_pc = PerfCounter()
-        if not len(order): raise NotImplementedError('No ServerManagers found')
-        for i,c in enumerate(order):
-            if c.bias <= 0:
-                raise RuntimeError(f'No suitable ServerManagers found (biases are all <= {c.bias}, which is <= 0) (tried for total of {total_pc})')
-            # Debugging
-            logger.info(f'Staging ServerManager {c.__qualname__} from {c.__module__} (type {c.type}) (bias {c.bias}, index {i}) (T+{total_pc})...')
-            ## Print out typing
-            logger.debug(f'{c.__qualname__} typing:')
-            logger.debug(f' _type: {c._type}')
-            logger.debug(f' Chain (MRO):')
-            for i,m in enumerate(c.__mro__[:(c.__mro__.index(ABC) if ABC in c.__mro__ else c.__mro__.index(object))]):
-                logger.debug(f'  {"^" if i else ">"} {m}{" <abstract>" if isabstract(m) else ""}')
-            ## Capabilities
-            logger.debug(f'{c.__qualname__} capabilites:')
-            for a,v in ((a, getattr(c, a)) for a in dir(c) if a.startswith('cap_')):
-                logger.debug(f' [{"Y" if v else "N"}] {a}')
-            ## Attributes
-            logger.debug(f'{c.__qualname__} attributes:')
-            for a,v in ((a, getattr(c, a)) for a in dir(c) if a.startswith('attr_')):
-                logger.debug(f'  {a}: {"<empty>" if v is None else ("[Y]" if v else "[N]") if isinstance(v, bool) else repr(v)}')
-            # Try to instantiate
-            current_pc = PerfCounter()
-            try:
-                inst = c()
-                logger.debug(f'Successfully instantiated {c.__qualname__} as {inst} in {current_pc} (total of {total_pc})')
-                return inst
-            except Exception as e:
-                logger.error(f'Could not instantiate {c.__qualname__}:\n{"".join(format_exception(e))}\n (failed after {current_pc}, total of {total_pc})')
-                if i < len(order):
-                    logger.warning('Trying the next possible choice...')
-        raise RuntimeError('None of the ServerManagers could be staged (tried for total of {total_pc}, cannot continue')
-    @classmethod
-    def register(cls, manager_type: typing.Type[BaseServerManager]):
-        cls.server_manager_types.add(manager_type)
-    @classmethod
-    def preferred_order(cls) -> list[typing.Type[BaseServerManager]]:
-        return sorted(cls.server_manager_types, key=lambda t: t.bias+t._bias_config(), reverse=True)
-ServerManager.BaseServerManager = BaseServerManager
-ServerManager.BasePopenManager = BasePopenManager
-ServerManager.ScreenManager = ScreenManager
-ServerManager.RConManager = RConManager
-ServerManager.SelectManager = SelectManager
