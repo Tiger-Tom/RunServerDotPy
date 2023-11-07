@@ -38,7 +38,7 @@ class BaseServerManager(ABC):
         logger = RS.logger.getChild('SM._base')
         logger.debug(f'subclassed by {"abstract" if isabstract(cls) else "concrete"} {cls.name}')
         if isabstract(cls):
-            cls.register()
+            cls.register_base()
             return
         logger.debug(f'registering {cls.name} in ServerManager')
         ServerManager.register(cls)
@@ -57,7 +57,7 @@ class BaseServerManager(ABC):
         if (b := cls._bias_override()) is not None: return b
         return cls.bias + cls._bias_config()
     @classmethod
-    def register(cls):
+    def register_base(cls):
         setattr(cls.basemanagers, cls.name, cls)
     @classmethod
     @property
