@@ -256,8 +256,14 @@ class PyInterpreterServerManager(DummyServerManager):
         BaseServerManager.__init__(self)
     def start(self):
         import code
-        code.interact('''Python Interpreter SM submode
-    All locals and globals have been passed, A.E.:
+        def tc():
+            import readline
+            import rlcompleter
+            readline.parse_and_bind('tab: complete')
+        ic = code.InteractiveConsole({'RS': RS, 'self': self, 'tc': tc})
+        ic.interact(f'''Python Interpreter SM submode
+    Some names are passed to this subinterpreter:
     - RS is the RunServer instance
     - self is the {self.__class__} instance
-    Use CTRL+D to exit subinterpreter, as exit() exits both the sub and main interpreters''', local=globals()+locals())
+    - tc() is a function that tries to enable tab completion
+    Use CTRL+D to exit subinterpreter, as exit() exits both the sub and main interpreters''')
