@@ -50,7 +50,7 @@ class BaseServerManager(ABC):
                (100.0 if Config(f'server_manager/prefer/{cls.name}', False) else 0.0)
     @classmethod
     def _bias_override(cls) -> float | None:
-        return Config(f'override/server_manager/bias_mod/{cls.name}', None)
+        return Config(f'override/server_manager/bias_mod/{cls.name}', None, Config.on_missing.SET_RETURN_DEFAULT)
     @classmethod
     @property
     def real_bias(cls) -> float:
@@ -215,7 +215,7 @@ class RConManager(BaseServerManager):
         if not Config('minecraft/rcon/enabled', False): raise RuntimeError('RCon is not enabled! (set it up in config: minecraft/rcon/enabled)')
         self.remote = f'{Config("minecraft/rcon/host", "127.0.0.1")}:{Config("minecraft/rcon/port", 25575)}'
         self.logger.warning(f'RCon remote: {self.remote} (can be set in config minecraft/rcon/)')
-        self.rconpwd = Config('minecraft/rcon/password', None)
+        self.rconpwd = Config('minecraft/rcon/password', None, Config.on_missing.SET_RETURN_DEFAULT)
         if self.rconpwd is None:
             self.rconpwd = getpass('Enter RCon password >')
             self.logger.warning('RCon password can be permanently set in config minecraft/rcon/password')
