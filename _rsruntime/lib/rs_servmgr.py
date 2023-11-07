@@ -96,7 +96,7 @@ class ScreenManager(BaseServerManager):
     _type = ('screen',)
     def __init__(self):
         super().__init__()
-        if shutil.which('screen') is None:
+        if shutil.which(Config('server_manager/screen/binary', 'screen')) is None:
             raise NotImplementedError('ScreenManager requires the `screen` binary!')
         raise NotImplementedError
     
@@ -106,7 +106,7 @@ class ScreenManager(BaseServerManager):
     cap_attachable = True
     cap_restartable = True
     
-    bias = -float('inf') if shutil.which('screen') is None else 10.0
+    bias = -float('inf') if shutil.which(Config('screen_manager/screen/binary', 'screen')) is None else 10.0
 class RConManager(BaseServerManager):
     __slots__ = ()
     _type = ('remote', 'passwd')
