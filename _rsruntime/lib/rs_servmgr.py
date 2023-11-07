@@ -45,9 +45,16 @@ class BaseServerManager(ABC):
     # Non-abstract methods
     @classmethod
     def _bias_config(cls) -> float:
-        return Config(f'override/server_manager/bias_mod/{cls.name}', 0.0) + \
-               (-float('inf') if Config(f'server_manager/blacklist/{cls.name}', False) else 0.0) + \
+        return (-float('inf') if Config(f'server_manager/blacklist/{cls.name}', False) else 0.0) + \
                (100.0 if Config(f'server_manager/prefer/{cls.name}', False) else 0.0)
+    @classmethod
+    def _bias_override(cls) -> float | None:
+        return Config(f'override/server_manager/bias_mod/{cls.name}', None)
+    @classmethod
+    @property
+    def real_bias(cls) -> float:
+        if (b := cls._bias_override()) is not None: return b
+        return cls.bias + cls._bias_config()
     @classmethod
     def register(cls):
         setattr(cls.basemanagers, cls.name, cls)
@@ -108,14 +115,14 @@ class ServerManager:
     def __new__(cls):
         logger = RS.logger.getChild('SM._staging')
         order = cls.preferred_order()
-        logger.debug(f'Instantiating server manager; preferred order: {tuple(f"{c.name}:<{c.type}>,[{c.bias}+{c._bias_config()}]" for c in order)}')
+        logger.debug(f'Instantiating server manager; preferred order: {tuple(f"{c.name}:<{c.type}>,[{c.real_bias}]" for c in order)}')
         total_pc = PerfCounter()
         if not len(order): raise NotImplementedError('No ServerManagers found')
         for i,c in enumerate(order):
-            if c.bias <= 0:
-                raise RuntimeError(f'No suitable ServerManagers found (biases are all <= {c.bias}, which is <= 0) (tried for total of {total_pc})')
+            if c.real_bias <= 0:
+                raise RuntimeError(f'No suitable ServerManagers found (biases are all <= {c.real_bias}, which is <= 0) (tried for total of {total_pc})')
             # Debugging
-            logger.info(f'Staging ServerManager {c.name} (type {c.type}) (bias {c.bias}, index {i}) (T+{total_pc})...')
+            logger.info(f'Staging ServerManager {c.name} (type {c.type}) (bias {c.real_bias}, index {i}) (T+{total_pc})...')
             ## Print out typing
             logger.debug(f'{c.name} typing:')
             logger.debug(f' _type: {c._type}')
@@ -147,7 +154,7 @@ class ServerManager:
     @classmethod
     def preferred_order(cls) -> list[typing.Type[BaseServerManager]]:
         print(cls.managers.__dict__)
-        return sorted(cls.managers.__dict__.values(), key=lambda t: t.bias+t._bias_config(), reverse=True)
+        return sorted(cls.managers.__dict__.values(), key=lambda t: t.real_bias, reverse=True)
 # Implementations
 class ScreenManager(BaseServerManager):
     __slots__ = ()
