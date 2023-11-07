@@ -79,6 +79,8 @@ class BaseServerManager(ABC):
     # Abstract methods
     @abstractmethod
     def start(self): pass
+    @abstractmethod
+    def write(self): pass
     # Abstract properties
     @classmethod
     @abstractproperty
@@ -200,6 +202,7 @@ class ScreenManager(BaseServerManager):
             self.run_screen_cmd('logfile', path)
             self.run_screen_cmd('logfile', 'flush', str(Config('server_manager/screen/log_flush_secs', 1)))
     def start(self): raise NotImplementedError
+    def write(self): raise NotImplementedError
     
     cap_arbitrary_read = True
     cap_arbitrary_write = True
@@ -224,6 +227,7 @@ class RConManager(BaseServerManager):
             self.logger.warning('RCon password can be permanently set in config minecraft/rcon/password')
         raise NotImplementedError
     def start(self): raise NotImplementedError
+    def write(self): raise NotImplementedError
 
     cap_arbitrary_read = False
     cap_arbitrary_write = True
@@ -245,6 +249,7 @@ class SelectManager(BasePopenManager):
         super().__init__()
         raise NotImplementedError
     def start(self): raise NotImplementedError
+    def write(self): raise NotImplementedError
 
     cap_arbitrary_read = True
     
