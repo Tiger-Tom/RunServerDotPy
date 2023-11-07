@@ -97,7 +97,7 @@ class ScreenManager(BaseServerManager):
     def __init__(self):
         super().__init__()
         if shutil.which(Config('server_manager/screen/binary', 'screen')) is None:
-            raise NotImplementedError('ScreenManager requires the `screen` binary!')
+            raise FileNotFoundError('ScreenManager requires the `screen` binary!')
         raise NotImplementedError
     
     cap_arbitrary_read = True
