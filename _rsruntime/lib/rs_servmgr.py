@@ -13,6 +13,7 @@ import shutil
 import typing
 from types import SimpleNamespace
 from abc import ABC, abstractmethod, abstractproperty
+from cmd import Cmd
 # Manager-specific modules
 try: from rcon.source import Client as RCONClient
 except ModuleNotFoundError: RCONClient = None
@@ -95,7 +96,18 @@ class BaseServerManager(ABC):
 
     # Misc. attributes
     attr_is_dummy: bool = False
-        
+
+class BaseInputManager(BaseServerManager, Cmd):
+    __slots__ = ()
+    _type = ('input_reader',)
+    def __init__(self):
+        BaseServerManager.__init__(self)
+        Cmd.__init__(self)
+    def emptyline(self): return
+    def completedefault(self, text, line, begidx, endidx):
+        print(f'{text!r} {line!r} {line!r} {begidx!r} {endidx!r}')
+    def default(self, line: str):
+        print(f'{line!r}')
 class BasePopenManager(BaseServerManager):
     __slots__ = ('popen',)
     _type = ('popen_writer',)
