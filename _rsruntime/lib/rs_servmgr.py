@@ -98,7 +98,27 @@ class ScreenManager(BaseServerManager):
         super().__init__()
         if shutil.which(Config('server_manager/screen/binary', 'screen')) is None:
             raise FileNotFoundError('ScreenManager requires the `screen` binary!')
-        raise NotImplementedError
+        Config('server_manager/screen/name', 'RS_ScreenManager_mcserverprocess')
+    class Screen:
+        __slots__ = ('name',)
+        def __init__(self, name: str):
+            self.name = shlex.quote(name)
+        @property
+        def _cmd_pfx(self) -> tuple[str]: return ('screen', '-x', self.name)
+        # Commands
+        def run_screen_cmd(self, cmd: tuple[str]) -> str:
+            return subprocess.check_output(self._cmd_pfx+cmd).decode(Config('encoding', sys.getdefaultencoding()))
+        # Status
+        @property
+        def is_alive(self) -> bool:
+            return not not subprocess.call(('screen', '-x', 'rssm', '-X', 'info'), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        # Logging
+        def setup_logfifo(self) -> Path:
+            if Config('server_manager/screen/reset_log', True): self.run_screen_cmd('log', 'off')
+            path = Path(Config('server_manager/screen/log_fifo', f'./screen.{Config["server_manager/screen/name"]}.fifo'))
+            os.mkfifo(path)
+            self.run_screen_cmd('logfile', path)
+            self.run_screen_cmd('logfile', 'flush', str(Config('server_manager/screen/log_flush_secs', 1)))
     
     cap_arbitrary_read = True
     cap_arbitrary_write = True
@@ -106,7 +126,7 @@ class ScreenManager(BaseServerManager):
     cap_attachable = True
     cap_restartable = True
     
-    bias = -float('inf') if shutil.which(Config('screen_manager/screen/binary', 'screen')) is None else 10.0
+    bias = -float('inf') if shutil.which(Config('server_manager/screen/binary', 'screen')) is None else 10.0
 class RConManager(BaseServerManager):
     __slots__ = ()
     _type = ('remote', 'passwd')
