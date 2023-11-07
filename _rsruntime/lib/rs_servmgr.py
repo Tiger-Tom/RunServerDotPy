@@ -1,20 +1,21 @@
 #!/bin/python3
 
 #> Imports
-from pathlib import Path
-import shlex
-from getpass import getpass
 from inspect import isabstract
 from traceback import format_exception
 import time
+# Shell
+import schlex
+from getpass import getpass
+# Files
+from pathlib import Path
+import shutil
 # Types
 import typing
 from abc import ABC, abstractmethod, abstractproperty
 # Manager-specific modules
 try: from rcon.source import Client as RCONClient
 except ModuleNotFoundError: RCONClient = None
-try: import screenutils
-except ModuleNotFoundError: screenutils = None
 #</Imports
 
 # RunServer Module
@@ -95,8 +96,8 @@ class ScreenManager(BaseServerManager):
     _type = ('screen',)
     def __init__(self):
         super().__init__()
-        if screenutils is None:
-            raise ModuleNotFoundError('Screenutils module is required for ScreenManager!')
+        if shutil.which('screen') is None:
+            raise NotImplementedError('ScreenManager requires the `screen` binary!')
         raise NotImplementedError
     
     cap_arbitrary_read = True
@@ -105,7 +106,7 @@ class ScreenManager(BaseServerManager):
     cap_attachable = True
     cap_restartable = True
     
-    bias = -float('inf') if screenutils is None else 10.0
+    bias = -float('inf') if shutil.which('screen') is None else 10.0
 class RConManager(BaseServerManager):
     __slots__ = ()
     _type = ('remote', 'passwd')
