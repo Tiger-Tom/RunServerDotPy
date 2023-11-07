@@ -4,6 +4,7 @@
 
 #> Imports
 import logging
+import logging.handlers
 import typing
 import sys
 # File
@@ -27,15 +28,49 @@ class Bootstrapper:
     algorithm = hashlib.sha1
     minimum_vers = (3, 12, 0)
     dl_timeout = 10
+    log_fmt_short = '[$asctime] [$name/$threadName/$levelname] $message'
+    log_fmt_long = '[$asctime] [$name/$processName:$threadName<$module.$funcName[$lineno]>/$levelname] $message'
+    date_fmt_short = '%H:%M:%S'
+    date_fmt_long = '%Y-%m-%d %H:%M:%S'
     
     def __init__(self):
-        self.root_logger = logging.getLogger('RS')
+        self.root_logger = self.setup_logging()
         self.logger = self.root_logger.getChild('BS')
         self.logger.info(f'Initialized: {self}')
         self.ensure_python_version()
     def ensure_python_version(self):
         if sys.version_info >= self.minimum_vers: return
         raise NotImplementedError(f'Python version {sys.version_info[:3]} is not supported, perhaps try updating? (expected >= {self.minimum_vers})')
+    # Setup logging
+    def setup_logging(self) -> logging.Logger:
+        log_path = (Path.cwd() / '_rslog'); log_path.mkdir(exist_ok=True)
+        # Setup formatters
+        stream_fmt = logging.Formatter(
+            self.log_fmt_long if '--verbose-log-headers' in sys.argv[1:] else self.log_fmt_short,
+            self.date_fmt_long if '--verbose-log-headers' in sys.argv[1:] else self.date_fmt_short,
+            style='$')
+        file_fmt = logging.Formatter(self.log_fmt_long, self.date_fmt_long, style='$')
+        # Configure logger
+        logger = logging.getLogger('RS')
+        logger.setLevel(logging.DEBUG if '--debug' in sys.argv[1:] \
+                        else logging.INFO if '--verbose' in sys.argv[1:] \
+                        else logging.WARNING)
+        ## Add handlers
+        ### Stream handler
+        stream_h = logging.StreamHandler()
+        stream_h.setFormatter(stream_fmt)
+        logger.addHandler(stream_h)
+        ### File handler
+        file_h = logging.handlers.TimedRotatingFileHandler(log_path / 'RunServer.log', when='H', interval=2, backupCount=24) # keeps logs for 48 hours
+        file_h.setFormatter(file_fmt)
+        # Set loglevel names
+        logging.addLevelName(logging.DEBUG, 'DBG')
+        logging.addLevelName(logging.INFO, 'INF')
+        logging.addLevelName(logging.WARNING, 'WRN')
+        logging.addLevelName(logging.ERROR, 'ERR')
+        logging.addLevelName(logging.CRITICAL, 'CRT')
+        # Finish up
+        return logger
     # Check for base directories
     def _bootstrap_basedir(self, name: str):
         self.logger.debug(f'Checking base directory: {name}')
