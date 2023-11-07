@@ -70,7 +70,7 @@ class BaseServerManager(ABC):
     cap_restartable: bool = False # we cannot always restart it
 
     # Misc. attributes
-    is_dummy: bool = False
+    attr_is_dummy: bool = False
     
         
 class BasePopenManager(BaseServerManager):
@@ -160,7 +160,7 @@ class DummyServerManager(BaseServerManager):
     cap_arbitrary_write = True
     cap_restartable = True
 
-    is_dummy = True
+    attr_is_dummy = True
     
     bias = -50.0
 
@@ -190,7 +190,7 @@ class ServerManager:
                 logger.debug(f' [{"Y" if v else "N"}] {a}')
             ## Attributes
             logger.debug(f'{c.__qualname__} attributes:')
-            for a,v in ((a, getattr(c, a)) for a in dir(c) if a.startswith('is_')):
+            for a,v in ((a, getattr(c, a)) for a in dir(c) if a.startswith('attr_')):
                 logger.debug(f'  {a}: {"<empty>" if v is None else ("[Y]" if v else "[N]") if isinstance(v, bool) else repr(v)}')
             # Try to instantiate
             current_pc = PerfCounter()
