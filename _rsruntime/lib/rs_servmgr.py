@@ -184,10 +184,22 @@ class DummyServerManager(BaseServerManager):
     attr_is_dummy = True
     
     bias = -50.0
+class PyInterpreterServerManager(DummyServerManager):
+    __slots__ = ()
+    _type = ('manual', 'debug', 'interpreter',)
+    def __init__(self):
+        BaseServerManager.__init__(self)
+    def start(self):
+        import code
+        code.interact('''Python Interpreter SM submode
+    All locals and globals have been passed, A.E.:
+    - RS is the RunServer instance
+    - self is the {self.__class__} instance
+    Use CTRL+D to exit subinterpreter, as exit() exits both the sub and main interpreters''', local=globals()+locals())
 
 # Manager
 class ServerManager:
-    server_manager_types = {ScreenManager, RConManager, SelectManager, DummyServerManager}
+    server_manager_types = {ScreenManager, RConManager, SelectManager, DummyServerManager, PyInterpreterServerManager}
     def __new__(cls):
         logger = RS.logger.getChild('SM._staging')
         order = cls.preferred_order()
