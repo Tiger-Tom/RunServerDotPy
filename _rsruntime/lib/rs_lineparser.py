@@ -15,7 +15,7 @@ import typing
 # RunServer Module
 import RS
 from RS import Config
-from RS.Types import Hooks
+from RS.Types import Hooks, PerfCounter
 
 #> Header >/
 class MCLang:
@@ -73,6 +73,8 @@ class MCLang:
     # Lang extraction
     def extract_lang(self) -> dict[str, str]:
         '''Extracts the language file from a server JAR file, sets and returns self.lang'''
+        self.logger.debug('Extracting lang')
+        pc = PerfCounter()
         with zipfile.ZipFile(Path(Config('minecraft/path/base', './minecraft'), Config('minecraft/path/server_jar', 'server.jar'))) as jzf:
             vers = Config('minecraft/lang_parser/version', None, on_missing=Config.on_missing.SET_RETURN_DEFAULT)
             self.version_info = None
@@ -82,6 +84,7 @@ class MCLang:
             with zipfile.ZipFile(jzf.open(f'META-INF/versions/{vers}/server-{vers}.jar')) as szf:
                 with szf.open(f'assets/minecraft/lang/{Config("minecraft/lang_parser/lang", "en_us")}.json') as lf:
                     self.lang = json.load(lf)
+                    self.logger.info(f'Loaded lang in {pc}')
                     return self.lang
             
 class LineParser:

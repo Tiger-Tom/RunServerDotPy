@@ -6,6 +6,7 @@ import shlex
 from getpass import getpass
 from inspect import isabstract
 from traceback import format_exception
+import time
 # Types
 import typing
 from abc import ABC, abstractmethod, abstractproperty
@@ -19,7 +20,7 @@ except ModuleNotFoundError: screenutils = None
 # RunServer Module
 import RS
 from RS import Config, LineParser
-from RS.Types import Hooks
+from RS.Types import Hooks, PerfCounter
 
 #> Header >/
 # Base classes
@@ -170,12 +171,13 @@ class ServerManager:
         logger = RS.logger.getChild('SM._staging')
         order = cls.preferred_order()
         logger.debug(f'Instantiating server manager; preferred order: {tuple(f"{c.__qualname__}:<{c.type}>,[{c.bias}+{c._bias_config()}]" for c in order)}')
+        total_pc = PerfCounter()
         if not len(order): raise NotImplementedError('No ServerManagers found')
         for i,c in enumerate(order):
             if c.bias <= 0:
-                raise RuntimeError(f'No suitable ServerManagers found (biases are all <= {c.bias}, which is <= 0)')
+                raise RuntimeError(f'No suitable ServerManagers found (biases are all <= {c.bias}, which is <= 0) (tried for total of {total_pc})')
             # Debugging
-            logger.info(f'Staging ServerManager {c.__qualname__} from {c.__module__} (type {c.type}) (bias {c.bias}, index {i})...')
+            logger.info(f'Staging ServerManager {c.__qualname__} from {c.__module__} (type {c.type}) (bias {c.bias}, index {i}) (T+{total_pc})...')
             ## Print out typing
             logger.debug(f'{c.__qualname__} typing:')
             logger.debug(f' _type: {c._type}')
@@ -191,16 +193,16 @@ class ServerManager:
             for a,v in ((a, getattr(c, a)) for a in dir(c) if a.startswith('is_')):
                 logger.debug(f'  {a}: {"<empty>" if v is None else ("[Y]" if v else "[N]") if isinstance(v, bool) else repr(v)}')
             # Try to instantiate
+            current_pc = PerfCounter()
             try:
                 inst = c()
-                logger.debug(f'Successfully instantiated {c.__qualname__} as {inst}')
+                logger.debug(f'Successfully instantiated {c.__qualname__} as {inst} in {current_pc} (total of {total_pc})')
                 return inst
             except Exception as e:
-                logger.error(f'Could not instantiate {c.__qualname__}:\n{"".join(format_exception(e))}')
+                logger.error(f'Could not instantiate {c.__qualname__}:\n{"".join(format_exception(e))}\n (failed after {current_pc}, total of {total_pc})')
                 if i < len(order):
                     logger.warning('Trying the next possible choice...')
-                    
-        raise RuntimeError('None of the ServerManagers could be staged, cannot continue')
+        raise RuntimeError('None of the ServerManagers could be staged (tried for total of {total_pc}, cannot continue')
     @classmethod
     def register(cls, manager_type: typing.Type[BaseServerManager]):
         cls.server_manager_types.add(manager_type)
