@@ -121,7 +121,7 @@ class ServerManager:
             logger.debug(f' _type: {c._type}')
             logger.debug(f' Chain (MRO):')
             for i,m in enumerate(c.__mro__[:(c.__mro__.index(ABC) if ABC in c.__mro__ else c.__mro__.index(object))]):
-                logger.debug(f'  {"^" if i else ">"} {m}<{"abstract" if isabstract(m) else "concrete"}>')
+                logger.debug(f'  {"^" if i else ">"} {getattr(m, "name", f"[unnamed?]{m.__module__}.{m.__qualname__}")}<{"abstract" if isabstract(m) else "concrete"}>')
             ## Capabilities
             logger.debug(f'{c.name} capabilites:')
             for a,v in ((a, getattr(c, a)) for a in dir(c) if a.startswith('cap_')):
