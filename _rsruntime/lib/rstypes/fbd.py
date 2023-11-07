@@ -4,7 +4,6 @@
 from pathlib import Path
 import functools
 import logging
-import time
 # Parsing
 import json
 import re
@@ -14,6 +13,7 @@ from collections import UserDict
 from enum import Enum
 from .timer import Timer
 from .locked_resource import LockedResource, locked
+from .perftimer import PerfCounter
 #</Imports
 
 #> Header >/
@@ -223,10 +223,10 @@ class FileBackedDict(UserDict, LockedResource):
         '''Reads in data from the JSON value corresponding to key (found via self.key_path)'''
         p = self.key_path(key)
         self.logger.warning(f'Reading in {key} from {p}...')
-        pc = time.perf_counter()
+        pc = PerfCounter()
         with p.open() as f:
             self.data[key] = json.load(f)
-        self.logger.info(f'Readin {key} took {time.perf_counter()-pc} sec(s)')
+        self.logger.info(f'Readin {key} took {pc}')
         self.watchdog_times[key] = p.stat().st_mtime
     @locked
     def readin_watchdog(self):
@@ -235,7 +235,7 @@ class FileBackedDict(UserDict, LockedResource):
             If a file is missing, it is removed from the watchdog list
         '''
         self.logger.debug(f'Readin watchdog ticked: checking {len(self.watchdog_times)} key(s)')
-        pc = time.perf_counter()
+        pc = PerfCounter()
         for k,t in tuple(self.watchdog_times.items()):
             p = self.key_path(k)
             if not p.exists():
@@ -246,7 +246,7 @@ class FileBackedDict(UserDict, LockedResource):
             if nt <= t: continue
             self.watchdog_times[k] = nt
             self.readin_data(k)
-        self.logger.info(f'Readin {len(self.watchdog_times)} key(s) took {time.perf_counter()-pc} sec(s)')
+        self.logger.info(f'Readin {len(self.watchdog_times)} key(s) took {pc}')
     ## Writing back
     @locked
     def writeback(self, key: str, *, clean: bool = True, force: bool = False) -> bool:
@@ -263,10 +263,10 @@ class FileBackedDict(UserDict, LockedResource):
         self.prune(key)
         p = self.key_path(key)
         self.logger.warning(f'Writing back {key} to {p}...')
-        pc = time.perf_counter()
+        pc = PerfCounter()
         with p.open('w') as f:
             json.dump(self.data[key], f, indent=4)
-        self.logger.info(f'Writeback {key} took {time.perf_counter()-pc} sec(s)')
+        self.logger.info(f'Writeback {key} took {pc}')
         self.watchdog_times[key] = p.stat().st_mtime
         if clean: self.dirty.remove(key)
         return True
@@ -274,10 +274,10 @@ class FileBackedDict(UserDict, LockedResource):
     def writeback_dirty(self):
         '''Writes back all dirty keys'''
         self.logger.debug(f'Writing back dirty keys: {len(self.dirty)} key(s) to clean')
-        nw = len(self.dirty); pc = time.perf_counter()
+        nw = len(self.dirty); pc = PerfCounter()
         while len(self.dirty):
             self.writeback(self.dirty.pop(), clean=False, force=True)
-        self.logger.info(f'Writeback {nw} key(s) took {time.perf_counter()-pc} sec(s)')
+        self.logger.info(f'Writeback {nw} key(s) took {pc}')
     ## Dual-ways sync
     @locked
     def sync_all(self):
