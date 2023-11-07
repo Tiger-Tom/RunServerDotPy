@@ -5,7 +5,7 @@ from inspect import isabstract
 from traceback import format_exception
 import time
 # Shell
-import schlex
+import shlex
 from getpass import getpass
 # Files
 from pathlib import Path
