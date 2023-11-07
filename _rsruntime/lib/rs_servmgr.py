@@ -62,7 +62,7 @@ class BaseServerManager(ABC):
     @classmethod
     @property
     def name(cls) -> str:
-        return f'{"[builtin]" if cls.__module__ == BaseServerManager.__module__ else cls.__module__}.{cls.__qualname__}'.replace('/', '.')
+        return f'{"_builtin" if cls.__module__ == BaseServerManager.__module__ else cls.__module__}.{cls.__qualname__}'.replace('/', '.')
     @classmethod
     @property
     def type(cls) -> str:
