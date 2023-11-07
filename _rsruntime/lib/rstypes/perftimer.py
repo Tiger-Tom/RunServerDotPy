@@ -9,8 +9,10 @@ import math
 class PerfCounter(float):
     '''Provides an object-oriented (because why not) way to use (and format) time.perf_counter'''
     __slots__ = ('prec', 'magic_prec_reduce', 'sec_text')
-    def __new__(self):
-        return float.__new__(self, time.perf_counter())
+    def __new__(cls, prec: int = 3, sec: str = ' sec', secs: str = ' secs'):
+        self = float.__new__(cls, time.perf_counter())
+        self.__init__(prec, sec, secs)
+        return self
     def __init__(self, prec: int = 3, sec: str = ' sec', secs: str = ' secs'):
         self.prec = prec # not used in calculations, for introspection (maybe) and bench_round
         self.magic_prec_reduce = 10**prec
