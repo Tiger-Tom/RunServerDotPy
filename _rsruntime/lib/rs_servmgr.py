@@ -29,7 +29,7 @@ class BaseServerManager(ABC):
     __slots__ = ('logger', 'hooks')
     basemanagers = SimpleNamespace()
     def __init__(self):
-        self.logger = RS.logger.getChild(f'SM<{self.__class__.__qualname__}>')
+        self.logger = RS.logger.getChild(f'SM<{self.name}>')
         self.hooks = Hooks.SingleHook()
         self.hooks.register(print)
         self.hooks.register(LineParser.handle_line)
