@@ -35,7 +35,7 @@ class BaseServerManager(ABC):
         self.hooks.register(LineParser.handle_line)
     def __init_subclass__(cls):
         logger = RS.logger.getChild('SM._base')
-        logger.debug(f'subclassed by {"" if isabstract(cls) else "non-"}abstract {cls.name}')
+        logger.debug(f'subclassed by {"abstract" if isabstract(cls) else "concrete"} {cls.name}')
         if isabstract(cls):
             cls.register()
             return
@@ -121,7 +121,7 @@ class ServerManager:
             logger.debug(f' _type: {c._type}')
             logger.debug(f' Chain (MRO):')
             for i,m in enumerate(c.__mro__[:(c.__mro__.index(ABC) if ABC in c.__mro__ else c.__mro__.index(object))]):
-                logger.debug(f'  {"^" if i else ">"} {m}{" <abstract>" if isabstract(m) else ""}')
+                logger.debug(f'  {"^" if i else ">"} {m}<{"abstract" if isabstract(m) else "concrete"}>')
             ## Capabilities
             logger.debug(f'{c.name} capabilites:')
             for a,v in ((a, getattr(c, a)) for a in dir(c) if a.startswith('cap_')):
