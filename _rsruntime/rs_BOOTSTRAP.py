@@ -100,11 +100,17 @@ class Bootstrapper:
 
         @property
         def key(self) -> PubKey:
+            '''The public key stored in this manifest'''
             return PubKey.from_public_bytes(base64.b85decode(self.m_public_key))
         @property
         def sig(self) -> bytes:
+            '''The signature stored in this manifest'''
             return base64.b85decode(self.m_signature)
         def compile(self) -> bytearray:
+            '''
+                Join all important parts of the manifest, useful for hashing or signing
+                    works the same as the similar part of the mkmanifest.py devel utility
+            '''
             ba = bytearray()
             # compile metadata
             if self.m_name is None: ba.append(255)
@@ -125,11 +131,13 @@ class Bootstrapper:
                 ba.append(0)
             return ba
         def verify(self, k: PubKey):
+            '''Compile this manifest (using self.compile()) and verify it with the given public key'''
             self.bs.logger.warning(f'Compiling {self.m_name} for verification')
             dat = bytes(self.compile())
             self.bs.logger.warning(f'Verifying {self.m_name} ({self.m_signature})')
             k.verify(self.sig, dat)
         def upstream_manif(self, verify: bool = True) -> typing.Self | None:
+            '''Fetches the upstream manifest from the manifest_upstream metadata field of this manifest'''
             self.bs.logger.warning(f'Fetching {self.m_name} upstream from {self.m_manifest_upstream}')
             with request.urlopen(self.m_manifest_upstream, timeout=self.bs.dl_timeout) as r:
                 newmanif = self.__class__(self.bs, self.path, json.load(r))
@@ -140,8 +148,13 @@ class Bootstrapper:
                     if input('Use anyway? (y/N) >').lower() == 'y': return newmanif
                     else: return None
             return newmanif
-        def update(self, new_manif: typing.Self, override: bool = False) -> typing.Self:
-            '''Prints out debug information and returns the manifest object to be executed'''
+        def update(self, new_manif: typing.Self, override: bool = False) -> typing.Self | None:
+            '''
+                This function does three things:
+                - Prints out debug information
+                - Fetches and writes the new manifest
+                - Creates and returns the new manifest object to be executed, or None if this manifest wishes to be ignored
+            '''
             self.bs.logger.warning(f'Updating manifest {self.m_name}')
             if self.meta.get('ignore', False):
                 self.bs.logger.error(f'{self.m.name} would like to be ignored, skipping')
@@ -168,6 +181,7 @@ class Bootstrapper:
                     self.bs.logger.error(f'Local {f} does not exist, redownloading')
                     self.download_file(f)
                 self.bs.logger.info(f'Checking {f}')
+                self.bs.logger.debug(self.path.parent / f)
                 with open(self.path.parent / f, 'rb') as fd:
                     fh = base64.b85encode(hashlib.file_digest(fd, self.bs.algorithm).digest()).decode()
                 self.bs.logger.debug(f'manif: {h}')
