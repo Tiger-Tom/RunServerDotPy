@@ -64,10 +64,10 @@ def parse_args(args=None):
         if p.suffix in {'.pyc'}: continue
         eprint(f'Adding manifest entry for {p.name}')
         with p.open('rb') as f:
-            hsh = hashlib.file_digest(f, hashlib.sha1)
-        eprint(f'"{p.name}": "{hsh.hexdigest()}"')
-        manifest[p.relative_to(args.path).as_posix()] = hsh.hexdigest()
-        ba.extend(hsh.digest())
+            hd = hashlib.file_digest(f, hashlib.sha1).digest()
+        eprint(f'"{p.name}": "{base64.b85encode(hd).decode()}"')
+        manifest[p.relative_to(args.path).as_posix()] = base64.b85encode(hd).decode()
+        ba.extend(hd)
         ba.append(0)
     eprint(f'Signing with privkey {base64.b85encode(priv.private_bytes_raw()).decode()}')
     manifest['_metadata']['signature'] = pysign.signstr(priv, bytes(ba))
