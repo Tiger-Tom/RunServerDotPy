@@ -1,32 +1,29 @@
 #!/bin/python3
 
-# Bootstrapper and manifest manager #
-
 #> Imports
+import sys
+from pathlib import Path
 import logging
 import logging.handlers
-import typing
-import sys
-# File
-from pathlib import Path
 import json
-import hashlib
-import re
-# Optimization
-import multiprocessing
-# Web
 from urllib import request
+# Typing
+import typing
+import types
+# Cryptography
+import hashlib
+import base64
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as PubKey
 #</Imports
 
 #> Header >/
 class Bootstrapper:
-    __slots__ = ('root_logger', 'logger')
-    # Paths
-    base_dirs = {'rsruntime', 'rsplugins/builtin'}
+    __slots__ = ('root_logger', 'logger', 'Manifest')
     # Remotes
     #dl_man_base = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e'
     dl_man_base = 'http://0.0.0.0:8000/manifests'
     dl_man_path = lambda self,n: f'{self.dl_man_base}/{n.replace("/", "_")}.json'
+    dl_timeout = 10
     # Logger formats
     log_fmt_short = '[$asctime] [$name/$threadName/$levelname] $message'
     log_fmt_long = '[$asctime] [$name/$processName:$threadName<$module.$funcName[$lineno]>/$levelname] $message'
@@ -35,19 +32,20 @@ class Bootstrapper:
     # Misc. config
     algorithm = hashlib.sha1
     minimum_vers = (3, 12, 0)
-    dl_timeout = 10
-    
+
     def __init__(self):
-        self.root_logger = self.setup_logging()
-        self.logger = self.root_logger.getChild('BS')
-        self.logger.info(f'Initialized: {self}')
-        self.ensure_python_version()
+        self.logger = self.setup_logger().getChild('BS')
+        self.Manifest = types.MethodType(self._Manifest, self)
+
+    # Pre-bootstrap setup
+    ## Check Python version
     def ensure_python_version(self):
-        if sys.version_info >= self.minimum_vers: return
-        raise NotImplementedError(f'Python version {sys.version_info[:3]} is not supported, perhaps try updating? (expected >= {self.minimum_vers})')
-    # Setup logging
-    def setup_logging(self) -> logging.Logger:
-        log_path = (Path.cwd() / '_rslog'); log_path.mkdir(exist_ok=True)
+        if sys.version_info > self.minimum_vers:
+            raise NotImplementedError(f'Python version {".".join(sys.version_info[:3])} doesn\'t meet the minimum requirements, needs {".".join(minimum_vers)}')
+    ## Setup logging
+    def setup_logger(self) -> logging.Logger:
+        log_path = (Path.cwd() / '_rslog')
+        log_path.mkdir(exist_ok=True)
         # Setup formatters
         stream_fmt = logging.Formatter(
             self.log_fmt_long if '--verbose-log-headers' in sys.argv[1:] else self.log_fmt_short,
@@ -59,6 +57,7 @@ class Bootstrapper:
         logger.setLevel(logging.DEBUG if '--debug' in sys.argv[1:] \
                         else logging.INFO if '--verbose' in sys.argv[1:] \
                         else logging.WARNING)
+        logger.propogate = False
         ## Add handlers
         ### Stream handler
         stream_h = logging.StreamHandler()
@@ -74,143 +73,117 @@ class Bootstrapper:
         logging.addLevelName(logging.ERROR, 'ERR')
         logging.addLevelName(logging.CRITICAL, 'CRT')
         # Finish up
+        self.root_logger = logger
         return logger
-    # Check for base directories
-    def _bootstrap_basedir(self, name: str):
-        self.logger.debug(f'Checking base directory: {name}')
-        path = Path.cwd() / f'_{name}'
-        man = path / 'MANIFEST.json'
-        # Create it if it doesn't exist
-        if path.exists(): self.logger.debug(f'[OKAY] {path} exists')
-        else:
-            self.logger.info(f'{path} does not exist, creating')
-            path.mkdir(parents=True)
-            self.logger.debug(f'[OKAY] {path} exists')
+    
+    # Bootstrapping
+    ## Base function
     def bootstrap(self):
-        self.logger.info('Distributing threads for each directory')
-        with multiprocessing.Pool() as p:
-            self.logger.info(f'Distrubuting {p._processes} thread(s) to _bootstrap_basedir')
-            p.map(self._bootstrap_basedir, self.base_dirs)
-            self.logger.info(f'Distributing {p._processes} thread(s) to check_manifest')
-            try:
-                mans = p.starmap(self.check_manifest, ((name, Path.cwd() / f'_{name}', self.dl_man_path(name), self.dl_man_base) for name in self.base_dirs))
-            except Exception as e:
-                self.logger.fatal(f'check_manifest failed somewhere: caught {e}; dazed and confused, but trying to continue')
-            self.logger.info(f'Distributing {p._processes} thread(s) to execute_manifest')
-            try:
-                p.starmap(self.execute_manifest, ((man, Path.cwd() / f'_{man["_metadata"]["name"]}') for man in mans))
-            except Exception as e:
-                self.logger.fatal(f'execute_manifest failed somewhere: caught {e}; dazed and confused, but trying to continue')
-        self.logger.warning('BOOTSTRAPPING COMPLETE; ATTEMPTING TO ACCESS ENTRYPOINT...')
-        from .rs_ENTRYPOINT import RunServer
-        self.logger.warning(f'ENTRYPOINT ACCESSED, INITIALIZING ENTRYPOINT...')
-        rs = RunServer(self)
-        self.logger.warning('ENTRYPOINT INITIALIZED, EXECUTING ENTRYPOINT...')
-        rs()
-    # Manifest utilities
-    def check_manifest(self, name: str, path: Path, man_upstream: str | None = None, man_upstream_base: str | None = None, known_differs: bool = False, past_upstreams: dict = {}) -> None | dict:
-        iman = {'_metadata': {'name': name, 'manifest_upstream': man_upstream, 'file_upstream': None}}
-        # Get local manifest
-        if (path / 'MANIFEST.json').exists():
-            with open(path / 'MANIFEST.json') as mf:
-                try: manif = json.load(mf)
-                except json.JSONDecodeError as e:
-                    self.logger.error(f'Local manifest for {name} is corrupted: {e}')
-                    if man_upstream is None: return None
-                    self.logger.warning(f'Attempting to refresh local manifest for {name}...')
-                    manif = dict(iman)
-            old_manif = dict(manif)
-            if manif['_metadata'].get('ignore', False):
-                self.logger.warning(f'Local manifest for {name} would like to be ignored, not checking')
-                return manif
-        else:
-            if man_upstream is not None:
-                self.logger.warning(f'Local manifest for {name} missing, will have to obtain later')
-                manif = {'_metadata': {'name': name, 'manifest_upstream': man_upstream_base, 'file_upstream': None}}
-            else:
-                raise FileNotFoundError(f'Local manifest for {name} missing')
-        # Get upstream manifest
-        with request.urlopen(man_upstream or manif['_metadata']['manifest_upstream'], timeout=self.timeout) as r:
-            if r.status != 200:
-                self.logger.fatal(f'Could not fetch manifest for {name}, got HTTP status code: {r.status_code}')
-                return None
-            try:
-                uman = json.load(r)
-            except json.JSONDecodeError as e:
-                self.logger.fatal(f'Upstream manifest for {name} appears to be corrupted: {e}')
-                return None
-        # Compare manifests
-        if manif == uman:
-            self.logger.debug(f'Upstream and local manifests for {name} match, no need to update')
-            return manif
-        ## Test for upstream manifest URL differences
-        if manif['_metadata']['manifest_upstream'] != uman['_metadata']['manifest_upstream']:
-            osource = manif['_metadata']['manifest_upstream']
-            self.logger.error(f'Local manifest for {name} lists manifest upstream of {osource}, which differs from fetched manifest listing {uman["_metadata"]["manifest_upstream"]}. Updating local manifest to reflect new manifest upstream and resetting...')
-            if uman['_metadata']['manifest_upstream'] in past_upstreams.get(name, set()):
-                raise Exception(f'Circular manifest upstream cycle detected for manifest {name}, can not safely continue!')
-            manif['_metadata']['manifest_upstream'] = uman['_metadata']['manifest_upstream']
-            with open(path / 'MANIFEST.json', 'w') as f:
-                json.dump(manif, f, indent=4)
-            self.logger.info(f'Wrote new manifest for {name}, resetting...')
-            past_upstreams[name] = (past_upstreams.get(name) or set()) | {osource, manif['_metadata']['manifest_upstream']}
-            return self.check_manifest(name, path, known_differs=True, past_upstreams=past_upstreams)
-        ## Test for upstream file URL differences
-        if manif['_metadata']['file_upstream'] != uman['_metadata']['file_upstream']:
-            self.logger.info(f'Local manifest for {name} lists file upstream of {manif["_metadata"]["file_upstream"]}, which differs from fetched manifest listing of {uman["_metadata"]["file_upstream"]}. Updating local manifest to reflect new file upstream')
-            manif['_metadata']['file_upstream'] = uman['_metadata']['file_upstream']
-            known_differs = True
-        ## Update local manifest
-        for f,h in uman.items():
-            if f.startswith('_'): continue
-            if f in manif:
-                if manif[f] == 'SKIP':
-                    self.logger.warning(f'Local manifest for {name} would like file {f} to be ignored ("SKIP"), not checking')
+        ...
+
+    # Manifest
+    class _Manifest:
+        __slots__ = ('bs', 'path', 'manif', 'meta')
+        def __init__(self, bs, path: Path, manif: dict | None = None):
+            self.bs = bs
+            self.path = path
+            if manif is None:
+                with self.path.open('r') as f:
+                    self.manif = json.load(f)
+            else: self.manif = manif
+            self.meta = self.manif['_metadata']
+        def __getattr__(self, attr: str):
+            if not attr.startswith('m_'):
+                return super().__getattribute__(attr)
+            elif (attr[2:] not in self.meta): raise AttributeError(attr[2:])
+            return self.meta[attr[2:]]
+
+        @property
+        def key(self) -> PubKey:
+            return PubKey.from_public_bytes(base64.b85decode(self.m_public_key))
+        @property
+        def sig(self) -> bytes:
+            return base64.b85decode(self.m_signature)
+        def compile(self) -> bytearray:
+            ba = bytearray()
+            # compile metadata
+            if self.m_name is None: ba.append(255)
+            else: ba.extend(self.m_name.encode())
+            ba.append(0)
+            if self.m_manifest_upstream is None: ba.append(255)
+            else: ba.extend(self.m_manifest_upstream.encode())
+            ba.append(0)
+            if self.m_file_upstream is None: ba.append(255)
+            else: ba.extend(self.m_file_upstream.encode())
+            ba.extend((0, 0))
+            # compile file hashes
+            for f,h in self.manif.items():
+                if f.startswith('_'): continue
+                ba.extend(base64.b85decode(h))
+                ba.append(255)
+                ba.extend(f.encode())
+                ba.append(0)
+            return ba
+        def verify(self, k: PubKey):
+            self.bs.logger.warning(f'Compiling {self.m_name} for verification')
+            dat = bytes(self.compile())
+            self.bs.logger.warning(f'Verifying {self.m_name} ({self.m_signature})')
+            k.verify(self.sig, dat)
+        def upstream_manif(self, verify: bool = True) -> typing.Self | None:
+            self.bs.logger.warning(f'Fetching {self.m_name} upstream from {self.m_manifest_upstream}')
+            with request.urlopen(self.m_manifest_upstream, timeout=self.bs.dl_timeout) as r:
+                newmanif = self.__class__(self.bs, self.path, json.load(r))
+            if verify:
+                try: newmanif.verify(self.key)
+                except Exception as e:
+                    self.bs.logger.fatal(f'Upstream manifest {self.m_name} fetched from {self.m_manifest_upstream} failed verification! ({e})')
+                    if input('Use anyway? (y/N) >').lower() == 'y': return newmanif
+                    else: return None
+            return newmanif
+        def update(self, new_manif: typing.Self, override: bool = False) -> typing.Self:
+            '''Prints out debug information and returns the manifest object to be executed'''
+            self.bs.logger.warning(f'Updating manifest {self.m_name}')
+            if self.meta.get('ignore', False):
+                self.bs.logger.error(f'{self.m.name} would like to be ignored, skipping')
+                return self
+            for f in self.manif.keys() - new_manif.keys():
+                if f.startswith('_'): continue
+            stale = tuple(f for f in self.manif.keys() - new_manif.keys() if not f.startswith('_'))
+            if stale:
+                self.bs.logger.error(f'The following stale file(s) no longer exist in the new manifest:\n- {"\n- ".join(stale)}')
+            else: self.bs.logger.info('No stale files found')
+            new = tuple(f for f in new_manif.keys() - self.manif.keys() if not f.startswith('_'))
+            if new: self.bs.logger.warning(f'The following new file(s) will need to be created:\n- {"\n- ".join(new)}')
+            else: self.bs.logger.info('No new files found')
+            with open(self.path, 'w') as f:
+                json.dump(new_manif.manif, f)
+            return new_manif
+        def execute(self):
+            self.bs.logger.warning(f'Executing manifest {self.m_name}')
+            try: self.verify(self.key)
+            except Exception as e: self.bs.logger.fatal(f'Local manifest {self.m_name} failed verification ({e}), continuing anyway')
+            for f,h in self.manif.items():
+                if f.startswith('_'): continue
+                if not (self.path.parent / f).exists():
+                    self.bs.logger.error(f'Local {f} does not exist, redownloading')
+                    self.download_file(f)
+                self.bs.logger.info(f'Checking {f}')
+                with open(self.path.parent / f, 'rb') as fd:
+                    fh = base64.b85encode(hashlib.file_digest(fd, self.bs.algorithm).digest()).decode()
+                self.bs.logger.debug(f'manif: {h}')
+                self.bs.logger.debug(f'local: {fh}')
+                if h == fh:
+                    self.bs.logger.info(f'Local {f} matches manifest')
                     continue
-                if manif[f] == h:
-                    self.logger.info(f'Local manifest for {name} has up-to-date hash for file {f}')
-                    continue
-                self.logger.info(f'Local manifest for {name} has an outdated hash for file {f}')
-            else: self.logger.warning(f'Local manifest for {name} is missing file {f}')
-            self.logger.info(f'Updating file {f} in local manifest for {name}')
-            manif[f] = h
-        # Check for stale files
-        stale = uman.keys() ^ manif.keys()
-        if stale: self.logger.warning(f'Local manifest for {name} describes the following stale files: {", ".join(stale)}')
-        # Write back to manifest
-        if (manif == old_manif) and not known_differs: self.logger.info(f'Local manifest unchanged')
-        else:
-            self.logger.info(f'Local manifest for {name} updated, writing back to file')
-            with open(path / 'MANIFEST.json', 'w') as f:
-                json.dump(manif, f, indent=4)
-            self.logger.debug(f'Wrote new manifest for {name}')
-        return manif
-    def execute_manifest(self, manif: dict, path: Path, verifyer_and_redownloader: typing.Callable[[dict, Path, str], None] | None = None):
-        self.logger.info(f'Executing manifest {manif["_metadata"]["name"]}')
-        if manif['_metadata'].get('ignore', False):
-            self.logger.warning(f'Manifest {manif["_metadata"]["name"]} would like to be ignored, not checking')
-            return
-        if not len(tuple(k for k in manif.keys() if not k.startswith('_'))):
-            self.logger.warning(f'Manifest {manif["_metadata"]["name"]} seems to be empty?')
-            return
-        self.logger.info(f'Distributing threads to verify manifest {manif["_metadata"]["name"]} hashes')
-        with multiprocessing.Pool() as p:
-            p.starmap(verifyer_and_redownloader or self.verify_hash_or_redownload, ((manif, path, file) for file in manif if not file.startswith('_')))
-    def verify_hash_or_redownload(self, manif: dict, base: Path, file: str):
-        if manif[f] == 'SKIP':
-            self.logger.warning(f'Manifest {manif["_metadata"]["name"]} would like file {file} to be ignored ("SKIP"), not checking')
-            return
-        self.logger.debug(f'Checking hash for {manif["_metadata"]["name"]}\'s {file} [{self.algorithm}]')
-        with (path / file).open('rb') as f:
-            hd = hashlib.file_digest(f, self.algorithm).hexdigest()
-        self.logger.debug(f'{name} local {file}: {local}\n{name} manif {file}: {manif[file]}')
-        if local == manif[f]:
-            self.logger.info(f'{name} local {file} matches manifest')
-            return
-        self.logger.warning(f'{name} local {file} does not match manifest, downloading new file')
-        self.download_file(base / file, f'{manif["_metadata"]["file_upstream"]}/{file}')
-    def download_file(self, f: Path, u: str):
-        self.logger.warning(f'Downloading {u} to {f}')
-        f.parent.mkdir(parents=True, exist_ok=True)
-        request.urlretrieve(u, f, timeout=self.timeout)
-        
+                self.bs.logger.warning(f'Local {f} does not match manifest, need to redownload!')
+                self.download_file(f)
+        def download_file(self, f: str):
+            print(f'fixme::download:{f}')
+
+sys.argv.append('--debug')
+                                                                                                        
+bs = Bootstrapper()
+                                                                                                        
+m = bs.Manifest(Path('./MANIFEST.json'))
+                                                                                                        
+m.execute()
