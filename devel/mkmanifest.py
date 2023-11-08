@@ -68,6 +68,8 @@ def parse_args(args=None):
         eprint(f'"{p.name}": "{base64.b85encode(hd).decode()}"')
         manifest[p.relative_to(args.path).as_posix()] = base64.b85encode(hd).decode()
         ba.extend(hd)
+        ba.append(255)
+        ba.extend(p.relative_to(args.path).as_posix().encode())
         ba.append(0)
     eprint(f'Signing with privkey {base64.b85encode(priv.private_bytes_raw()).decode()}')
     manifest['_metadata']['signature'] = pysign.signstr(priv, bytes(ba))
