@@ -7,7 +7,6 @@ import typing
 import sys
 # Crytography
 import base64
-from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey as EdPrivK, Ed25519PublicKey as EdPubK
 #</Imports
 
