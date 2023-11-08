@@ -119,8 +119,10 @@ class RunServer(types.ModuleType):
             self.logger.debug(f'{l} = {s} = {module}.{n} [T+{pc}]')
     def __call__(self):
         self.logger.info('Entrypoint starting')
-        # Start ServerManager
+        # Instantiate ServerManager
         self.ServerManager = self.SM = self.ServerManager()
+        # Start ServerManager
+        self.SM.start()
         # Finalize config
         self.Config.stop_autosync()
         self.Config.sync_all()
