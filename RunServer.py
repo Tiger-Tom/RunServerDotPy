@@ -4,11 +4,19 @@
 import sys
 #</Imports
 
+#> Header
+def chainload_bootstrapper():
+    from _rsruntime.rs_BOOTSTRAP import Bootstrapper
+    bs = Bootstrapper()
+    bs.bootstrap()
+def fetch_bootstrapper():
+    ...
+#</Header
+
 #> Bootstrap >/
 if __name__ == '__main__':
-    if 1:#try:
+    try:
         from _rsruntime.rs_BOOTSTRAP import Bootstrapper
-        bs = Bootstrapper() # not the kind you're thinking of!!!
-    #except Exception as e:
-    #    ...
-    bs.bootstrap()
+    except Exception as e:
+        ...
+    chainload_bootstrapper()
