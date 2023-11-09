@@ -94,7 +94,7 @@ class Bootstrapper:
                 return
         self.logger.info(f'Loading in {mp}')
         man = self.Manifest(mp)
-        man.update().execute()
+        man.update(man.upstream_manif()).execute()
 
     # Manifest
     class _Manifest:
