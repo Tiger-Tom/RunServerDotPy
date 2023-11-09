@@ -99,7 +99,6 @@ def parse_args(args=None):
             old = json.load(f)
         eprint('Fetched old manifest')
         meta = old['_metadata']
-        
         man = manifest(meta['name'], args.old_manifest, pysign.read_key(args.sign), meta['manifest_upstream'], meta['file_upstream'], args.long)
     # invalid cmd
     if args.cmd != 'add':
