@@ -66,6 +66,7 @@ class Bootstrapper:
         ### File handler
         file_h = logging.handlers.TimedRotatingFileHandler(log_path / 'RunServer.log', when='H', interval=2, backupCount=24) # keeps logs for 48 hours
         file_h.setFormatter(file_fmt)
+        logger.addHandler(file_h)
         # Set loglevel names
         logging.addLevelName(logging.DEBUG, 'DBG')
         logging.addLevelName(logging.INFO, 'INF')
