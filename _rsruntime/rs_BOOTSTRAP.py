@@ -4,9 +4,12 @@
 import sys
 import json
 from urllib import request
+import time
 # Files
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
+import gzip
+import shutil
 # Logging / info
 import logging
 import logging.handlers
@@ -67,11 +70,29 @@ class Bootstrapper:
                           else logging.INFO if '--verbose' in sys.argv[1:] \
                           else logging.WARNING)
         logger.addHandler(stream_h)
-        ### File handler
-        file_h = logging.handlers.TimedRotatingFileHandler(log_path / 'RunServer.log', when='H', interval=2, backupCount=24) # keeps logs for 48 hours
-        file_h.setFormatter(file_fmt)
-        file_h.setLevel(logging.DEBUG)
-        logger.addHandler(file_h)
+        ### Main file handler
+        # stores verbose logs (level=INFO)
+        # rotates logs when it reaches 1/2 MiB, keeps 12 previous logs
+        # compresses logs with gzip
+        mfile_h = logging.handlers.RotatingFileHandler(log_path / 'RunServer.log', maxBytes=1024**2 / 2, backupCount=12)
+        mfile_h.setFormatter(file_fmt)
+        mfile_h.setLevel(logging.INFO)
+        def mfile_h_rotator(src, dst):
+            with open(src, 'rb') as srcd, gzip.open(dst, 'wb') as dstd:
+                shutil.copyfileobj(srcd, dstd)
+            Path(src).unlink()
+        mfile_h.namer = lambda n: f'{n}.log.gz'
+        mfile_h.rotator = mfile_h_rotator
+        logger.addHandler(mfile_h)
+        ### Debug file handler
+        # stores all logs (level=DEBUG)
+        # overwrites upon startup
+        # forcibly deletes itself if it ever manages to reach the ungodly size of 8 MiB
+        dfile_h = logging.handlers.RotatingFileHandler(log_path / 'RunServer.VERBOSE.log', mode='w', maxBytes=8 * 1024**2, backupCount=1)
+        dfile_h.setFormatter(file_fmt)
+        dfile_h.setLevel(logging.DEBUG)
+        dfile_h.rotator = lambda src,dst: Path(src).unlink()
+        logger.addHandler(dfile_h)
         # Set loglevel names
         logging.addLevelName(logging.DEBUG, 'DBG')
         logging.addLevelName(logging.INFO, 'INF')
