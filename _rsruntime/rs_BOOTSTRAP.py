@@ -167,17 +167,22 @@ class Bootstrapper:
             self.bs.logger.debug(f'Key:\n {k.public_bytes_raw()}')
             k.verify(self.sig, dat)
             self.bs.logger.info(f'{self.m_name} passed verification')
-        def upstream_manif(self, verify: bool = True) -> typing.Self | None:
+        def upstream_manif(self, verify: bool = True, fail: bool = False) -> typing.Self:
             '''Fetches the upstream manifest from the manifest_upstream metadata field of this manifest'''
             self.bs.logger.warning(f'Fetching {self.m_name} upstream from {self.m_manifest_upstream}')
-            with request.urlopen(self.m_manifest_upstream, timeout=self.bs.dl_timeout) as r:
-                newmanif = self.__class__(self.bs, self.path, json.load(r))
+            try:
+                with request.urlopen(self.m_manifest_upstream, timeout=self.bs.dl_timeout) as r:
+                    newmanif = self.__class__(self.bs, self.path, json.load(r))
+            except Exception as e:
+                if fail: raise e from None
+                self.bs.logger.error(f'An error occured whilst downloading upstream manifest:\n{"".join(traceback.format_exception(e))}\n Using current manifest instead')
+                return self
             if verify:
                 try: newmanif.verify(self.key)
                 except Exception as e:
                     self.bs.logger.fatal(f'Upstream manifest {self.m_name} fetched from {self.m_manifest_upstream} failed verification! ({e})')
                     if input('Use anyway? (y/N) >').lower().startswith('y'): return newmanif
-                    else: return None
+                    else: return self
             return newmanif
         def update(self, new_manif: typing.Self, override: bool = False) -> typing.Self | None:
             '''
