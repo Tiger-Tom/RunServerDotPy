@@ -107,6 +107,9 @@ class Bootstrapper:
     ## Base function
     def bootstrap(self):
         self.base_manifest()
+        if '--update-only' in sys.argv[1:]:
+            self.logger.fatal('--update-only argument supplied, exiting')
+            return
         self.chainload_entrypoint(
             self.stage_entrypoint(
                 self.access_entrypoint('_rsruntime/rs_ENTRYPOINT.py')
