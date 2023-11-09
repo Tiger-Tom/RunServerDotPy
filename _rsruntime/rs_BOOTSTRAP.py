@@ -89,7 +89,6 @@ class Bootstrapper:
                 self.access_entrypoint('_rsruntime/rs_ENTRYPOINT.py')
             )
         )
-        
     ## Install and execute base manifest
     def base_manifest(self):
         mp = Path('_rsruntime/MANIFEST.json')
