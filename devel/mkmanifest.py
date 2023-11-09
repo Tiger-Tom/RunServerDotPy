@@ -72,6 +72,7 @@ def jsonify(manif: dict, long_fmt: bool, compact: bool, extra_compact: bool) -> 
 
 #> Main >/
 def parse_args(args=None):
+    # create parsers
     p = argparse.ArgumentParser(prog='mkmanifest.py')
     sp = p.add_subparsers(dest='cmd')
     u = sp.add_parser('update')
@@ -90,7 +91,9 @@ def parse_args(args=None):
     a.add_argument('path', help='The path to create a manifest for', type=Path)
     a.add_argument('manifest_upstream', help='The URI to fetch manifest updates from', nargs='?')
     a.add_argument('file_upstream', help='The URI to fetch file updates from', nargs='?')
+    # parse arguments
     args = p.parse_args(args)
+    # update
     if args.cmd == 'update':
         with args.old_manifest.open('r') as f:
             old = json.load(f)
@@ -98,11 +101,14 @@ def parse_args(args=None):
         meta = old['_metadata']
         
         man = manifest(meta['name'], args.old_manifest, pysign.read_key(args.sign), meta['manifest_upstream'], meta['file_upstream'], args.long)
+    # invalid cmd
     if args.cmd != 'add':
         p.print_help()
         exit(1)
+    # add
     else:
         man = manifest(args.name, args.path, pysign.read_key(args.sign), args.manifest_upstream, args.file_upstream, args.long)
+    # render manifest and dump to output
     jsn = jsonify(man, args.long, args.compact, args.extra_compact)
     eprint(jsn)
     with sys.stdout if args.output is None else args.output.open('w') as f:
