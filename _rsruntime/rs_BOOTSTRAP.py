@@ -97,45 +97,61 @@ class Bootstrapper:
                 return super().__getattribute__(attr)
             elif (attr[2:] not in self.meta): raise AttributeError(attr[2:])
             return self.meta[attr[2:]]
-
+        @staticmethod
+        def _decode(val: str | tuple[int] | list[int]) -> bytes:
+            return base64.b85decode(val) if isinstance(val, str) else bytes(val)
         @property
         def key(self) -> PubKey:
             '''The public key stored in this manifest'''
-            return PubKey.from_public_bytes(base64.b85decode(self.m_public_key))
+            return PubKey.from_public_bytes(self._decode(self.m_public_key))
         @property
         def sig(self) -> bytes:
             '''The signature stored in this manifest'''
-            return base64.b85decode(self.m_signature)
+            return self._decode(self.m_signature)
+        @staticmethod
+        def _compile(datas_heads: tuple[tuple[str | None]], datas_body: tuple[tuple[str, bytes]]) -> bytes:
+            '''Joins data, just like compile() in the devel mkmanifest.py script'''
+            ba = bytearray()
+            byte_me = lambda n: bytes((*(byte_me(n // 256) if n >= 256 else b''), n % 256))
+            for dh in datas_heads:
+                for d in dh:
+                    if d is None: ba.append(255)
+                    elif isinstance(d, int):
+                        if d < 0: raise ValueError(f'Cannot compile negative numbers ({d})')
+                        ba.extend(byte_me(d))
+                    elif isinstance(d, str): ba.extend(d.encode())
+                    else: raise TypeError(f'Cannot compile {d!r} (type {type(d)})')
+                    ba.append(0)
+                ba.append(0)
+            ba.append(0)
+            for d0,d1 in datas_body:
+                ba.extend(d0.encode())
+                ba.append(255)
+                ba.extend(d1)
+                ba.append(0)
+            return bytes(ba)
         def compile(self) -> bytearray:
             '''
                 Join all important parts of the manifest, useful for hashing or signing
                     works the same as the similar part of the mkmanifest.py devel utility
             '''
-            ba = bytearray()
-            # compile metadata
-            if self.m_name is None: ba.append(255)
-            else: ba.extend(self.m_name.encode())
-            ba.append(0)
-            if self.m_manifest_upstream is None: ba.append(255)
-            else: ba.extend(self.m_manifest_upstream.encode())
-            ba.append(0)
-            if self.m_file_upstream is None: ba.append(255)
-            else: ba.extend(self.m_file_upstream.encode())
-            ba.extend((0, 0))
-            # compile file hashes
-            for f,h in self.manif.items():
-                if f.startswith('_'): continue
-                ba.extend(base64.b85decode(h))
-                ba.append(255)
-                ba.extend(f.encode())
-                ba.append(0)
-            return ba
+            return self._compile(
+                (
+                    (self.m_name, self.m_manifest_upstream, self.m_file_upstream),
+                    tuple(v for v in self.m_creation.values() if not isinstance(v, dict)),
+                    ((None,) if self.m_creation['system'] is None else self.m_creation['system'].values()),
+                ),
+                (tuple(((f, self._decode(h)) for f,h in self.manif.items() if not f.startswith('_')))),
+            )
         def verify(self, k: PubKey):
             '''Compile this manifest (using self.compile()) and verify it with the given public key'''
             self.bs.logger.warning(f'Compiling {self.m_name} for verification')
             dat = bytes(self.compile())
+            self.bs.logger.debug(f'Compiled:\n {dat}')
             self.bs.logger.warning(f'Verifying {self.m_name} ({self.m_signature})')
+            self.bs.logger.debug(f'Key:\n {k.public_bytes_raw()}')
             k.verify(self.sig, dat)
+            self.bs.logger.info(f'{self.m_name} passed verification')
         def upstream_manif(self, verify: bool = True) -> typing.Self | None:
             '''Fetches the upstream manifest from the manifest_upstream metadata field of this manifest'''
             self.bs.logger.warning(f'Fetching {self.m_name} upstream from {self.m_manifest_upstream}')
@@ -145,7 +161,7 @@ class Bootstrapper:
                 try: newmanif.verify(self.key)
                 except Exception as e:
                     self.bs.logger.fatal(f'Upstream manifest {self.m_name} fetched from {self.m_manifest_upstream} failed verification! ({e})')
-                    if input('Use anyway? (y/N) >').lower() == 'y': return newmanif
+                    if input('Use anyway? (y/N) >').lower().startswith('y'): return newmanif
                     else: return None
             return newmanif
         def update(self, new_manif: typing.Self, override: bool = False) -> typing.Self | None:
@@ -175,29 +191,47 @@ class Bootstrapper:
             self.bs.logger.warning(f'Executing manifest {self.m_name}')
             try: self.verify(self.key)
             except Exception as e: self.bs.logger.fatal(f'Local manifest {self.m_name} failed verification ({e}), continuing anyway')
+            to_install = []
+            to_replace = []
             for f,h in self.manif.items():
                 if f.startswith('_'): continue
                 if not (self.path.parent / f).exists():
                     self.bs.logger.error(f'Local {f} does not exist, redownloading')
-                    self.download_file(f)
+                    to_install.append(f)
+                    continue
                 self.bs.logger.info(f'Checking {f}')
                 self.bs.logger.debug(self.path.parent / f)
                 with open(self.path.parent / f, 'rb') as fd:
-                    fh = base64.b85encode(hashlib.file_digest(fd, self.bs.algorithm).digest()).decode()
+                    dig = hashlib.file_digest(fd, self.bs.algorithm).digest()
+                    fh = base64.b85encode(dig).decode() if isinstance(h, str) else tuple(dig)
                 self.bs.logger.debug(f'manif: {h}')
                 self.bs.logger.debug(f'local: {fh}')
                 if h == fh:
                     self.bs.logger.info(f'Local {f} matches manifest')
                     continue
                 self.bs.logger.warning(f'Local {f} does not match manifest, need to redownload!')
-                self.download_file(f)
+                to_replace.append(f)
+            changes = set()
+            if to_install:
+                print('Files to install:')
+                for f in to_install:
+                    print(f'{Path(self.m_file_upstream, f)} -> {self.path.parent / f}')
+                if ('--unattended' in sys.argv[1:]) or ('--unattended-install' in sys.argv[1:]) or not input('Install okay? (Y/n) >').lower().startswith('n'):
+                    for f in to_install:
+                        self.download_file(f)
+                        changes.add(f)
+            if to_replace:
+                print('Files to replace:')
+                for f in to_replace: print(f'- {f}')
+                if ('--unattended' in sys.argv[1:]) or ('--unattended-replace' in sys.argv[1:]) or input('Replace okay? (y/N) >').lower().startswith('y'):
+                    for f in to_replace:
+                        self.download_file(f)
+                        changes.add(f)
+            if changes:
+                print(f'{len(to_install+to_replace)} files were downloaded')
+                for f in changes: print(f'- {f}')
+                if ('--unattended' in sys.argv[1:]) or not input('Filesystem changes were made; rerun execute to verify checksums? (Y/n) >').lower().startswith('n'):
+                    execute()
         def download_file(self, f: str):
-            print(f'fixme::download:{f}')
-
-sys.argv.append('--debug')
-                                                                                                        
-bs = Bootstrapper()
-                                                                                                        
-m = bs.Manifest(Path('./MANIFEST.json'))
-                                                                                                        
-m.execute()
+            self.bs.logger.warning(f'Downloading {Path(self.m_file_upstream, f)} to {self.path.parent / f}...')
+            request.urlretrieve(Path(self.m_file_upstream, f), self.path.parent / f)
