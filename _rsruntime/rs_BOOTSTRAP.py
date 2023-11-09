@@ -8,6 +8,7 @@ import logging.handlers
 import json
 from urllib import request
 import traceback
+from importlib.machinery import SourceFileLoader
 # Typing
 import typing
 import types
@@ -83,6 +84,12 @@ class Bootstrapper:
     ## Base function
     def bootstrap(self):
         self.base_manifest()
+        self.chainload_entrypoint(
+            self.stage_entrypoint(
+                self.access_entrypoint('_rsruntime/rs_ENTRYPOINT.py')
+            )
+        )
+        
     ## Install and execute base manifest
     def base_manifest(self):
         mp = Path('_rsruntime/MANIFEST.json')
@@ -95,6 +102,18 @@ class Bootstrapper:
         self.logger.info(f'Loading in {mp}')
         man = self.Manifest(mp)
         man.update(man.upstream_manif()).execute()
+    ## Load entrypoint
+    def access_entrypoint(self, ep: str) -> types.ModuleType:
+        fl = SourceFileLoader(f'{__package__}.RS', ep)
+        self.logger.warning(f'ACCESSING ENTRYPOINT: {fl}')
+        return fl.load_module()
+    def stage_entrypoint(self, rs_outer: types.ModuleType) -> 'RunServer':
+        self.logger.warning(f'STAGING ENTRYPOINT: {rs_outer.RunServer.__init__}')
+        return rs_outer.RunServer(self)
+    def chainload_entrypoint(self, rs: 'RunServer'):
+        self.logger.warning(f'ENTERING ENTRYPOINT: {rs.__call__}')
+        rs()
+        self.logger.fatal('EXITED ENTRYPOINT')
 
     # Manifest
     class _Manifest:
