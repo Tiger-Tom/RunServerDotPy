@@ -54,18 +54,20 @@ class Bootstrapper:
         file_fmt = logging.Formatter(self.log_fmt_long, self.date_fmt_long, style='$')
         # Configure logger
         logger = logging.getLogger('RS')
-        logger.setLevel(logging.DEBUG if '--debug' in sys.argv[1:] \
-                        else logging.INFO if '--verbose' in sys.argv[1:] \
-                        else logging.WARNING)
+        logger.setLevel(logging.DEBUG)
         logger.propogate = False
         ## Add handlers
         ### Stream handler
         stream_h = logging.StreamHandler()
         stream_h.setFormatter(stream_fmt)
+        stream_h.setLevel(logging.DEBUG if '--debug' in sys.argv[1:] \
+                          else logging.INFO if '--verbose' in sys.argv[1:] \
+                          else logging.WARNING)
         logger.addHandler(stream_h)
         ### File handler
         file_h = logging.handlers.TimedRotatingFileHandler(log_path / 'RunServer.log', when='H', interval=2, backupCount=24) # keeps logs for 48 hours
         file_h.setFormatter(file_fmt)
+        file_h.setLevel(logging.DEBUG)
         logger.addHandler(file_h)
         # Set loglevel names
         logging.addLevelName(logging.DEBUG, 'DBG')
