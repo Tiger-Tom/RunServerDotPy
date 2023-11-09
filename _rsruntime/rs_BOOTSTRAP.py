@@ -5,6 +5,7 @@ import sys
 import json
 from urllib import request
 import time
+import argparse
 # Files
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -25,7 +26,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey a
 
 #> Header >/
 class Bootstrapper:
-    __slots__ = ('root_logger', 'logger', 'Manifest')
+    __slots__ = ('args', 'args_unknown', 'root_logger', 'logger', 'Manifest')
     # Remotes
     #dl_man = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e/manifest.json'
     dl_man = 'http://0.0.0.0:8000/manifest.json'
@@ -40,6 +41,7 @@ class Bootstrapper:
     minimum_vers = (3, 12, 0)
 
     def __init__(self):
+        self.parse_arguments()
         self.logger = self.setup_logger().getChild('BS')
         self.Manifest = types.MethodType(self._Manifest, self)
 
@@ -48,14 +50,29 @@ class Bootstrapper:
     def ensure_python_version(self):
         if sys.version_info > self.minimum_vers:
             raise NotImplementedError(f'Python version {".".join(sys.version_info[:3])} doesn\'t meet the minimum requirements, needs {".".join(minimum_vers)}')
+    ## Argument parser
+    def parse_arguments(self, args=None):
+        p = argparse.ArgumentParser('RunServer.py')
+        log_grp = p.add_argument_group('Logging')
+        log_l_grp = log_grp.add_mutually_exclusive_group()
+        log_l_grp.add_argument('--verbose', help='Show more information in stderr logging (loglvl=INFO)', action='store_true')
+        log_l_grp.add_argument('--debug', help='Show even more information in stderr logging (loglvl=DEBUG)', action='store_true')
+        log_grp.add_argument('--verbose-headers', help='Show longer headers in stderr logs', action='store_true')
+        p.add_argument('--update-only', help='Only download/update and execute the bootstrapper manifest, don\'t start the server', action='store_true')
+        unat_grp_ = p.add_argument_group()
+        unat_grp = unat_grp_.add_mutually_exclusive_group()
+        unat_grp.add_argument('--unattended-install', help='When executing manifests, don\'t ask before installing new files', action='store_true')
+        unat_grp.add_argument('--unattended-replace', help='When executing manifests, don\'t ask before replacing existing files', action='store_true')
+        unat_grp.add_argument('--unattended', help='Combined effects of --unattended-install and --unattended-replace', action='store_true')
+        self.args, self.args_unknown = p.parse_known_args(args)
     ## Setup logging
     def setup_logger(self) -> logging.Logger:
         log_path = (Path.cwd() / '_rslog')
         log_path.mkdir(exist_ok=True)
         # Setup formatters
         stream_fmt = logging.Formatter(
-            self.log_fmt_long if '--verbose-log-headers' in sys.argv[1:] else self.log_fmt_short,
-            self.date_fmt_long if '--verbose-log-headers' in sys.argv[1:] else self.date_fmt_short,
+            self.log_fmt_long if self.args.verbose_headers else self.log_fmt_short,
+            self.date_fmt_long if self.args.verbose_headers else self.date_fmt_short,
             style='$')
         file_fmt = logging.Formatter(self.log_fmt_long, self.date_fmt_long, style='$')
         # Configure logger
@@ -66,9 +83,7 @@ class Bootstrapper:
         ### Stream handler
         stream_h = logging.StreamHandler()
         stream_h.setFormatter(stream_fmt)
-        stream_h.setLevel(logging.DEBUG if '--debug' in sys.argv[1:] \
-                          else logging.INFO if '--verbose' in sys.argv[1:] \
-                          else logging.WARNING)
+        stream_h.setLevel(logging.DEBUG if self.args.debug else logging.INFO if self.args.verbose else logging.WARNING)
         logger.addHandler(stream_h)
         ### Main file handler
         # stores verbose logs (level=INFO)
@@ -107,7 +122,7 @@ class Bootstrapper:
     ## Base function
     def bootstrap(self):
         self.base_manifest()
-        if '--update-only' in sys.argv[1:]:
+        if self.args.update_only:
             self.logger.fatal('--update-only argument supplied, exiting')
             return
         self.chainload_entrypoint(
@@ -280,21 +295,21 @@ class Bootstrapper:
                 print('Files to install:')
                 for f in to_install:
                     print(f'{Path(self.m_file_upstream, f)} -> {self.path.parent / f}')
-                if ('--unattended' in sys.argv[1:]) or ('--unattended-install' in sys.argv[1:]) or not input('Install okay? (Y/n) >').lower().startswith('n'):
+                if (self.bs.args.unattended) or (self.bs.args.unattended_install) or not input('Install okay? (Y/n) >').lower().startswith('n'):
                     for f in to_install:
                         self.download_file(f)
                         changes.add(f)
             if to_replace:
                 print('Files to replace:')
                 for f in to_replace: print(f'- {f}')
-                if ('--unattended' in sys.argv[1:]) or ('--unattended-replace' in sys.argv[1:]) or input('Replace okay? (y/N) >').lower().startswith('y'):
+                if (self.bs.args.unattended) or (self.bs.args.unattended_replace) or input('Replace okay? (y/N) >').lower().startswith('y'):
                     for f in to_replace:
                         self.download_file(f)
                         changes.add(f)
             if changes:
                 print(f'{len(to_install+to_replace)} files were downloaded')
                 for f in changes: print(f'- {f}')
-                if ('--unattended' in sys.argv[1:]) or not input('Filesystem changes were made; rerun execute to verify checksums? (Y/n) >').lower().startswith('n'):
+                if input('Filesystem changes were made; rerun execute to verify checksums? (Y/n) >').lower().startswith('n'):
                     execute()
         def download_file(self, f: str):
             self.bs.logger.warning(f'Downloading {Path(self.m_file_upstream, f)} to {self.path.parent / f}...')
