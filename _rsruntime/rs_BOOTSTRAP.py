@@ -2,13 +2,15 @@
 
 #> Imports
 import sys
-from pathlib import Path
-import logging
-import logging.handlers
 import json
 from urllib import request
-import traceback
+# Files
 from importlib.machinery import SourceFileLoader
+from pathlib import Path
+# Logging / info
+import logging
+import logging.handlers
+import traceback
 # Typing
 import typing
 import types
