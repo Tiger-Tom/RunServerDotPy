@@ -195,13 +195,13 @@ class Bootstrapper:
             if self.meta.get('ignore', False):
                 self.bs.logger.error(f'{self.m.name} would like to be ignored, skipping')
                 return self
-            for f in self.manif.keys() - new_manif.keys():
+            for f in self.manif.keys() - new_manif.manif.keys():
                 if f.startswith('_'): continue
-            stale = tuple(f for f in self.manif.keys() - new_manif.keys() if not f.startswith('_'))
+            stale = tuple(f for f in self.manif.keys() - new_manif.manif.keys() if not f.startswith('_'))
             if stale:
                 self.bs.logger.error(f'The following stale file(s) no longer exist in the new manifest:\n- {"\n- ".join(stale)}')
             else: self.bs.logger.info('No stale files found')
-            new = tuple(f for f in new_manif.keys() - self.manif.keys() if not f.startswith('_'))
+            new = tuple(f for f in new_manif.manif.keys() - self.manif.keys() if not f.startswith('_'))
             if new: self.bs.logger.warning(f'The following new file(s) will need to be created:\n- {"\n- ".join(new)}')
             else: self.bs.logger.info('No new files found')
             with open(self.path, 'w') as f:
