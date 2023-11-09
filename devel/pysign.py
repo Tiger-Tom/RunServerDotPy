@@ -19,10 +19,13 @@ def read_key(path: Path = Path('key.pyk')) -> EdPrivK:
 def write_key(priv: EdPrivK, path: Path = Path('key.pyk')):
     with path.open('wb') as f:
         f.write(priv.private_bytes_raw())
-def signstr(priv: EdPrivK, data: bytes):
-    return base64.b85encode(priv.sign(data)).decode()
-def verstr(pub: EdPubK, sig: str, msg: bytes):
-    pub.verify(base64.b85decode(sig), msg)
+def signstr(priv: EdPrivK, data: bytes, long: bool = False) -> str | tuple[int]:
+    dat = priv.sign(data)
+    if long: return tuple(dat)
+    return base64.b85encode(dat).decode()
+def verstr(pub: EdPubK, sig: str | tuple[int], msg: bytes):
+    if isinstance(sig, str): sig = base64.b85decode(sig)
+    pub.verify(bytes(sig), msg)
 eprint = lambda *a,**kw: print(*a, **kw, file=sys.stderr)
 #</Header
 
