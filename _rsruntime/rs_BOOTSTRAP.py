@@ -7,6 +7,7 @@ import logging
 import logging.handlers
 import json
 from urllib import request
+import traceback
 # Typing
 import typing
 import types
@@ -20,9 +21,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey a
 class Bootstrapper:
     __slots__ = ('root_logger', 'logger', 'Manifest')
     # Remotes
-    #dl_man_base = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e'
-    dl_man_base = 'http://0.0.0.0:8000/manifests'
-    dl_man_path = lambda self,n: f'{self.dl_man_base}/{n.replace("/", "_")}.json'
+    #dl_man = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e/manifest.json'
+    dl_man = 'http://0.0.0.0:8000/manifest.json'
     dl_timeout = 10
     # Logger formats
     log_fmt_short = '[$asctime] [$name/$threadName/$levelname] $message'
@@ -79,7 +79,16 @@ class Bootstrapper:
     # Bootstrapping
     ## Base function
     def bootstrap(self):
-        ...
+        mp = Path('_rsruntime/MANIFEST.json')
+        if not mp.exists():
+            self.logger.error(f'Manifest at {mp} does not exist, attempting to download')
+            try: request.urlretrieve(self.dl_man, mp)
+            except Exception as e:
+                self.logger.fatal(f'Could not fetch manifest from {self.dl_man}:\n{"".join(traceback.format_exception(e))}')
+                raise FileNotFoundError(f'Cannot continue without {mp} which could not be retrieved from {self.dl_man}') from None
+        self.logger.info(f'Loading in {mp}')
+        man = self.Manifest(mp)
+        man.execute()
 
     # Manifest
     class _Manifest:
