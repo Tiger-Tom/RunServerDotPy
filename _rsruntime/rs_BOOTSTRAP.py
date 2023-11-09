@@ -82,16 +82,19 @@ class Bootstrapper:
     # Bootstrapping
     ## Base function
     def bootstrap(self):
+        self.base_manifest()
+    ## Install and execute base manifest
+    def base_manifest(self):
         mp = Path('_rsruntime/MANIFEST.json')
         if not mp.exists():
             self.logger.error(f'Manifest at {mp} does not exist, attempting to download')
             try: request.urlretrieve(self.dl_man, mp)
             except Exception as e:
                 self.logger.fatal(f'Could not fetch manifest from {self.dl_man}:\n{"".join(traceback.format_exception(e))}')
-                raise FileNotFoundError(f'Cannot continue without {mp} which could not be retrieved from {self.dl_man}') from None
+                return
         self.logger.info(f'Loading in {mp}')
         man = self.Manifest(mp)
-        man.execute()
+        man.update().execute()
 
     # Manifest
     class _Manifest:
