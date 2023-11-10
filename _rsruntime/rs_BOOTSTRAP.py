@@ -157,13 +157,13 @@ class Bootstrapper:
 
     # Manifest
     class _Manifest:
-        __slots__ = ('bs', 'path', 'manif', 'meta')
+        __slots__ = ('bs', 'path', 'raw', 'manif', 'meta')
         def __init__(self, bs, path: Path, manif: dict | None = None):
             self.bs = bs
             self.path = path
             if manif is None:
-                with self.path.open('r') as f:
-                    self.manif = json.load(f)
+                with self.path.open('r') as f: self.raw = f.read()
+                self.manif = json.loads(self.raw)
             else: self.manif = manif
             self.meta = self.manif['_metadata']
         def __getattr__(self, attr: str):
@@ -263,8 +263,7 @@ class Bootstrapper:
             new = tuple(f for f in new_manif.manif.keys() - self.manif.keys() if not f.startswith('_'))
             if new: self.bs.logger.warning(f'The following new file(s) will need to be created:\n- {"\n- ".join(new)}')
             else: self.bs.logger.info('No new files found')
-            with open(self.path, 'w') as f:
-                json.dump(new_manif.manif, f)
+            with open(self.path, 'w') as f: f.write(new_manif.raw)
             return new_manif
         def execute(self):
             self.bs.logger.warning(f'Executing manifest {self.m_name}')
