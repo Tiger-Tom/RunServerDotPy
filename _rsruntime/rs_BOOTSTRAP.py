@@ -199,6 +199,7 @@ class Bootstrapper:
                         if d < 0: raise ValueError(f'Cannot compile negative numbers ({d})')
                         ba.extend(byte_me(d))
                     elif isinstance(d, str): ba.extend(d.encode(encoding))
+                    elif isinstance(d, (tuple, list)): ba.extend(d)
                     else: raise TypeError(f'Cannot compile {d!r} (type {type(d)})')
                     ba.append(0)
                 ba.append(0)
