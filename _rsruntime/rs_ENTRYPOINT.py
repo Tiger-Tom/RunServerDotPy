@@ -124,7 +124,4 @@ class RunServer(types.ModuleType):
         # Start server
         self.SM.start()
         # Finalize
-        self.Config.stop_autosync()
-        self.Config.sync_all()
-        self.UserManager.fbd.stop_autosync()
-        self.UserManager.fbd.sync_all()
+        self.BS.close()

@@ -13,7 +13,7 @@ from pathlib import Path
 
 # RunServer Module
 import RS
-from RS import Config, MCLang, LineParser
+from RS import Bootstrapper, Config, MCLang, LineParser
 from RS.Types import FileBackedDict
 
 #> Header >/
@@ -71,6 +71,7 @@ class UserManager:
         path = Path(Config('users/fbd/path', './_rsusers/'))
         path.mkdir(parents=True, exist_ok=True)
         self.fbd = FileBackedDict(path, Config('users/fbd/sync_time', 60.0))
+        Bootstrapper.register_onclose(self.close)
         # Register hooks
         LineParser.register_callback( # player joins
             MCLang.lang_to_pattern(MCLang.lang['multiplayer.player.joined'], ('username',)),
@@ -91,6 +92,10 @@ class UserManager:
     def __getitem__(self, username: str) -> User:
         if username in self.users: return self.users[username]
         else: return self.User(username)
+
+    def close(self):
+        self.fbd.stop_autosync()
+        self.fbd.sync_all()
 
 class TellRaw(list):
     '''

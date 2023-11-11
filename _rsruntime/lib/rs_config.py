@@ -19,6 +19,7 @@ class Config(FileBackedDict):
         self.conf_path.mkdir(parents=True, exist_ok=True)
         super().__init__(self.conf_path, 60.0)
         self.start_autosync()
+        RS.BS.register_onclose(self.close)
     def mass_set_default(self, **values):
         if len(values) == 0:
             self.logger.error(f'Instructed to set mass default of 0 values?')
@@ -39,3 +40,6 @@ class Config(FileBackedDict):
             # Resume bg loop if needed
             if resume: self.fbd.sync_all_bg_loop(intvl)
             else: self.start_autosync()
+    def close(self):
+        self.stop_autosync()
+        self.sync_all()

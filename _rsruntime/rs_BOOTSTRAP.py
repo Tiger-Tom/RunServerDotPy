@@ -26,7 +26,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey a
 
 #> Header >/
 class Bootstrapper:
-    __slots__ = ('args', 'args_unknown', 'root_logger', 'logger', 'Manifest')
+    __slots__ = ('args', 'args_unknown', 'root_logger', 'logger', 'Manifest', 'shutdown_callbacks')
     # Remotes
     #dl_man = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e/manifest.json'
     dl_man = 'http://0.0.0.0:8000/manifest.json'
@@ -44,6 +44,7 @@ class Bootstrapper:
         self.parse_arguments()
         self.logger = self.setup_logger().getChild('BS')
         self.Manifest = types.MethodType(self._Manifest, self)
+        self.shutdown_callbacks = set()
 
     # Pre-bootstrap setup
     ## Check Python version
@@ -321,3 +322,14 @@ class Bootstrapper:
         def download_file(self, f: str):
             self.bs.logger.warning(f'Downloading {Path(self.m_file_upstream, f)} to {self.path.parent / f}...')
             request.urlretrieve(Path(self.m_file_upstream, f), self.path.parent / f)
+
+    # Utility functions
+    ## Shutdown functions
+    def close(self, do_exit: bool | int = False):
+        self.logger.fatal('Instructed to perform orderly shutdown, executing shutdown callbacks...')
+        for h in self.shutdown_handlers: h()
+        self.logger.error(f'Closing logger{f" and exiting with code {do_exit}" if do_exit is not False else ""}, goodbye!')
+        logging.shutdown()
+        if do_exit is not False: exit(do_exit)
+    def register_onclose(self, cb: typing.Callable[[None], None]):
+        self.shutdown_callbacks.add(cb)
