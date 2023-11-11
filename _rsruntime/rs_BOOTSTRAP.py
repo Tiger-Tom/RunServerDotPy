@@ -182,8 +182,13 @@ class Bootstrapper:
         def sig(self) -> bytes:
             '''The signature stored in this manifest'''
             return self._decode(self.m_signature)
+        @property
+        def encoding(self) -> str:
+            '''The encoding type stored in this manifest, or the default if none is stored'''
+            if (f := self.m_creation.get('for')) is not None: return f.get('encoding', sys.getdefaultencoding())
+            return sys.getdefaultencoding()
         @staticmethod
-        def _compile(datas_heads: tuple[tuple[str | None]], datas_body: tuple[tuple[str, bytes]]) -> bytes:
+        def _compile(datas_heads: tuple[tuple[str | None]], datas_body: tuple[tuple[str, bytes]], encoding: str) -> bytes:
             '''Joins data, just like compile() in the devel mkmanifest.py script'''
             ba = bytearray()
             byte_me = lambda n: bytes((*(byte_me(n // 256) if n >= 256 else b''), n % 256))
@@ -193,13 +198,13 @@ class Bootstrapper:
                     elif isinstance(d, int):
                         if d < 0: raise ValueError(f'Cannot compile negative numbers ({d})')
                         ba.extend(byte_me(d))
-                    elif isinstance(d, str): ba.extend(d.encode())
+                    elif isinstance(d, str): ba.extend(d.encode(encoding))
                     else: raise TypeError(f'Cannot compile {d!r} (type {type(d)})')
                     ba.append(0)
                 ba.append(0)
             ba.append(0)
             for d0,d1 in datas_body:
-                ba.extend(d0.encode())
+                ba.extend(d0.encode(encoding))
                 ba.append(255)
                 ba.extend(d1)
                 ba.append(0)
@@ -214,8 +219,10 @@ class Bootstrapper:
                     (self.m_name, self.m_manifest_upstream, self.m_file_upstream),
                     tuple(v for v in self.m_creation.values() if not isinstance(v, dict)),
                     ((None,) if self.m_creation['system'] is None else self.m_creation['system'].values()),
+                    self.m_creation['for'].values(),
                 ),
                 (tuple(((f, self._decode(h)) for f,h in self.manif.items() if not f.startswith('_')))),
+                self.encoding,
             )
         def verify(self, k: PubKey):
             '''Compile this manifest (using self.compile()) and verify it with the given public key'''
@@ -268,7 +275,7 @@ class Bootstrapper:
         def execute(self):
             self.bs.logger.warning(f'Executing manifest {self.m_name}')
             try: self.verify(self.key)
-            except Exception as e: self.bs.logger.fatal(f'Local manifest {self.m_name} failed verification ({e}), continuing anyway')
+            except Exception as e: self.bs.logger.fatal(f'Local manifest {self.m_name} failed verification ({e!r}), continuing anyway')
             to_install = []
             to_replace = []
             for f,h in self.manif.items():

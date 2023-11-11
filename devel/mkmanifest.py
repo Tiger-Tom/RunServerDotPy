@@ -67,7 +67,7 @@ def manifest(name: str, path: Path, key: pysign.EdPrivK, creation_info: dict, mu
     for f,h in hashes:
         man[f] = tuple(h) if long_fmt else base64.b85encode(h).decode()
         eprint(f'{f} -> {man[f]}')
-    compd = compile(((name, mupstream, fupstream), tuple(v for v in creation_info.values() if not isinstance(v, dict)), ((None,) if creation_info['system'] is None else creation_info['system'].values())), hashes)
+    compd = compile(((name, mupstream, fupstream), tuple(v for v in creation_info.values() if not isinstance(v, dict)), ((None,) if creation_info['system'] is None else creation_info['system'].values()), creation_info['for']), hashes)
     eprint(f'Compiled: ({len(compd)} byte(s))\n{compd}')
     keydump = tuple(key.public_key().public_bytes_raw()) if long_fmt else base64.b85encode(key.public_key().public_bytes_raw()).decode()
     eprint(f'Signing {len(compd)} bytes\n private: {tuple(key.private_bytes_raw()) if long_fmt else base64.b85encode(key.private_bytes_raw()).decode()}\n public:  {keydump}')
@@ -79,7 +79,7 @@ def jsonify(manif: dict, long_fmt: bool, compact: bool, extra_compact: bool) -> 
     jsn = json.dumps(manif, sort_keys=False,
                      indent=None if compact or extra_compact else 4,
                      separators=(',', ':')  if extra_compact else None)
-    if (not long_fmt) or compact or extra_compact: return jsn
+    if compact or extra_compact: return jsn
     return re.sub(r'^(\s*"[^"]*":\s*)(\[[\s\d,]*\])(,?\s*)$', lambda m: m.group(1)+(re.sub(f'\s+', '', m.group(2)).replace(',', ', '))+m.group(3), jsn, flags=re.MULTILINE)
 #</Header
 
@@ -110,7 +110,7 @@ def parse_args(args=None):
     a.add_argument('--contact', help='Contact information to add to the manifest', default=None)
     a.add_argument('--desc', help='A description to add to the manifest', default=None)
     a.add_argument('--version', help='Version information to add to the manifest (not used for updating, only for user info)', default=None)
-    a.add_argument('--no-system', help='Don\'t add system ID-ing info (such as OS type and Python version) to manifest', action='store_true')
+    a.add_argument('--no-system', help='Don\'t add system ID-ing info (such as OS version and hostname) to manifest', action='store_true')
     # parse arguments
     args = p.parse_args(args)
     # invalid cmd
@@ -137,9 +137,8 @@ def parse_args(args=None):
                 'os_version': un.version,
                 'arch': un.machine,
                 'hostname': un.nodename,
-                'py_version': sys.version,
+                'py_version_full': sys.version,
                 'py_implementation': sys.implementation.name,
-                'encoding': sys.getdefaultencoding(),
                 'maxsize': sys.maxsize,
                 'maxunicode': sys.maxunicode,
             },
@@ -147,6 +146,11 @@ def parse_args(args=None):
         } | (
             {'aka': args.realname} if args.username is not None else {}
         ) | {
+            'for': {
+                'os': os.name,
+                'python': sys.version_info[:3],
+                'encoding': sys.getdefaultencoding(),
+            },
             'contact': args.contact,
         } | (
             {'description': args.desc} if args.desc is not None else {}
