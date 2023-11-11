@@ -121,8 +121,10 @@ class RunServer(types.ModuleType):
         self.logger.info('Entrypoint starting')
         # Instantiate ServerManager
         self.ServerManager = self.SM = self.ServerManager()
-        # Start ServerManager
+        # Start server
         self.SM.start()
-        # Finalize config
+        # Finalize
         self.Config.stop_autosync()
         self.Config.sync_all()
+        self.UserManager.fbd.stop_autosync()
+        self.UserManager.fbd.sync_all()
