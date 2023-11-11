@@ -67,7 +67,7 @@ def manifest(name: str, path: Path, key: pysign.EdPrivK, creation_info: dict, mu
     for f,h in hashes:
         man[f] = tuple(h) if long_fmt else base64.b85encode(h).decode()
         eprint(f'{f} -> {man[f]}')
-    compd = compile(((name, mupstream, fupstream), tuple(v for v in creation_info.values() if not isinstance(v, dict)), ((None,) if creation_info['system'] is None else creation_info['system'].values()), creation_info['for']), hashes)
+    compd = compile(((name, mupstream, fupstream), tuple(v for v in creation_info.values() if not isinstance(v, dict)), ((None,) if creation_info['system'] is None else creation_info['system'].values()), creation_info['for'].values()), hashes)
     eprint(f'Compiled: ({len(compd)} byte(s))\n{compd}')
     keydump = tuple(key.public_key().public_bytes_raw()) if long_fmt else base64.b85encode(key.public_key().public_bytes_raw()).decode()
     eprint(f'Signing {len(compd)} bytes\n private: {tuple(key.private_bytes_raw()) if long_fmt else base64.b85encode(key.private_bytes_raw()).decode()}\n public:  {keydump}')
