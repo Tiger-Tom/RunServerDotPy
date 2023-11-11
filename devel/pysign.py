@@ -48,6 +48,7 @@ if (__name__ == '__main__') and ('idlelib.run' not in sys.modules):
             action='append_const', const=(name, func), dest='output', default=[])
         modes.append((name, func))
     add_omode('raw', lambda b: b.decode(errors='backslashreplace'))
+    add_omode('repr', lambda b: repr(b))
     add_omode('base10', lambda b: repr(tuple(b)))
     add_omode('base16', base64.b16encode)
     add_omode('base32', base64.b32encode)
