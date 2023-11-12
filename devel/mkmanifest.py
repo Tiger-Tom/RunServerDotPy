@@ -80,7 +80,7 @@ def jsonify(manif: dict, long_fmt: bool, compact: bool, extra_compact: bool) -> 
                      indent=None if compact or extra_compact else 4,
                      separators=(',', ':')  if extra_compact else None)
     if compact or extra_compact: return jsn
-    return re.sub(r'^(\s*"[^"]*":\s*)(\[[\s\d,]*\])(,?\s*)$', lambda m: m.group(1)+(re.sub(f'\s+', '', m.group(2)).replace(',', ', '))+m.group(3), jsn, flags=re.MULTILINE)
+    return re.sub(r'^(\s*"[^"]*":\s*)(\[[\s\d,]*\])(,?\s*)$', lambda m: m.group(1)+(re.sub(fr'\s+', '', m.group(2)).replace(',', ', '))+m.group(3), jsn, flags=re.MULTILINE)
 #</Header
 
 #> Main >/
