@@ -318,7 +318,7 @@ class Bootstrapper:
                 print(f'{len(to_install+to_replace)} files were downloaded')
                 for f in changes: print(f'- {f}')
                 if input('Filesystem changes were made; rerun execute to verify checksums? (Y/n) >').lower().startswith('n'):
-                    execute()
+                    self.execute()
         def download_file(self, f: str):
             self.bs.logger.warning(f'Downloading {Path(self.m_file_upstream, f)} to {self.path.parent / f}...')
             request.urlretrieve(Path(self.m_file_upstream, f), self.path.parent / f)
