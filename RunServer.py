@@ -17,6 +17,6 @@ def fetch_bootstrapper():
 if __name__ == '__main__':
     try:
         from _rsruntime.rs_BOOTSTRAP import Bootstrapper
-    except Exception as e:
-        ...
+    except ImportError as e:
+        raise e
     chainload_bootstrapper()
