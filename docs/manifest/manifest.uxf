@@ -24,14 +24,14 @@ fontfamily=Monospaced
 
 
 // This text will be stored with each diagram;  use it for notes.</help_text>
-  <zoom_level>8</zoom_level>
+  <zoom_level>9</zoom_level>
   <element>
     <id>UMLPackage</id>
     <coordinates>
-      <x>312</x>
-      <y>344</y>
-      <w>360</w>
-      <h>48</h>
+      <x>351</x>
+      <y>306</y>
+      <w>405</w>
+      <h>54</h>
     </coordinates>
     <panel_attributes>key.pyk
 --
@@ -39,41 +39,39 @@ b'\x0e\xf7L\xf6\xa9\x13a\xa9\xa5\xf1\xad\xf8\x0f~\x80r\x05&amp;\xa1\xcc\xf95\x84
 bg=GRAY
 halign=left
 style=wordwrap
-group=group-9</panel_attributes>
+fontsize=12</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>96</x>
-      <y>344</y>
-      <w>200</w>
-      <h>24</h>
+      <x>108</x>
+      <y>306</y>
+      <w>225</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>./pysign.py generate key.pyk
-
-group=group-9</panel_attributes>
+</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>288</x>
-      <y>344</y>
-      <w>40</w>
-      <h>24</h>
+      <x>324</x>
+      <y>306</y>
+      <w>45</w>
+      <h>27</h>
     </coordinates>
-    <panel_attributes>lt=&lt;&lt;-
-group=group-9</panel_attributes>
+    <panel_attributes>lt=&lt;&lt;-</panel_attributes>
     <additional_attributes>30.0;10.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLPackage</id>
     <coordinates>
-      <x>312</x>
-      <y>400</y>
-      <w>360</w>
-      <h>48</h>
+      <x>351</x>
+      <y>369</y>
+      <w>405</w>
+      <h>54</h>
     </coordinates>
     <panel_attributes>&lt;stdout&gt;
 --
@@ -81,41 +79,39 @@ b'y\xf6\xd5$\xa5\xeb\x98H\xf5\x8c\xbak\xc0\xf8\xee\x19\tbcJ\xe3\x1d\x8f\xd39c!,X
 bg=GRAY
 halign=left
 style=wordwrap
-group=group-9</panel_attributes>
+fontsize=12</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>96</x>
-      <y>400</y>
-      <w>200</w>
-      <h>32</h>
+      <x>108</x>
+      <y>369</y>
+      <w>225</w>
+      <h>36</h>
     </coordinates>
     <panel_attributes>./pysign.py extract key.pyk --no-headers -repr -pub
-style=wordwrap
-group=group-9</panel_attributes>
+style=wordwrap</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>288</x>
-      <y>400</y>
-      <w>40</w>
-      <h>24</h>
+      <x>324</x>
+      <y>369</y>
+      <w>45</w>
+      <h>27</h>
     </coordinates>
-    <panel_attributes>lt=&lt;&lt;-
-group=group-9</panel_attributes>
+    <panel_attributes>lt=&lt;&lt;-</panel_attributes>
     <additional_attributes>30.0;10.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLPackage</id>
     <coordinates>
-      <x>312</x>
-      <y>456</y>
-      <w>360</w>
-      <h>48</h>
+      <x>351</x>
+      <y>432</y>
+      <w>405</w>
+      <h>54</h>
     </coordinates>
     <panel_attributes>&lt;stdout&gt;
 --
@@ -123,53 +119,50 @@ b'\x0e\xf7L\xf6\xa9\x13a\xa9\xa5\xf1\xad\xf8\x0f~\x80r\x05&amp;\xa1\xcc\xf95\x84
 bg=GRAY
 halign=left
 style=wordwrap
-group=group-9</panel_attributes>
+fontsize=12</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>96</x>
-      <y>456</y>
-      <w>200</w>
-      <h>32</h>
+      <x>108</x>
+      <y>432</y>
+      <w>225</w>
+      <h>36</h>
     </coordinates>
     <panel_attributes>./pysign.py extract key.pyk --no-headers -repr -priv
-style=wordwrap
-group=group-9</panel_attributes>
+style=wordwrap</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>288</x>
-      <y>456</y>
-      <w>40</w>
-      <h>24</h>
+      <x>324</x>
+      <y>432</y>
+      <w>45</w>
+      <h>27</h>
     </coordinates>
-    <panel_attributes>lt=&lt;&lt;-
-group=group-9</panel_attributes>
+    <panel_attributes>lt=&lt;&lt;-</panel_attributes>
     <additional_attributes>30.0;10.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLGeneric</id>
     <coordinates>
-      <x>88</x>
-      <y>320</y>
-      <w>592</w>
-      <h>192</h>
+      <x>99</x>
+      <y>279</y>
+      <w>666</w>
+      <h>216</h>
     </coordinates>
-    <panel_attributes>Key Generation
-group=group-9</panel_attributes>
+    <panel_attributes>Key Generation</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>UMLGeneric</id>
     <coordinates>
       <x>0</x>
-      <y>696</y>
-      <w>904</w>
-      <h>72</h>
+      <y>702</y>
+      <w>1017</w>
+      <h>81</h>
     </coordinates>
     <panel_attributes>Demo File Tree
 group=group-7</panel_attributes>
@@ -178,10 +171,10 @@ group=group-7</panel_attributes>
   <element>
     <id>UMLPackage</id>
     <coordinates>
-      <x>8</x>
-      <y>720</y>
-      <w>168</w>
-      <h>40</h>
+      <x>9</x>
+      <y>729</y>
+      <w>189</w>
+      <h>45</h>
     </coordinates>
     <panel_attributes>demo/test_a.py
 --
@@ -194,10 +187,10 @@ group=group-7</panel_attributes>
   <element>
     <id>UMLPackage</id>
     <coordinates>
-      <x>184</x>
-      <y>720</y>
-      <w>168</w>
-      <h>40</h>
+      <x>207</x>
+      <y>729</y>
+      <w>189</w>
+      <h>45</h>
     </coordinates>
     <panel_attributes>demo/test_b.py
 --
@@ -210,10 +203,10 @@ group=group-7</panel_attributes>
   <element>
     <id>UMLPackage</id>
     <coordinates>
-      <x>360</x>
-      <y>720</y>
-      <w>168</w>
-      <h>40</h>
+      <x>405</x>
+      <y>729</y>
+      <w>189</w>
+      <h>45</h>
     </coordinates>
     <panel_attributes>demo/dir/test_c.py
 --
@@ -226,10 +219,10 @@ group=group-7</panel_attributes>
   <element>
     <id>UMLPackage</id>
     <coordinates>
-      <x>536</x>
-      <y>720</y>
-      <w>168</w>
-      <h>40</h>
+      <x>603</x>
+      <y>729</y>
+      <w>189</w>
+      <h>45</h>
     </coordinates>
     <panel_attributes>demo/dir/test_d.py
 --
@@ -242,10 +235,10 @@ group=group-7</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>32</x>
-      <y>544</y>
-      <w>576</w>
-      <h>24</h>
+      <x>36</x>
+      <y>531</y>
+      <w>648</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>./mkmanifest.py add demo_manif ./demo/ --output ./demo/MANIFEST.json --sign ./key.pyk</panel_attributes>
     <additional_attributes/>
@@ -253,10 +246,10 @@ group=group-7</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>600</x>
-      <y>552</y>
-      <w>200</w>
-      <h>56</h>
+      <x>675</x>
+      <y>540</y>
+      <w>225</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;&lt;&lt;-
 fg=ORANGE</panel_attributes>
@@ -265,10 +258,10 @@ fg=ORANGE</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>24</x>
-      <y>560</y>
-      <w>48</w>
-      <h>40</h>
+      <x>27</x>
+      <y>549</y>
+      <w>54</w>
+      <h>45</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;&lt;&lt;-
 fg=RED</panel_attributes>
@@ -277,10 +270,10 @@ fg=RED</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>24</x>
-      <y>576</y>
-      <w>344</w>
-      <h>80</h>
+      <x>27</x>
+      <y>567</y>
+      <w>387</w>
+      <h>90</h>
     </coordinates>
     <panel_attributes>lt=&lt;&lt;&lt;&lt;-
 fg=RED</panel_attributes>
@@ -289,10 +282,10 @@ fg=RED</panel_attributes>
   <element>
     <id>UMLPackage</id>
     <coordinates>
-      <x>784</x>
-      <y>104</y>
-      <w>704</w>
-      <h>472</h>
+      <x>882</x>
+      <y>36</y>
+      <w>792</w>
+      <h>531</h>
     </coordinates>
     <panel_attributes>./demo/MANIFEST.json
 --
@@ -331,17 +324,16 @@ halign=left
     "test_b.py": "+Euz2&amp;cFC2BhK7&amp;0V1E$v27qc",
     "dir/test_c.py": "B_ts;B%1BQ@pAW~_Cy0kh?@iR",
     "dir/test_d.py": ")Y&lt;HbWj{QSzeLS_Gb?56(t45U"
-}
-group=group-0</panel_attributes>
+}</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>160</x>
-      <y>96</y>
-      <w>152</w>
-      <h>32</h>
+      <x>180</x>
+      <y>27</y>
+      <w>171</w>
+      <h>36</h>
     </coordinates>
     <panel_attributes>lt=-&gt;&gt;
 Writes File</panel_attributes>
@@ -350,10 +342,10 @@ Writes File</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>160</x>
-      <y>176</y>
-      <w>152</w>
-      <h>32</h>
+      <x>180</x>
+      <y>117</y>
+      <w>171</w>
+      <h>36</h>
     </coordinates>
     <panel_attributes>lt=-&gt;&gt;&gt;&gt;
 Outputs</panel_attributes>
@@ -362,10 +354,10 @@ Outputs</panel_attributes>
   <element>
     <id>UMLPackage</id>
     <coordinates>
-      <x>8</x>
-      <y>104</y>
-      <w>64</w>
-      <h>40</h>
+      <x>9</x>
+      <y>36</y>
+      <w>72</w>
+      <h>45</h>
     </coordinates>
     <panel_attributes>File
 --
@@ -377,10 +369,10 @@ halign=left</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>8</x>
-      <y>184</y>
-      <w>96</w>
-      <h>24</h>
+      <x>9</x>
+      <y>126</y>
+      <w>108</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>Command Line</panel_attributes>
     <additional_attributes/>
@@ -388,10 +380,10 @@ halign=left</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>160</x>
-      <y>120</y>
-      <w>152</w>
-      <h>32</h>
+      <x>180</x>
+      <y>54</y>
+      <w>171</w>
+      <h>36</h>
     </coordinates>
     <panel_attributes>lt=-&gt;&gt;&gt;
 Reads File</panel_attributes>
@@ -400,10 +392,10 @@ Reads File</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>160</x>
-      <y>200</y>
-      <w>152</w>
-      <h>32</h>
+      <x>180</x>
+      <y>144</y>
+      <w>171</w>
+      <h>36</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
 Loose Relation</panel_attributes>
@@ -412,36 +404,34 @@ Loose Relation</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>976</x>
-      <y>120</y>
-      <w>648</w>
-      <h>56</h>
+      <x>1098</x>
+      <y>54</y>
+      <w>729</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=BLUE
-group=group-0</panel_attributes>
+fg=BLUE</panel_attributes>
     <additional_attributes>10.0;50.0;650.0;50.0;650.0;10.0;790.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1016</x>
-      <y>136</y>
-      <w>608</w>
-      <h>80</h>
+      <x>1143</x>
+      <y>72</y>
+      <w>684</w>
+      <h>90</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=BLUE
-group=group-0</panel_attributes>
+fg=BLUE</panel_attributes>
     <additional_attributes>10.0;80.0;610.0;80.0;610.0;10.0;740.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>1608</x>
-      <y>120</y>
-      <w>528</w>
-      <h>456</h>
+      <x>1809</x>
+      <y>54</y>
+      <w>594</w>
+      <h>513</h>
     </coordinates>
     <panel_attributes>b'demo_manif'                                                      + b'\x00'
 b'\xff'                                                            + b'\x00'
@@ -482,43 +472,40 @@ bg=gray
 fg=red
 style=wordwrap
 halign=left
-valign=top
-group=group-0</panel_attributes>
+valign=top</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>968</x>
-      <y>464</y>
-      <w>560</w>
-      <h>24</h>
+      <x>1089</x>
+      <y>441</y>
+      <w>630</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>lt=.
-fg=RED
-group=group-0</panel_attributes>
+fg=RED</panel_attributes>
     <additional_attributes>10.0;10.0;680.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>936</x>
-      <y>176</y>
-      <w>688</w>
-      <h>232</h>
+      <x>1053</x>
+      <y>117</y>
+      <w>774</w>
+      <h>261</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=RED
-group=group-0</panel_attributes>
+fg=RED</panel_attributes>
     <additional_attributes>10.0;270.0;710.0;270.0;710.0;10.0;840.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>160</x>
-      <y>224</y>
-      <w>152</w>
-      <h>40</h>
+      <x>180</x>
+      <y>171</y>
+      <w>171</w>
+      <h>45</h>
     </coordinates>
     <panel_attributes>lt=-&gt;
 Interpreted
@@ -528,49 +515,46 @@ Relation</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>984</x>
-      <y>152</y>
-      <w>640</w>
-      <h>80</h>
+      <x>1107</x>
+      <y>90</y>
+      <w>720</w>
+      <h>90</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=BLUE
-group=group-0</panel_attributes>
+fg=BLUE</panel_attributes>
     <additional_attributes>10.0;80.0;660.0;80.0;660.0;10.0;780.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>992</x>
-      <y>168</y>
-      <w>632</w>
-      <h>88</h>
+      <x>1116</x>
+      <y>108</y>
+      <w>711</w>
+      <h>99</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=RED
-group=group-0</panel_attributes>
+fg=RED</panel_attributes>
     <additional_attributes>10.0;90.0;630.0;90.0;630.0;10.0;770.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1504</x>
-      <y>192</y>
-      <w>120</w>
-      <h>296</h>
+      <x>1692</x>
+      <y>135</y>
+      <w>135</w>
+      <h>333</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=RED
-group=group-0</panel_attributes>
+fg=RED</panel_attributes>
     <additional_attributes>10.0;350.0;10.0;10.0;130.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLGeneric</id>
     <coordinates>
-      <x>24</x>
-      <y>520</y>
-      <w>656</w>
-      <h>136</h>
+      <x>27</x>
+      <y>504</y>
+      <w>738</w>
+      <h>153</h>
     </coordinates>
     <panel_attributes>Manifest Generation</panel_attributes>
     <additional_attributes/>
@@ -578,218 +562,202 @@ group=group-0</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1024</x>
-      <y>208</y>
-      <w>600</w>
-      <h>72</h>
+      <x>1152</x>
+      <y>153</y>
+      <w>675</w>
+      <h>81</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=#009900
-group=group-0</panel_attributes>
+fg=#009900</panel_attributes>
     <additional_attributes>10.0;70.0;620.0;70.0;620.0;10.0;730.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1088</x>
-      <y>224</y>
-      <w>536</w>
-      <h>72</h>
+      <x>1224</x>
+      <y>171</y>
+      <w>603</w>
+      <h>81</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=#009900
-group=group-0</panel_attributes>
+fg=#009900</panel_attributes>
     <additional_attributes>10.0;70.0;550.0;70.0;550.0;10.0;650.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1368</x>
-      <y>240</y>
-      <w>256</w>
-      <h>64</h>
+      <x>1539</x>
+      <y>189</y>
+      <w>288</w>
+      <h>72</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=#009900
-group=group-0</panel_attributes>
+fg=#009900</panel_attributes>
     <additional_attributes>10.0;60.0;210.0;60.0;210.0;10.0;300.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1000</x>
-      <y>248</y>
-      <w>624</w>
-      <h>72</h>
+      <x>1125</x>
+      <y>198</y>
+      <w>702</w>
+      <h>81</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=#009900
-group=group-0</panel_attributes>
+fg=#009900</panel_attributes>
     <additional_attributes>10.0;70.0;680.0;70.0;680.0;10.0;760.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1024</x>
-      <y>264</y>
-      <w>600</w>
-      <h>64</h>
+      <x>1152</x>
+      <y>216</y>
+      <w>675</w>
+      <h>72</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=#009900
-group=group-0</panel_attributes>
+fg=#009900</panel_attributes>
     <additional_attributes>10.0;60.0;660.0;60.0;660.0;10.0;730.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1432</x>
-      <y>272</y>
-      <w>192</w>
-      <h>72</h>
+      <x>1611</x>
+      <y>225</y>
+      <w>216</w>
+      <h>81</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=#009900
-group=group-0</panel_attributes>
+fg=#009900</panel_attributes>
     <additional_attributes>10.0;70.0;160.0;70.0;160.0;10.0;220.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1096</x>
-      <y>288</y>
-      <w>528</w>
-      <h>72</h>
+      <x>1233</x>
+      <y>243</y>
+      <w>594</w>
+      <h>81</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=#009900
-group=group-0</panel_attributes>
+fg=#009900</panel_attributes>
     <additional_attributes>10.0;70.0;590.0;70.0;590.0;10.0;640.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1096</x>
-      <y>304</y>
-      <w>528</w>
-      <h>64</h>
+      <x>1233</x>
+      <y>261</y>
+      <w>594</w>
+      <h>72</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=#009900
-group=group-0</panel_attributes>
+fg=#009900</panel_attributes>
     <additional_attributes>10.0;60.0;600.0;60.0;600.0;10.0;640.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1032</x>
-      <y>312</y>
-      <w>592</w>
-      <h>72</h>
+      <x>1161</x>
+      <y>270</y>
+      <w>666</w>
+      <h>81</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=#009900
-group=group-0</panel_attributes>
+fg=#009900</panel_attributes>
     <additional_attributes>10.0;70.0;690.0;70.0;690.0;10.0;720.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>992</x>
-      <y>328</y>
-      <w>632</w>
-      <h>112</h>
+      <x>1116</x>
+      <y>288</y>
+      <w>711</w>
+      <h>126</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=BLUE
-group=group-0</panel_attributes>
+fg=BLUE</panel_attributes>
     <additional_attributes>10.0;120.0;630.0;120.0;630.0;10.0;770.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1032</x>
-      <y>344</y>
-      <w>592</w>
-      <h>104</h>
+      <x>1161</x>
+      <y>306</y>
+      <w>666</w>
+      <h>117</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=BLUE
-group=group-0</panel_attributes>
+fg=BLUE</panel_attributes>
     <additional_attributes>10.0;110.0;610.0;110.0;610.0;10.0;720.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1016</x>
-      <y>360</y>
-      <w>608</w>
-      <h>104</h>
+      <x>1143</x>
+      <y>324</y>
+      <w>684</w>
+      <h>117</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=BLUE
-group=group-0</panel_attributes>
+fg=BLUE</panel_attributes>
     <additional_attributes>10.0;110.0;670.0;110.0;670.0;10.0;740.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1088</x>
-      <y>384</y>
-      <w>536</w>
-      <h>144</h>
+      <x>1224</x>
+      <y>351</y>
+      <w>603</w>
+      <h>162</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=BLACK
-group=group-0</panel_attributes>
+fg=BLACK</panel_attributes>
     <additional_attributes>10.0;160.0;550.0;160.0;550.0;10.0;650.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1088</x>
-      <y>416</y>
-      <w>536</w>
-      <h>128</h>
+      <x>1224</x>
+      <y>387</y>
+      <w>603</w>
+      <h>144</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=BLACK
-group=group-0</panel_attributes>
+fg=BLACK</panel_attributes>
     <additional_attributes>10.0;140.0;560.0;140.0;560.0;10.0;650.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1112</x>
-      <y>448</y>
-      <w>512</w>
-      <h>104</h>
+      <x>1251</x>
+      <y>423</y>
+      <w>576</w>
+      <h>117</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=BLACK
-group=group-0</panel_attributes>
+fg=BLACK</panel_attributes>
     <additional_attributes>10.0;110.0;540.0;110.0;540.0;10.0;620.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1112</x>
-      <y>472</y>
-      <w>512</w>
-      <h>96</h>
+      <x>1251</x>
+      <y>450</y>
+      <w>576</w>
+      <h>108</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
-fg=BLACK
-group=group-0</panel_attributes>
+fg=BLACK</panel_attributes>
     <additional_attributes>10.0;100.0;550.0;100.0;550.0;10.0;620.0;10.0</additional_attributes>
   </element>
   <element>
     <id>UMLGeneric</id>
     <coordinates>
       <x>0</x>
-      <y>80</y>
-      <w>312</w>
-      <h>208</h>
+      <y>9</y>
+      <w>351</w>
+      <h>234</h>
     </coordinates>
     <panel_attributes>Key</panel_attributes>
     <additional_attributes/>
@@ -797,10 +765,10 @@ group=group-0</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>8</x>
-      <y>152</y>
-      <w>96</w>
-      <h>24</h>
+      <x>9</x>
+      <y>90</y>
+      <w>108</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>Interm. Cont.
 fg=red
@@ -810,10 +778,10 @@ bg=gray</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>56</x>
-      <y>576</y>
-      <w>288</w>
-      <h>56</h>
+      <x>63</x>
+      <y>567</y>
+      <w>324</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>test_a.py -&gt; Xr4_cL9D%uEDJ1rzvvt*3d6Ku
 test_b.py -&gt; +Euz2&amp;cFC2BhK7&amp;0V1E$v27qc
@@ -829,10 +797,10 @@ valign=center</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>352</x>
-      <y>576</y>
-      <w>320</w>
-      <h>72</h>
+      <x>396</x>
+      <y>567</y>
+      <w>360</w>
+      <h>81</h>
     </coordinates>
     <panel_attributes>priv: 4);v&lt;sS{zTrSYx!4}O4h1ty`)`89;ssWc!e$f-bp
 pub:  dG^&amp;LrR$hT^^Ce}!1(SN31VYP;~kIFIb$I#Sekws
@@ -847,23 +815,22 @@ halign=left</panel_attributes>
   <element>
     <id>UMLGeneric</id>
     <coordinates>
-      <x>776</x>
-      <y>80</y>
-      <w>1368</w>
-      <h>592</h>
+      <x>873</x>
+      <y>9</y>
+      <w>1539</w>
+      <h>666</h>
     </coordinates>
     <panel_attributes>Manifest Compilation
-group=group-0
 fg=blue</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>UMLPackage</id>
     <coordinates>
-      <x>784</x>
-      <y>584</y>
-      <w>1352</w>
-      <h>80</h>
+      <x>882</x>
+      <y>576</y>
+      <w>1521</w>
+      <h>90</h>
     </coordinates>
     <panel_attributes>Compiled: (345 byte(s))
 --
@@ -875,16 +842,17 @@ bg=gray
 fg=red
 style=wordwrap
 halign=left
-group=group-0</panel_attributes>
+valign=top
+fontsize=13</panel_attributes>
     <additional_attributes/>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>664</x>
-      <y>624</y>
-      <w>136</w>
-      <h>24</h>
+      <x>747</x>
+      <y>621</y>
+      <w>153</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>lt=&lt;.
 fg=ORANGE</panel_attributes>
@@ -893,10 +861,10 @@ fg=ORANGE</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>8</x>
-      <y>320</y>
-      <w>328</w>
-      <h>248</h>
+      <x>9</x>
+      <y>279</y>
+      <w>369</w>
+      <h>279</h>
     </coordinates>
     <panel_attributes>lt=-&gt;&gt;&gt;
 fg=MAGENTA</panel_attributes>
@@ -905,10 +873,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>8</x>
-      <y>680</y>
-      <w>24</w>
-      <h>56</h>
+      <x>9</x>
+      <y>684</y>
+      <w>27</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>lt=-&gt;&gt;&gt;
 fg=MAGENTA</panel_attributes>
@@ -917,10 +885,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>184</x>
-      <y>680</y>
-      <w>24</w>
-      <h>56</h>
+      <x>207</x>
+      <y>684</y>
+      <w>27</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>lt=-&gt;&gt;&gt;
 fg=MAGENTA</panel_attributes>
@@ -929,10 +897,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>536</x>
-      <y>680</y>
-      <w>24</w>
-      <h>56</h>
+      <x>603</x>
+      <y>684</y>
+      <w>27</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>lt=-&gt;&gt;&gt;
 fg=MAGENTA</panel_attributes>
@@ -941,10 +909,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>368</x>
-      <y>680</y>
-      <w>24</w>
-      <h>56</h>
+      <x>405</x>
+      <y>684</y>
+      <w>27</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>lt=-&gt;&gt;&gt;
 fg=MAGENTA</panel_attributes>
@@ -953,10 +921,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>600</x>
-      <y>456</y>
-      <w>200</w>
-      <h>112</h>
+      <x>675</x>
+      <y>432</y>
+      <w>225</w>
+      <h>126</h>
     </coordinates>
     <panel_attributes>lt=-&gt;&gt;
 fg=ORANGE</panel_attributes>
@@ -965,10 +933,10 @@ fg=ORANGE</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>1864</x>
-      <y>568</y>
-      <w>24</w>
-      <h>48</h>
+      <x>2097</x>
+      <y>558</y>
+      <w>27</w>
+      <h>54</h>
     </coordinates>
     <panel_attributes>lt=-&gt;</panel_attributes>
     <additional_attributes>10.0;40.0;10.0;10.0</additional_attributes>
@@ -976,10 +944,10 @@ fg=ORANGE</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>8</x>
-      <y>552</y>
-      <w>552</w>
-      <h>152</h>
+      <x>9</x>
+      <y>540</y>
+      <w>621</w>
+      <h>171</h>
     </coordinates>
     <panel_attributes>lt=-
 fg=MAGENTA</panel_attributes>
@@ -988,10 +956,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>664</x>
-      <y>576</y>
-      <w>40</w>
-      <h>56</h>
+      <x>747</x>
+      <y>567</y>
+      <w>45</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>lt=&lt;.
 fg=ORANGE</panel_attributes>
@@ -1000,10 +968,10 @@ fg=ORANGE</panel_attributes>
   <element>
     <id>UMLPackage</id>
     <coordinates>
-      <x>728</x>
-      <y>720</y>
-      <w>168</w>
-      <h>40</h>
+      <x>819</x>
+      <y>729</y>
+      <w>189</w>
+      <h>45</h>
     </coordinates>
     <panel_attributes>demo/MANIFEST.json
 --
@@ -1016,10 +984,10 @@ group=group-7</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>728</x>
-      <y>560</y>
-      <w>72</w>
-      <h>176</h>
+      <x>819</x>
+      <y>549</y>
+      <w>81</w>
+      <h>198</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
 fg=#009900</panel_attributes>
@@ -1029,9 +997,9 @@ fg=#009900</panel_attributes>
     <id>UMLGeneric</id>
     <coordinates>
       <x>0</x>
-      <y>296</y>
-      <w>704</w>
-      <h>376</h>
+      <y>252</y>
+      <w>792</w>
+      <h>423</h>
     </coordinates>
     <panel_attributes>devel (creation)
 fg=BLUE</panel_attributes>
@@ -1040,10 +1008,10 @@ fg=BLUE</panel_attributes>
   <element>
     <id>UMLGeneric</id>
     <coordinates>
-      <x>328</x>
-      <y>80</y>
-      <w>376</w>
-      <h>208</h>
+      <x>369</x>
+      <y>9</y>
+      <w>423</w>
+      <h>234</h>
     </coordinates>
     <panel_attributes>Bootstrapper (execution)
 fg=BLUE</panel_attributes>
@@ -1052,10 +1020,10 @@ fg=BLUE</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>8</x>
-      <y>216</y>
-      <w>80</w>
-      <h>24</h>
+      <x>9</x>
+      <y>162</y>
+      <w>90</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>/Invocations/
 </panel_attributes>
@@ -1064,10 +1032,10 @@ fg=BLUE</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>584</x>
-      <y>216</y>
-      <w>88</w>
-      <h>24</h>
+      <x>657</x>
+      <y>162</y>
+      <w>99</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>/.verify(key)/
 
@@ -1077,10 +1045,10 @@ fg=BLUE</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>696</x>
-      <y>104</y>
-      <w>104</w>
-      <h>24</h>
+      <x>783</x>
+      <y>36</y>
+      <w>117</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>lt=-&gt;&gt;&gt;
 fg=MAGENTA</panel_attributes>
@@ -1089,10 +1057,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>664</x>
-      <y>176</y>
-      <w>192</w>
-      <h>64</h>
+      <x>747</x>
+      <y>117</y>
+      <w>216</w>
+      <h>72</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
 fg=#009900</panel_attributes>
@@ -1101,10 +1069,10 @@ fg=#009900</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>664</x>
-      <y>112</y>
-      <w>136</w>
-      <h>520</h>
+      <x>747</x>
+      <y>45</y>
+      <w>153</w>
+      <h>585</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
 fg=MAGENTA</panel_attributes>
@@ -1113,10 +1081,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>600</x>
-      <y>112</y>
-      <w>72</w>
-      <h>24</h>
+      <x>675</x>
+      <y>45</y>
+      <w>81</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>/.compile()/
 
@@ -1126,10 +1094,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>648</x>
-      <y>128</y>
-      <w>24</w>
-      <h>104</h>
+      <x>729</x>
+      <y>63</y>
+      <w>27</w>
+      <h>117</h>
     </coordinates>
     <panel_attributes>lt=.&gt;&gt;
 fg=MAGENTA</panel_attributes>
@@ -1138,10 +1106,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>352</x>
-      <y>112</y>
-      <w>128</w>
-      <h>24</h>
+      <x>396</x>
+      <y>45</y>
+      <w>144</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>/.upstream_manif()/</panel_attributes>
     <additional_attributes/>
@@ -1149,10 +1117,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>632</x>
-      <y>144</y>
-      <w>224</w>
-      <h>88</h>
+      <x>711</x>
+      <y>81</y>
+      <w>252</w>
+      <h>99</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
 fg=#009900</panel_attributes>
@@ -1161,10 +1129,10 @@ fg=#009900</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>472</x>
-      <y>120</y>
-      <w>136</w>
-      <h>112</h>
+      <x>531</x>
+      <y>54</y>
+      <w>153</w>
+      <h>126</h>
     </coordinates>
     <panel_attributes>lt=.&gt;&gt;
 fg=MAGENTA</panel_attributes>
@@ -1173,10 +1141,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>456</x>
-      <y>128</y>
-      <w>400</w>
-      <h>88</h>
+      <x>513</x>
+      <y>63</y>
+      <w>450</w>
+      <h>99</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
 fg=RED</panel_attributes>
@@ -1185,10 +1153,10 @@ fg=RED</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>352</x>
-      <y>240</y>
-      <w>72</w>
-      <h>24</h>
+      <x>396</x>
+      <y>189</y>
+      <w>81</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>/.execute()/</panel_attributes>
     <additional_attributes/>
@@ -1196,10 +1164,10 @@ fg=RED</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>408</x>
-      <y>128</y>
-      <w>24</w>
-      <h>64</h>
+      <x>459</x>
+      <y>63</y>
+      <w>27</w>
+      <h>72</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
 fg=MAGENTA</panel_attributes>
@@ -1208,10 +1176,10 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>160</x>
-      <y>256</y>
-      <w>152</w>
-      <h>32</h>
+      <x>180</x>
+      <y>207</y>
+      <w>171</w>
+      <h>36</h>
     </coordinates>
     <panel_attributes>lt=.&gt;&gt;
 Caller Relation</panel_attributes>
@@ -1220,10 +1188,10 @@ Caller Relation</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>352</x>
-      <y>176</y>
-      <w>72</w>
-      <h>24</h>
+      <x>396</x>
+      <y>117</y>
+      <w>81</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>/.update()/</panel_attributes>
     <additional_attributes/>
@@ -1231,10 +1199,10 @@ Caller Relation</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>408</x>
-      <y>192</y>
-      <w>24</w>
-      <h>64</h>
+      <x>405</x>
+      <y>135</y>
+      <w>27</w>
+      <h>72</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
 fg=MAGENTA</panel_attributes>
@@ -1243,82 +1211,82 @@ fg=MAGENTA</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>416</x>
-      <y>128</y>
-      <w>208</w>
-      <h>136</h>
+      <x>450</x>
+      <y>63</y>
+      <w>252</w>
+      <h>144</h>
     </coordinates>
     <panel_attributes>lt=.&gt;&gt;
 fg=#009900</panel_attributes>
-    <additional_attributes>10.0;150.0;170.0;150.0;170.0;90.0;240.0;90.0;240.0;10.0</additional_attributes>
+    <additional_attributes>10.0;140.0;10.0;130.0;190.0;130.0;190.0;90.0;260.0;90.0;260.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>408</x>
-      <y>256</y>
-      <w>368</w>
-      <h>312</h>
+      <x>468</x>
+      <y>198</y>
+      <w>405</w>
+      <h>360</h>
+    </coordinates>
+    <panel_attributes>lt=.&gt;
+fg=#009900</panel_attributes>
+    <additional_attributes>430.0;380.0;430.0;10.0;10.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>846</x>
+      <y>486</y>
+      <w>90</w>
+      <h>27</h>
     </coordinates>
     <panel_attributes>lt=.
 fg=#009900</panel_attributes>
-    <additional_attributes>440.0;370.0;440.0;20.0;10.0;20.0;10.0;10.0</additional_attributes>
+    <additional_attributes>80.0;10.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>752</x>
+      <x>846</x>
       <y>504</y>
-      <w>80</w>
-      <h>24</h>
+      <w>90</w>
+      <h>27</h>
     </coordinates>
-    <panel_attributes>lt=&lt;&lt;&lt;&lt;&lt;.
+    <panel_attributes>lt=.
 fg=#009900</panel_attributes>
     <additional_attributes>80.0;10.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>752</x>
-      <y>520</y>
-      <w>80</w>
-      <h>24</h>
+      <x>846</x>
+      <y>513</y>
+      <w>90</w>
+      <h>27</h>
     </coordinates>
-    <panel_attributes>lt=&lt;&lt;&lt;&lt;&lt;.
+    <panel_attributes>lt=.
 fg=#009900</panel_attributes>
     <additional_attributes>80.0;10.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>752</x>
-      <y>528</y>
-      <w>80</w>
-      <h>24</h>
+      <x>855</x>
+      <y>531</y>
+      <w>81</w>
+      <h>27</h>
     </coordinates>
-    <panel_attributes>lt=&lt;&lt;&lt;&lt;&lt;.
-fg=#009900</panel_attributes>
-    <additional_attributes>80.0;10.0;10.0;10.0</additional_attributes>
-  </element>
-  <element>
-    <id>Relation</id>
-    <coordinates>
-      <x>760</x>
-      <y>544</y>
-      <w>72</w>
-      <h>24</h>
-    </coordinates>
-    <panel_attributes>lt=&lt;&lt;&lt;&lt;&lt;.
+    <panel_attributes>lt=.
 fg=#009900</panel_attributes>
     <additional_attributes>70.0;10.0;10.0;10.0</additional_attributes>
   </element>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>160</x>
-      <y>144</y>
-      <w>152</w>
-      <h>40</h>
+      <x>180</x>
+      <y>81</y>
+      <w>171</w>
+      <h>45</h>
     </coordinates>
     <panel_attributes>lt=-&gt;&gt;&gt;&gt;&gt;
 Reads &amp; Writes
@@ -1328,22 +1296,22 @@ File</panel_attributes>
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>416</x>
-      <y>200</y>
-      <w>440</w>
+      <x>468</x>
+      <y>144</y>
+      <w>495</w>
       <h>72</h>
     </coordinates>
     <panel_attributes>lt=.&gt;
 fg=RED</panel_attributes>
-    <additional_attributes>530.0;10.0;470.0;10.0;470.0;70.0;10.0;70.0</additional_attributes>
+    <additional_attributes>530.0;10.0;470.0;10.0;470.0;60.0;10.0;60.0</additional_attributes>
   </element>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>1592</x>
-      <y>704</y>
-      <w>104</w>
-      <h>56</h>
+      <x>1791</x>
+      <y>711</y>
+      <w>117</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>Function 0
 --
@@ -1354,10 +1322,10 @@ metadata</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>1704</x>
-      <y>704</y>
-      <w>104</w>
-      <h>56</h>
+      <x>1917</x>
+      <y>711</y>
+      <w>117</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>Function 1
 --
@@ -1368,10 +1336,10 @@ local manifest</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>1816</x>
-      <y>704</y>
-      <w>168</w>
-      <h>56</h>
+      <x>2043</x>
+      <y>711</y>
+      <w>189</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>Function 2
 --
@@ -1382,10 +1350,10 @@ the upstream manifest</panel_attributes>
   <element>
     <id>UMLClass</id>
     <coordinates>
-      <x>1992</x>
-      <y>704</y>
-      <w>128</w>
-      <h>56</h>
+      <x>2241</x>
+      <y>711</y>
+      <w>144</w>
+      <h>63</h>
     </coordinates>
     <panel_attributes>Function 3
 --
@@ -1396,10 +1364,10 @@ local files</panel_attributes>
   <element>
     <id>UMLGeneric</id>
     <coordinates>
-      <x>1584</x>
-      <y>680</y>
-      <w>560</w>
-      <h>88</h>
+      <x>1782</x>
+      <y>684</y>
+      <w>630</w>
+      <h>99</h>
     </coordinates>
     <panel_attributes>Manifest Functions
 _umletcode=
@@ -1411,15 +1379,15 @@ drawCircle(width-10,40,3) //Parameters (x, y, radius)</panel_attributes>
   <element>
     <id>UMLNote</id>
     <coordinates>
-      <x>992</x>
-      <y>680</y>
-      <w>504</w>
-      <h>88</h>
+      <x>1116</x>
+      <y>684</y>
+      <w>567</w>
+      <h>99</h>
     </coordinates>
     <panel_attributes>Note that bytes are shown in two forms in this document:
 --
 *Python bytes:*
-- surrounded with single-quotes and prefixed with `b`), Python repr()
+- surrounded with single-quotes and prefixed with `b`, Python repr()
 *Base85:*
 - encoded with the Base85 encoding, used in manifests
 - in manifests, can be replaced with a "long" form as a list of integers
@@ -1433,13 +1401,73 @@ drawCircle(width-10,40+25,3) //Parameters (x, y, radius)
   <element>
     <id>Relation</id>
     <coordinates>
-      <x>392</x>
-      <y>256</y>
-      <w>336</w>
-      <h>448</h>
+      <x>27</x>
+      <y>207</y>
+      <w>792</w>
+      <h>495</h>
     </coordinates>
-    <panel_attributes>lt=-&gt;&gt;&gt;&gt;
+    <panel_attributes>lt=-
+fg=#009900</panel_attributes>
+    <additional_attributes>470.0;10.0;470.0;30.0;860.0;30.0;860.0;530.0;10.0;530.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>441</x>
+      <y>162</y>
+      <w>234</w>
+      <h>45</h>
+    </coordinates>
+    <panel_attributes>lt=.&gt;
 fg=MAGENTA</panel_attributes>
-    <additional_attributes>10.0;10.0;10.0;30.0;400.0;30.0;400.0;540.0;190.0;540.0</additional_attributes>
+    <additional_attributes>10.0;30.0;10.0;10.0;240.0;10.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>27</x>
+      <y>675</y>
+      <w>27</w>
+      <h>72</h>
+    </coordinates>
+    <panel_attributes>lt=-&gt;&gt;&gt;&gt;&gt;
+fg=#009900</panel_attributes>
+    <additional_attributes>10.0;10.0;10.0;60.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>225</x>
+      <y>675</y>
+      <w>27</w>
+      <h>72</h>
+    </coordinates>
+    <panel_attributes>lt=-&gt;&gt;&gt;&gt;&gt;
+fg=#009900</panel_attributes>
+    <additional_attributes>10.0;10.0;10.0;60.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>423</x>
+      <y>675</y>
+      <w>27</w>
+      <h>72</h>
+    </coordinates>
+    <panel_attributes>lt=-&gt;&gt;&gt;&gt;&gt;
+fg=#009900</panel_attributes>
+    <additional_attributes>10.0;10.0;10.0;60.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>621</x>
+      <y>675</y>
+      <w>27</w>
+      <h>72</h>
+    </coordinates>
+    <panel_attributes>lt=-&gt;&gt;&gt;&gt;&gt;
+fg=#009900</panel_attributes>
+    <additional_attributes>10.0;10.0;10.0;60.0</additional_attributes>
   </element>
 </diagram>
