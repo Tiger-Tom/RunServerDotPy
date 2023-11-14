@@ -260,6 +260,9 @@ class Bootstrapper:
                 - Creates and returns the new manifest object to be executed, or None if this manifest wishes to be ignored
             '''
             self.bs.logger.warning(f'Updating manifest {self.m_name}')
+            self.info()
+            self.bs.logger.warning(f'With new manifest {new_manif.m_name}')
+            new_manif.info()
             if self.meta.get('ignore', False):
                 self.bs.logger.error(f'{self.m.name} would like to be ignored, skipping')
                 return self
@@ -274,6 +277,11 @@ class Bootstrapper:
             else: self.bs.logger.info('No new files found')
             with open(self.path, 'w') as f: f.write(new_manif.raw)
             return new_manif
+        def info(self):
+            c = self.m_creation
+            self.bs.logger.info(f' on {time.ctime(c["time"])} ({c["time"]})') # ctime c time
+            self.bs.logger.info(f' by {c["by"]}{"" if "aka" not in c else f""" AKA {c["aka"]}"""}')
+            self.bs.logger.info(f' for a(n) {c["for"]["os"]}{"" if c["system"] is None else f""" [{c["system"]["platform"]} {c["system"]["version"]} on {c["system"]["arch"]}]"""} system running {"Python" if c["system"] is None else c["system"]["py_implementation"]} {".".join(map(str, c["for"]["python"]))}')
         def execute(self):
             self.bs.logger.warning(f'Executing manifest {self.m_name}')
             try: self.verify(self.key)
