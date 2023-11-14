@@ -4,6 +4,10 @@
 _*.dump
 # Python privkey files
 *.pyk
+# Non-code runtime-generated folders
+_rsconfig/
+_rslog/
+_rsusers/
 
 ####################
 
