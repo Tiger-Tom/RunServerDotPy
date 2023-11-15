@@ -103,13 +103,13 @@ class FileBackedDict(UserDict, LockedResource):
         if (not unsafe_allow_get_subkey) and isinstance(d[key[-1]], dict): raise TypeError(f'{key} refers to a subkey, pass unsafe_allow_get_subkey=True to bypass')
         return d[key[-1]]
     __getitem__ = get_item
-    def get_set_default(self, key: str | tuple[str], default):
+    def get_set_default(self, key: str | tuple[str], default, *, unsafe_allow_op_subkey: bool = False):
         '''
             Gets an item.
             If the item doesn't exist, tries to set "default" as its value and returns default with set_default
         '''
-        self.set_default(key, default)
-        return self[key]
+        self.set_default(key, default, unsafe_allow_op_subkey=unsafe_allow_op_subkey)
+        return self.get_item(key, unsafe_allow_get_subkey=unsafe_allow_op_subkey)
     ## Setting
     def set_item(self, key: str | tuple[str], val: typing.Any | dict, *, unsafe_allow_set_subkey: bool = False, unsafe_allow_assign_dict: bool = False):
         '''	
@@ -126,9 +126,10 @@ class FileBackedDict(UserDict, LockedResource):
         d[key[-1]] = val
         self.dirty.add(key[0])
     __setitem__ = set_item
-    def set_default(self, key: str | tuple[str], default):
+    def set_default(self, key: str | tuple[str], default, unsafe_allow_op_subkey: bool = False, unsafe_allow_assign_dict: bool = False):
         '''If the item corresponding to key doesn't exist, then sets it to default. Has no effect otherwise'''
-        if key not in self: self[key] = default
+        if not self.contains(key, unsafe_no_error_on_subkey=unsafe_allow_op_subkey): return
+        self.set_item(key, default, unsafe_allow_set_subkey=unsafe_allow_op_subkey, unsafe_allow_assign_dict=unsafe_allow_assign_dict)
     ## Containing
     @locked
     def contains(self, key: str | tuple[str], *, unsafe_no_error_on_subkey: bool = False) -> bool:
