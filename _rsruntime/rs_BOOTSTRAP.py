@@ -23,7 +23,7 @@ import types
 # Cryptography
 import hashlib
 import base64
-#from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as PubKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as PubKey
 #</Imports
 
 #> Header >/
