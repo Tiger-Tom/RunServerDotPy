@@ -182,6 +182,33 @@ class TellRaw(list):
         return self
     
 class ChatCommands:
-    ...
-    class ChatCommand:
+    __slots__ = ('logger', 'ChatCommand', 'commands', 'aliases')
+
+    def _bind_ChatCommand(self):
+        class ChatCommand:
+            '''
+                Help for the command is specified by the doc-string of the target function
+                The target function must have at least an argument for the object of the calling user
+                The command-line string (A.E. "test|t [arg0:int] [arg1_1|arg1_2] {arg1:str='abc'} {arg2} {arg3:int} (varargs...)") is generated automatically using the target function's arguments
+                    That command-line string would be generated from a function such as: `def test(rs: 'RunServer', user: 'User', arg0: int, arg1: typing.Literal['arg1_1', 'arg1_2'], arg2: str = 'abc', arg3=None, arg4: int = None, *varargs)`
+                    Annotations of multiple possible literal arguments should be given as `typing.Literal[literal0, literal1, ...]`, which results in `[literal0|literal1|...]`
+                    Annotations and default values are detected from the function signature, as in: `arg: int = 0`, which results in `{arg:int=0}`
+                        A default value of "None" indicates the argument as optional without hinting the default, as in: `arg=None`, which results in `{arg}`
+                    Keyword-only args and varargs are ignored
+                When arguments are provided by users, they are split via shlex.split
+                
+            '''
+            __slots__ = ('target', 'help', 'section')
+
+            def __init__(self, target: typing.Callable[['User', ...], None], required_permission):
+                self.target = target
+        return ChatCommand
+            
+
+    def __init__(self):
+        self.logger = RS.logger.getChild('CC')
+        self.ChatCommand = self._bind_ChatCommand()
+        self.commands = {}
+        self.aliases = {}
+    def register(self, cmd: 'ChatCommand') -> bool:
         ...
