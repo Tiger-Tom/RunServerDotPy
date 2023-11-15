@@ -7,9 +7,17 @@
 import RS
 
 #> Header >/
-class PluginManager(dict):
-    ...
+class PluginManager:
+    __slots__ = ('logger', 'plugins')
+
     class Plugin:
         ...
-    def early_load_plugin(self):#, ...):
+    
+    def __init__(self):
+        self.logger = RS.logger.getChild('PM')
+    def early_load_plugins(self):
+        ...
+    def load_plugins(self):
+        ...
+    def start(self):
         ...

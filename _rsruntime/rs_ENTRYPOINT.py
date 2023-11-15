@@ -78,7 +78,7 @@ class RunServer(types.ModuleType):
         self.__setup_frommod('rs_plugins', {
             ('PluginManager', 'PM'): 'PluginManager',
         })
-        print('fixme::rs_plugins.py:Plugins:early_load_plugin()')
+        self.PM.early_load_plugins()
         self.logger.debug(f'finish:load_2@T+{pc}')
         # Load: 3
         self.logger.debug(f'start:load_3@T+{pc}')
@@ -104,7 +104,7 @@ class RunServer(types.ModuleType):
         # Load: 6
         self.logger.debug(f'start:load_6@T+{pc}')
         self.Config.sync_all()
-        print('fixme::rs_plugins.py:Plugins:load_plugins()')
+        self.PM.load_plugins()
         self.logger.debug(f'finish:load_6@T+{pc}')
         # Final log
         self.logger.debug(f'finish@T+{pc}')
@@ -121,6 +121,8 @@ class RunServer(types.ModuleType):
         self.logger.infop('Entrypoint starting')
         # Instantiate ServerManager
         self.ServerManager = self.SM = self.ServerManager()
+        # Start plugins
+        self.PM.start()
         # Start server
         self.SM.start()
         # Finalize
