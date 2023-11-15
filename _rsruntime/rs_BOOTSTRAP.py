@@ -281,7 +281,7 @@ class Bootstrapper:
             c = self.m_creation
             self.bs.logger.info(f' on {time.ctime(c["time"])} ({c["time"]})') # ctime c time
             self.bs.logger.info(f' by {c["by"]}{"" if "aka" not in c else f""" AKA {c["aka"]}"""}')
-            self.bs.logger.info(f' for a(n) {c["for"]["os"]}{"" if c["system"] is None else f""" [{c["system"]["platform"]} {c["system"]["version"]} on {c["system"]["arch"]}]"""} system running {"Python" if c["system"] is None else c["system"]["py_implementation"]} {".".join(map(str, c["for"]["python"]))}')
+            self.bs.logger.info(f' for a(n) {c["for"]["os"]}{"" if c["system"] is None else f""" [{c["system"]["platform"]} {c["system"]["os_version"]} on {c["system"]["arch"]}]"""} system running {"Python" if c["system"] is None else c["system"]["py_implementation"]} {".".join(map(str, c["for"]["python"]))}')
         def execute(self):
             self.bs.logger.warning(f'Executing manifest {self.m_name}')
             try: self.verify(self.key)
