@@ -23,7 +23,10 @@ import types
 # Cryptography
 import hashlib
 import base64
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as PubKey
+try:
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as PubKey
+except ModuleNotFoundError:
+    raise ModuleNotFoundError('Cannot find crytography module, perhaps you need to `pip install cryptography`?')
 #</Imports
 
 #> Header >/
