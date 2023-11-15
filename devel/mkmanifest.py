@@ -62,7 +62,7 @@ def manifest(name: str, path: Path, key: pysign.EdPrivK, creation_info: dict, mu
             for f in set(path.glob('**/*.py')) | set(path.glob('**/rs_*.*'))
             if (not f.name.startswith('_')) and (not f.suffix in {'.pyc'})),
             key=lambda fg: (len(fg[0].parents), fg[0])
-        ),
+        )
     )
     for f,h in hashes:
         man[f] = tuple(h) if long_fmt else base64.b85encode(h).decode()
