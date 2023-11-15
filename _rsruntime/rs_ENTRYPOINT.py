@@ -7,7 +7,7 @@ import types
 import sys
 import importlib
 # RSModules
-from .lib.rstypes import fbd, hooks, locked_resource, perftimer, timer
+from .util import fbd, hooks, locked_resource, perftimer, timer
 #</Imports
 
 #> Header >/
