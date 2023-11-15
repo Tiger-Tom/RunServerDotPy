@@ -41,7 +41,7 @@ class RunServer(types.ModuleType):
         # Init self & bootstrapper
         self.Bootstrapper = self.BS = bs
         self.logger = self.BS.root_logger
-        self.logger.info('Initializing entrypoint')
+        self.logger.infop('Initializing entrypoint')
         # Add self to sys.modules
         if 'RS' in sys.modules:
             self.logger.fatal('RS already exists in sys.modules, continuing by overwriting but this may have consequences!')
@@ -118,7 +118,7 @@ class RunServer(types.ModuleType):
             setattr(self, s, getattr(self, l))
             self.logger.debug(f'{l} = {s} = {module}.{n} [T+{pc}]')
     def __call__(self):
-        self.logger.info('Entrypoint starting')
+        self.logger.infop('Entrypoint starting')
         # Instantiate ServerManager
         self.ServerManager = self.SM = self.ServerManager()
         # Start server
