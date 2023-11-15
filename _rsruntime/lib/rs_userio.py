@@ -9,6 +9,7 @@ import time # struct_time
 import dataclasses
 import typing
 from pathlib import Path
+from enum import IntEnum
 #</Imports
 
 # RunServer Module
@@ -20,6 +21,30 @@ from RS.Types import FileBackedDict
 class UserManager:
     __slots__ = ('logger', 'users', 'fbd')
 
+    # Permissions
+    ## Insert comments
+    Config['permissions/levels/__comments'] = ( # S+ tier JSON commenting
+        ('Lower permession numbers are more \'powerful\'.',
+         'In the config `users/[uuid]/permissions`, permissions can be given as strings (corresponding to keys in the config `permissions/levels/`), or as integers.'),
+        ('Permission level names are always given as, or converted to, uppercase',
+         'Permission level values are always positive integers, being silently set to 255 if they are not and cannot be converted'),
+        ('The excessive number of permissions are more for example/documentational use than for real use, but are put in anyway.',
+         'The large gaps in the default are to allow modification if, somehow, finer control is needed.'),
+    )
+    ## Insert defaults
+    Config.mass_set_default('permissions/levels',
+        LIMITED = 100, USER    = 80,
+        KNOWN   =  60, TRUSTED = 40,
+        ADMIN   =  20, OWNER   =  0,
+    )
+
+    ## Enum
+    Permission = Perm = IntEnum('Perm', {
+        n.upper(): (v if v >= 0 else 255) if isinstance(v, int) else (int(v) if v.isdigit() else 255) if isinstance(v, str) else 255
+        for n,v in Config.get_item('permissions/levels', unsafe_allow_get_subkey=True).items()
+        if not n.startswith('_')
+    })
+    
     @dataclasses.dataclass(slots=True)
     class User:
         name: str
@@ -34,12 +59,26 @@ class UserManager:
         last_connected: time.struct_time | None = None
         last_disconnected: time.struct_time | None = None
 
+    
+        @staticmethod
         @property
-        def permission(self) -> int:
-            return RS.UserManager.fbd(f'{self.uuid}/ChatCommand Permission Level', 0)
+        def default_perm_str(cls) -> str:
+            return Config('permissions/default_level', 'USER').upper()
+        @classmethod
+        def perm_from_value(cls, val: str | int | typing.ForwardRef('Perm') | ...):
+            if isinstance(val, Perm): return val
+            if not isinstance(val, (str, int)):
+                return cls.perm_from_value(cls.default_perm_str)
+            try:
+                if isinstance(val, int): return Perm(p)
+                return Perm[p.upper()]
+            except ValueError: return cls.perm_from_value(cls.default_perm_str)
+        @property
+        def permission(self) -> 'Perm':
+            return perm_from_value(RS.UserManager.fbd(f'{self.uuid}/ChatCommand Permission Level'), self.default_perm_str)
         @permission.setter
-        def permission(self, val: int):
-            RS.UserManager.fbd[f'{self.uuid}/ChatCommand Permission Level'] = val
+        def permission(self, val: 'Perm'):
+            RS.UserManager.fbd[f'{self.uuid}/ChatCommand Permission Level'] = int(val)
 
         store_attrs: typing.ClassVar = {
             'name': ('Username', None),
