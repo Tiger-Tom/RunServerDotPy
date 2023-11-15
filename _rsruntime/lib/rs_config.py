@@ -21,7 +21,7 @@ class Config(FileBackedDict):
         super().__init__(self.conf_path, 60.0)
         self.start_autosync()
         RS.BS.register_onclose(self.close)
-    def mass_set_default(self, pfx: str | None = None, dict_vals: dict[str, ...] = None, **values):
+    def mass_set_default(self, pfx: str | None = None, dict_vals: dict[str, ...] | None = None, **values: dict[str, ...]):
         '''
             Sets a large amount of default values
                 When pfx is not None, it is prepended (with a / if it doesn't already have one) to each key
