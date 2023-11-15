@@ -5,13 +5,33 @@ from threading import RLock
 import warnings
 # Types
 import typing
+from types import SimpleNamespace
+from collections import namedtuple
 from functools import wraps
 from contextlib import AbstractContextManager
 #</Imports
 
 #> Header >/
-__all__ = ('LockedResource', 'locked')
-
+__all__ = (
+    'LockedResource', 'locked',
+    'basic', 'b',
+    'cls',
+    'etc',
+    'func_decors',
+    'superclasses',
+    'cls_decors',
+)
+#naming convention:
+#long = thing.__qualname__
+#short = \
+#      long.replace('_', '').replace('class', 'cls').replace('locked', 'lockd') if long.is_lower() \
+#      else ''.join(c for c in long if c.isupper())
+_basic        = namedtuple('basic',        ('LockedResource','LR', 'locked','lockd'))
+_cls          = namedtuple('cls',          ('LockedClass','LC', 'classlocked','clslockd', 'iclasslocked','iclslockd'))
+_etc          = namedtuple('etc',          ('locked_by','lockdby'))
+_func_decors  = namedtuple('func_decors',  ('locked','lockd', 'classlocked','clslockd', 'iclasslocked','iclslockd', 'locked_by','lockdby'))
+_superclasses = namedtuple('superclasses', ('LockedResource','LR'))
+_cls_decors   = namedtuple('cls_decors',   ('LockedClass','LC'))
 # Classes
 class LockedResource:
     '''
@@ -110,3 +130,8 @@ def locked_by(lock: AbstractContextManager):
                 return func(*args, **kwargs)
         return locked_func
     return func_locker
+
+# Assign to namespaces
+for c in (_basic, _cls, _etc, _func_decors, _superclasses, _cls_decors):
+    globals()[c.__qualname__] = c._make((o for ol in ((globals()[f], globals()[f]) for f in c._fields[::2]) for o in ol))
+b = basic

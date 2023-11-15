@@ -12,7 +12,7 @@ import typing
 from collections import UserDict
 from enum import Enum
 from .timer import Timer
-from .locked_resource import LockedResource, locked
+from .locked_resource import basic
 from .perftimer import PerfCounter
 #</Imports
 
@@ -21,7 +21,7 @@ __all__ = ('serializable', 'FileBackedDict')
 
 serializable = (dict, list, str, int, float, bool, type(None))
 
-class FileBackedDict(UserDict, LockedResource):
+class FileBackedDict(UserDict, basic.LockedResource):
     '''
         A dictionary backed by an on-disk JSON file
         Asynchronously synchronizes entries with a file on disk when enabled
@@ -35,7 +35,7 @@ class FileBackedDict(UserDict, LockedResource):
     # Ironic that the word "short" is longer than the word "long"...
 
     def __init__(self, path: Path, interval: float = 120.0):
-        LockedResource.__init__(self)
+        basic.LockedResource.__init__(self)
         UserDict.__init__(self)
         self.path = Path(path) # path path path
         self.logger = logging.getLogger(f'FBD[{self.path.name.replace(".", "_")}]')
@@ -72,7 +72,7 @@ class FileBackedDict(UserDict, LockedResource):
         return self.path / f'{self.key(key, allow_top_lvl_key=True)[0]}.json'
 
     # Dict functions
-    @locked
+    @basic.locked
     def _get_(self, key: tuple[str], *, make_if_missing: bool = False, no_raise: bool = False) -> dict | None:
         '''Gets the dictionary referenced by the key, useful for mutating'''
         d = self.data
@@ -88,7 +88,7 @@ class FileBackedDict(UserDict, LockedResource):
                 raise TypeError(f'{key}[{i}] referenced as subkey, but it is a value')
         return d
     ## Getting
-    @locked
+    @basic.locked
     def get_item(self, key: str | tuple[str], *, unsafe_allow_get_subkey: bool = False) -> typing.Union[*serializable]:
         '''
             Gets an item
@@ -133,7 +133,7 @@ class FileBackedDict(UserDict, LockedResource):
         if not self.contains(key, unsafe_no_error_on_subkey=unsafe_allow_op_subkey): return
         self.set_item(key, default, unsafe_allow_set_subkey=unsafe_allow_op_subkey, unsafe_allow_assign_dict=unsafe_allow_assign_dict)
     ## Containing
-    @locked
+    @basic.locked
     def contains(self, key: str | tuple[str], *, unsafe_no_error_on_subkey: bool = False) -> bool:
         '''
             Checks if the key exists
@@ -150,7 +150,7 @@ class FileBackedDict(UserDict, LockedResource):
         return True
     __contains__ = contains
     ## Deleting
-    @locked
+    @basic.locked
     def delete(self, key: str | tuple[str], *, unsafe_allow_delete_subkey: bool = False):
         '''
             Deletes an item
@@ -165,7 +165,7 @@ class FileBackedDict(UserDict, LockedResource):
         self.prune(key[0])
         self.dirty.add(key[0])
     __delitem__ = delete
-    @locked
+    @basic.locked
     def remove(self, key: str, *, unsafe_I_know_what_I_am_doing: bool = False):
         '''Deletes a top level key AND it's corresponding JSON file. Don\'t call if you don\'t know what you are doing'''
         if not unsafe_I_know_what_I_am_doing: raise RuntimeError('Pass unsafe_I_know_what_I_am_doing=True if you really want to do this')
@@ -191,7 +191,7 @@ class FileBackedDict(UserDict, LockedResource):
                 del data[k]
                 continue
             self.__prune(v)
-    @locked
+    @basic.locked
     def prune(self, start_key: str | None = None):
         '''Recursively removes empty dictionaries, starting with start_key (or from root if start_key is None)'''
         self.__prune(self.data if start_key is None else self._get_(self.key(start_key, allow_top_lvl_key=True)))
@@ -221,7 +221,7 @@ class FileBackedDict(UserDict, LockedResource):
 
     # Data sync functions
     ## Reading in
-    @locked
+    @basic.locked
     def readin_data(self, key: str):
         '''Reads in data from the JSON value corresponding to key (found via self.key_path)'''
         p = self.key_path(key)
@@ -231,7 +231,7 @@ class FileBackedDict(UserDict, LockedResource):
             self.data[key] = json.load(f)
         self.logger.infop(f'Readin {key} took {pc}')
         self.watchdog_times[key] = p.stat().st_mtime
-    @locked
+    @basic.locked
     def readin_watchdog(self):
         '''
             Reads in data from files that have been modified since the last read
@@ -255,7 +255,7 @@ class FileBackedDict(UserDict, LockedResource):
         if not readind: return
         self.logger.infop(f'Readin {readind} key(s) took {pc}')
     ## Writing back
-    @locked
+    @basic.locked
     def writeback(self, key: str, *, clean: bool = True, force: bool = False) -> bool:
         '''
             Writes back a top-level key to its JSON file
@@ -277,7 +277,7 @@ class FileBackedDict(UserDict, LockedResource):
         self.watchdog_times[key] = p.stat().st_mtime
         if clean: self.dirty.remove(key)
         return True
-    @locked
+    @basic.locked
     def writeback_dirty(self):
         '''Writes back all dirty keys'''
         self.logger.debug(f'Writing back dirty keys: {len(self.dirty)} key(s) to clean')
@@ -286,22 +286,22 @@ class FileBackedDict(UserDict, LockedResource):
             self.writeback(self.dirty.pop(), clean=False, force=True)
         self.logger.infop(f'Writeback {nw} key(s) took {pc}')
     ## Dual-ways sync
-    @locked
+    @basic.locked
     def sync_all(self):
         '''Basically notifies the user and runs self.writeback_dirty() and then self.readin_watchdog()'''
         self.logger.info('Syncing all...')
         self.writeback_dirty()
         self.readin_watchdog()
     ## Sync timer
-    @locked
+    @basic.locked
     def start_autosync(self):
         '''Starts the internal watchdog timer'''
         self.watchdog.start()
-    @locked
+    @basic.locked
     def stop_autosync(self):
         '''Stops the internal watchdog timer'''
         self.watchdog.stop()
-    @locked
+    @basic.locked
     def is_autosyncing(self) -> bool:
         '''Returns whether or not the internal watchdog timer is ticking'''
         return self.watchdog.is_alive()

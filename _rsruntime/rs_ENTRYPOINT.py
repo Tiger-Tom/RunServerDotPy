@@ -51,10 +51,13 @@ class RunServer(types.ModuleType):
         self.logger.debug(f'start@T+{pc}')
         # Load: 0
         self.logger.debug(f'start:load_0@T+{pc}')
+        types.SimpleNamespace(
+            FileBackedDict = ...
+        )
         self.Types = self.T = types.SimpleNamespace()
         self.Types.FileBackedDict = fbd.FileBackedDict
         self.Types.Hooks = hooks.Hooks
-        self.Types.LockedResource = locked_resource.LockedResource
+        self.Types.Lockers = locked_resource
         self.Types.locked = locked_resource.locked
         self.Types.PerfCounter = perftimer.PerfCounter
         self.Types.Timer = timer.Timer
