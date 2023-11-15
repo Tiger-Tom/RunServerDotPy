@@ -103,7 +103,7 @@ def parse_args(args=None):
     a.add_argument('--desc', help='A description to add to the manifest', default=None)
     a.add_argument('--version', help='Version information to add to the manifest (not used for updating, only for user info)', default=None)
     a.add_argument('--no-system', help='Don\'t add system ID-ing info (such as OS version and hostname) to manifest', action='store_true')
-    # symmetric arguments #2
+    # symmetric arguments
     for sub in (u, a):
         sub.add_argument('-l', '--long', help='Store the public key, signature, and hashes in long format', action='store_true')
         sub.add_argument('-c', '--compact', help='Compact output', action='store_true')
@@ -156,4 +156,5 @@ def parse_args(args=None):
     eprint(jsn)
     with sys.stdout if args.output is None else args.output.open('w') as f:
         f.write(jsn)
-if __name__ == '__main__': parse_args()
+if (__name__ == '__main__') and ('idlelib.run' not in sys.modules):
+    parse_args()
