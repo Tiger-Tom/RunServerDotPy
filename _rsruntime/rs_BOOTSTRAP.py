@@ -190,6 +190,10 @@ class Bootstrapper:
                     return super().__getattribute__(attr)
                 elif (attr[2:] not in self.meta): raise AttributeError(attr[2:])
                 return self.meta[attr[2:]]
+            # Relocation
+            def relocate(self, np: Path) -> typing.Self:
+                '''Create a new manifest with this manifest's dict and the supplied path'''
+                return self.__class__(np, self.manif)
             # Module attributes
             ## (Enc/De)coding
             @property
