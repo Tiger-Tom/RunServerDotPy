@@ -234,7 +234,9 @@ class FileBackedDict(UserDict, LockedResource):
             Reads in data from files that have been modified since the last read
             If a file is missing, it is removed from the watchdog list
         '''
+        if not self.watchdog_times: return
         self.logger.debug(f'Readin watchdog ticked: checking {len(self.watchdog_times)} key(s)')
+        readind = 0
         pc = PerfCounter()
         for k,t in tuple(self.watchdog_times.items()):
             p = self.key_path(k)
@@ -244,9 +246,11 @@ class FileBackedDict(UserDict, LockedResource):
                 continue
             nt = p.stat().st_mtime
             if nt <= t: continue
+            readind += 1
             self.watchdog_times[k] = nt
             self.readin_data(k)
-        self.logger.infop(f'Readin {len(self.watchdog_times)} key(s) took {pc}')
+        if not readind: return
+        self.logger.infop(f'Readin {readind} key(s) took {pc}')
     ## Writing back
     @locked
     def writeback(self, key: str, *, clean: bool = True, force: bool = False) -> bool:
