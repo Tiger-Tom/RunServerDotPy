@@ -320,7 +320,7 @@ class Bootstrapper:
             def execute(self):
                 '''
                     Executes the manifest:
-                    - verifies it (NOTE: ONLY DISPLAYS A WARNING IF VERIFICATION FAILS, INSTALL FILES ANYWAY!)
+                    - verifies it (NOTE: ONLY DISPLAYS A WARNING IF VERIFICATION FAILS, INSTALLS FILES ANYWAY!)
                     - checks for missing files
                     - checks for outdated files
                     - asks and (possibly) proceeds to download missing files
