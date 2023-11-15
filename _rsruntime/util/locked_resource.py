@@ -2,14 +2,17 @@
 
 #> Imports
 from threading import RLock
+import warnings
 # Types
 import typing
 from functools import wraps
+from contextlib import AbstractContextManager
 #</Imports
 
 #> Header >/
 __all__ = ('LockedResource', 'locked')
 
+# Classes
 class LockedResource:
     '''
         Adds a "lock" parameter to class instances (and slots!)
@@ -23,8 +26,33 @@ class LockedResource:
                     print("lock acquired!")
     '''
     __slots__ = ('lock',)
-    def __init__(self, *, lock_class=RLock):
+    def __init__(self, *, lock_class: AbstractContextManager = RLock):
         self.lock = lock_class()
+## Class decorators
+def LockedClass(lock_class: AbstractContextManager = RLock, *, I_KNOW_WHAT_IM_DOING: bool = False):
+    '''
+        Adds a "classlock" class variable
+        This should be used in tandem with either the @classlocked or @iclasslocked decorators
+            see help(classlockd) or help(iclasslocked) for real demo code
+        Note that, unless you pass I_KNOW_WHAT_IM_DOING=True, lock_class is instantiated immediately in order to check if it is an instance of AbstractContextManager
+            This is to try to help emit a warning if LockedClass is used on a user class without being called (@LockedClass instead of @LockedClass())
+            The lock_class must be instantiated to check, as threading.RLock and threading.Lock are actually functions
+            I_KNOW_WHAT_IM_DOING=True disables both the immediate instantiation of lock_class, the isinstance check, and the warning
+        lock_class is the type of lock (or really any context manager will do) to use (defaults to RLock)
+        Short demo code:
+            @LockedClass()
+            class Locked: ...
+        or, to use a custom lock:
+            @LockedClass(threading.Semaphore)
+            class CustomLocked: ...
+    '''
+    if (not I_KNOW_WHAT_IM_DOING) and (not isinstance(lock_class(), AbstractContextManager)):
+        warnings.warn(f'LockedClass was used with lock_class {lock_class}, which (when instantiated) is not an instance of AbstractContextManager. Perhaps you meant to use `@LockedClass()`?', SyntaxWarning)
+    def ClassLocker(cls: typing.Type):
+        cls.classlock = lock_class()
+        return cls
+    return ClassLocker
+# Function decorators
 def locked(func: typing.Callable):
     '''
         Waits to acquire the method's self's .lock attribute (uses "with")
@@ -42,3 +70,43 @@ def locked(func: typing.Callable):
         with self.lock:
             return func(self, *args, **kwargs)
     return locked_func
+def classlocked(func: typing.Callable):
+    '''
+        Similar to @locked, but uses cls's .classlock attribute
+        Does NOT imply classmethod (use @iclasslocked if you want to do that)
+        Meant to be used with the @LockedClass class decorator:
+            @LockedClass
+            class DemoLockedClass:
+                @classmethod # note: @classmethod BEFORE @classlocked
+                @classlocked # could both be replaced by a single @iclasslocked
+                def test_lock(cls):
+                    print("class lock acquired!")
+                @classlocked
+                def test_lock_2(self):
+                    print("class lock acquired on non-classmethod!")
+    '''
+    @wraps(func)
+    def locked_func(self_or_cls: LockedClass | typing.Type[LockedClass], *args, **kwargs):
+        with self_or_cls.classlock:
+            return func(self_or_cls, *args, **kwargs)
+    return locked_func
+def iclasslocked(func: typing.Callable):
+    '''
+        Is the same as @classlocked (it even calls it), but also wraps the method in classmethod
+        Meant to be used with @LockedClass:
+            @LockedClass()
+            class Locked:
+                @iclasslocked
+                def classlocked_classmethod(cls):
+                    print("class lock acquired!")
+    '''
+    return classmethod(classlocked(func))
+## Function decorator... decorator?
+def locked_by(lock: AbstractContextManager):
+    def func_locker(func: typing.Callable):
+        @wraps(func)
+        def locked_func(*args, **kwargs):
+            with lock:
+                return func(*args, **kwargs)
+        return locked_func
+    return func_locker
