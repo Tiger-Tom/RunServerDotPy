@@ -130,7 +130,7 @@ class FileBackedDict(UserDict, basic.LockedResource):
     __setitem__ = set_item
     def set_default(self, key: str | tuple[str], default, unsafe_allow_op_subkey: bool = False, unsafe_allow_assign_dict: bool = False):
         '''If the item corresponding to key doesn't exist, then sets it to default. Has no effect otherwise'''
-        if not self.contains(key, unsafe_no_error_on_subkey=unsafe_allow_op_subkey): return
+        if self.contains(key, unsafe_no_error_on_subkey=unsafe_allow_op_subkey): return
         self.set_item(key, default, unsafe_allow_set_subkey=unsafe_allow_op_subkey, unsafe_allow_assign_dict=unsafe_allow_assign_dict)
     ## Containing
     @basic.locked
