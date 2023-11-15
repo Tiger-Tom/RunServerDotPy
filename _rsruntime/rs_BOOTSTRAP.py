@@ -81,7 +81,7 @@ class Bootstrapper:
         logging.INFOPLUS = logging.INFO + ((logging.WARNING - logging.INFO) // 2)
         def log_infop(self, message, *a, **kw):
             if not self.isEnabledFor(logging.INFOPLUS): return
-            self._log(logging.INFOPLUS, message, *a, **kw)
+            self._log(logging.INFOPLUS, message, a, **kw)
         logging.getLoggerClass().infop = log_infop
         # Configure logger
         logger = logging.getLogger('RS')
