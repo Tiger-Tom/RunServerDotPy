@@ -288,16 +288,20 @@ class FileBackedDict(UserDict, LockedResource):
     ## Dual-ways sync
     @locked
     def sync_all(self):
+        '''Basically notifies the user and runs self.writeback_dirty() and then self.readin_watchdog()'''
         self.logger.info('Syncing all...')
         self.writeback_dirty()
         self.readin_watchdog()
     ## Sync timer
     @locked
     def start_autosync(self):
+        '''Starts the internal watchdog timer'''
         self.watchdog.start()
     @locked
     def stop_autosync(self):
+        '''Stops the internal watchdog timer'''
         self.watchdog.stop()
     @locked
     def is_autosyncing(self) -> bool:
+        '''Returns whether or not the internal watchdog timer is ticking'''
         return self.watchdog.is_alive()
