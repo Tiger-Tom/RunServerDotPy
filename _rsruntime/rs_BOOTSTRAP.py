@@ -313,7 +313,8 @@ class Bootstrapper:
             def download_file(self, f: str):
                 '''Fetches a file from this manifest's upstream to this manifest's current path'''
                 bs.logger.warning(f'Downloading {Path(self.m_file_upstream, f)} to {self.path.parent / f}...')
-                with request.urlopen(Path(self.m_file_upstream, f), timeout=self.bs.dl_timeout) as uf, (self.path.parent / f).open('wb') as f:
+                print(f'{str(Path(self.m_file_upstream, f))=!r}')
+                with request.urlopen(str(Path(self.m_file_upstream, f)), timeout=bs.dl_timeout) as uf, (self.path.parent / f).open('wb') as f:
                     shutil.copyfileobj(uf, f)
             # Info
             def info(self):
