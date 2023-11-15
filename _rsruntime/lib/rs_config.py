@@ -36,14 +36,15 @@ class Config(FileBackedDict):
             If a total of 1 value is given, a warning is logged
             Otherwise, an infop is logged decribing how many keys will be set
         '''
-        if dict_vals.keys() and values.keys():
-            warnings.warn('Using both dict_vals and values is a bad practice', SyntaxWarning)
-        for k in dict_vals.keys() & values.keys():
-            if dict_vals[k] == values[k]: continue
-            raise ValueError(f'''Cannot resolve *A* (there could be more!) mismatched duplicate key from dict_vals and **values:
-                dict_vals[{k!r}] = {dict_vals[k]!r}
-                values    = {values[k]!r}''')
-        values |= dict_vals
+        if dict_vals is not None:
+            if dict_vals.keys() and values.keys():
+                warnings.warn('Using both dict_vals and values is a bad practice', SyntaxWarning)
+            for k in dict_vals.keys() & values.keys():
+                if dict_vals[k] == values[k]: continue
+                raise ValueError(f'''Cannot resolve *A* (there could be more!) mismatched duplicate key from dict_vals and **values:
+                    dict_vals[{k!r}] = {dict_vals[k]!r}
+                    values    = {values[k]!r}''')
+            values |= dict_vals
         if len(values) == 0:
             self.logger.error(f'Instructed to set mass default of 0 values?')
             return
