@@ -6,6 +6,8 @@ import typing
 #</Imports
 
 #> Header >/
+__all__ = ('GenericHooks', 'Hooks', 'SingleHook', 'FuncHooks', 'ReHooks', 'SubHooks')
+
 class GenericHooks[HookType, FuncType]:
     __slots__ = ('hooks',)
 

@@ -10,6 +10,8 @@ from .locked_resource import LockedResource, locked
 #</Imports
 
 #> Header >/
+__all__ = ('Timer',)
+
 class Timer:
     __slots__ = ()
 

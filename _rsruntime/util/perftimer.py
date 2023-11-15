@@ -6,6 +6,8 @@ import math
 #</Imports
 
 #> Header >/
+__all__ = ('PerfCounter',)
+
 class PerfCounter(float):
     '''Provides an object-oriented (because why not) way to use (and format) time.perf_counter'''
     __slots__ = ('prec', 'magic_prec_reduce', 'sec_text')

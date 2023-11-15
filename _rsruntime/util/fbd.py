@@ -17,6 +17,8 @@ from .perftimer import PerfCounter
 #</Imports
 
 #> Header >/
+__all__ = ('serializable', 'FileBackedDict')
+
 serializable = (dict, list, str, int, float, bool, type(None))
 
 class FileBackedDict(UserDict, LockedResource):

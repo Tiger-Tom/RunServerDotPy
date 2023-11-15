@@ -8,6 +8,8 @@ from functools import wraps
 #</Imports
 
 #> Header >/
+__all__ = ('LockedResource', 'locked')
+
 class LockedResource:
     __slots__ = ('lock',)
     def __init__(self, *, lock_class=RLock):
