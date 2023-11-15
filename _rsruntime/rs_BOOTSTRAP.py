@@ -43,7 +43,7 @@ class Bootstrapper:
     def __init__(self):
         self.parse_arguments()
         self.logger = self.setup_logger().getChild('BS')
-        self.Manifest = self._Manifest(self)
+        self.Manifest = self._bind_Manifest(self)
         self.shutdown_callbacks = set()
 
     # Pre-bootstrap setup
@@ -166,8 +166,8 @@ class Bootstrapper:
 
     # Manifest
     @staticmethod
-    def _Manifest(bs: 'Bootstrapper'):
-        '''Binds the manifest'''
+    def _bind_Manifest(bs: 'Bootstrapper'):
+        '''Binds the Manifest class'''
         class Manifest:
             __slots__ = ('path', 'raw', 'manif', 'meta')
             def __init__(self, path: Path, manif: dict | None = None):
