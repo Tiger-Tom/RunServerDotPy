@@ -78,7 +78,7 @@ class PluginManager:
         def discover_manifests(self, base: Path) -> typing.Generator[BS.Manifest, None, None]:
             '''Yields all manifests in a tree'''
             for p in sorted(base.iterdir(),
-                            key=lambda p: (p.is_dir(), p.name.lower() == 'manifest.json', p.match('*manifest*'), p.match('*.json'), p.name)):
+                            key=lambda p: (p.is_dir(), p.name.lower() != 'manifest.json', not p.match('*manifest*'), not p.match('*.json'), p.name)):
                 if p.is_dir():
                     yield from self.discover_manifests(p)
                 if (p.name.lower() == 'manifest.json') or p.match('*manifest*') or p.match('*.json'):
