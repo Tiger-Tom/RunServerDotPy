@@ -1,5 +1,7 @@
 #!/bin/python3
 
+from __future__ import annotations
+
 #> Imports
 import sys
 import json
@@ -21,7 +23,7 @@ import types
 # Cryptography
 import hashlib
 import base64
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as PubKey
+#from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as PubKey
 #</Imports
 
 #> Header >/
@@ -41,6 +43,7 @@ class Bootstrapper:
     minimum_vers = (3, 12, 0)
 
     def __init__(self):
+        self.ensure_python_version()
         self.parse_arguments()
         self.logger = self.setup_logger().getChild('BS')
         self.Manifest = self._bind_Manifest(self)
@@ -48,9 +51,10 @@ class Bootstrapper:
 
     # Pre-bootstrap setup
     ## Check Python version
-    def ensure_python_version(self):
-        if sys.version_info > self.minimum_vers:
-            raise NotImplementedError(f'Python version {".".join(sys.version_info[:3])} doesn\'t meet the minimum requirements, needs {".".join(minimum_vers)}')
+    @classmethod
+    def ensure_python_version(cls):
+        if sys.version_info < cls.minimum_vers:
+            raise NotImplementedError(f'Python version {".".join(map(str, sys.version_info[:3]))} doesn\'t meet the minimum requirements, needs {".".join(map(str, cls.minimum_vers))}')
     ## Argument parser
     def parse_arguments(self, args=None):
         p = argparse.ArgumentParser('RunServer.py')
@@ -188,8 +192,9 @@ class Bootstrapper:
             @property
             def encoding(self) -> str:
                 '''The encoding type stored in this manifest, or the default if none is stored'''
-                if (f := self.m_creation.get('for')) is not None: return f.get('encoding', sys.getdefaultencoding())
-                return sys.getdefaultencoding()
+                f = self.m_creation.get('for') # use instead of := to allow successful compilation against python<38
+                if f in None: return sys.getdefaultencoding()
+                return f.get('encoding', sys.getdefaultencoding())
             ### Attribute decoder method
             @staticmethod
             def _decode(val: str | tuple[int] | list[int]) -> bytes:
@@ -272,10 +277,10 @@ class Bootstrapper:
                     if f.startswith('_'): continue
                 stale = tuple(f for f in self.manif.keys() - new_manif.manif.keys() if not f.startswith('_'))
                 if stale:
-                    bs.logger.error(f'The following stale file(s) no longer exist in the new manifest:\n- {"\n- ".join(stale)}')
+                    bs.logger.error('The following stale file(s) no longer exist in the new manifest:\n- '+('\n- '.join(stale))) # not using \n in f-string {} to allow compilation against python<312
                 else: bs.logger.infop('No stale files found')
                 new = tuple(f for f in new_manif.manif.keys() - self.manif.keys() if not f.startswith('_'))
-                if new: bs.logger.warning(f'The following new file(s) will need to be created:\n- {"\n- ".join(new)}')
+                if new: bs.logger.warning(f'The following new file(s) will need to be created:\n- '+('\n- '.join(new))) # not using \n in f-string {} to allow compilation against python<312
                 else: bs.logger.infop('No new files found')
                 with open(self.path, 'w') as f: f.write(new_manif.raw)
                 return new_manif
