@@ -168,7 +168,7 @@ class FileBackedDict(UserDict, LockedResource):
     @locked
     def remove(self, key: str, *, unsafe_I_know_what_I_am_doing: bool = False):
         '''Deletes a top level key AND it's corresponding JSON file. Don\'t call if you don\'t know what you are doing'''
-        if not I_know_what_I_am_doing: raise RuntimeError('Pass unsafe_I_know_what_I_am_doing=True if you really want to do this')
+        if not unsafe_I_know_what_I_am_doing: raise RuntimeError('Pass unsafe_I_know_what_I_am_doing=True if you really want to do this')
         del self.data[key]
         self.key_path(key).unlink()
         self.dirty.remove(key)
