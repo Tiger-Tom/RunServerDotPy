@@ -275,7 +275,7 @@ class DummyServerManager(BaseServerManager):
     
     bias = -50.0
 class PyInterpreterServerManager(DummyServerManager):
-    __slots__ = ()
+    __slots__ = ('interpreter',)
     _type = ('manual', 'debug', 'interpreter',)
     def __init__(self):
         BaseServerManager.__init__(self)
@@ -284,11 +284,19 @@ class PyInterpreterServerManager(DummyServerManager):
         def tc():
             import readline
             import rlcompleter
+            _completer = None
+            def complete(text: str, state: int):
+                nonlocal _completer # first time I've ever actually had a reason to use this!
+                if state == 0:
+                    _completer = rlcompleter.Completer(self.interpreter.locals)
+                return _completer.complete(text, state)
+            readline.set_completer(complete)
             readline.parse_and_bind('tab: complete')
-        ic = code.InteractiveConsole({'RS': RS, 'self': self, 'tc': tc})
-        ic.interact(f'''Python Interpreter SM submode
+        self.interpreter = code.InteractiveConsole({'RS': RS, 'self': self, 'tc': tc})
+        self.interpreter.interact(f'''Python Interpreter SM submode
     Some names are passed to this subinterpreter:
     - RS is the RunServer instance
     - self is the {self.__class__} instance
+    - self.interpreter is the InteractiveConsole instance
     - tc() is a function that tries to enable tab completion
     Use CTRL+D to exit subinterpreter, as exit() exits both the sub and main interpreters''')
