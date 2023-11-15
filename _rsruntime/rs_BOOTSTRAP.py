@@ -236,16 +236,16 @@ class Bootstrapper:
             )
         def verify(self, k: PubKey):
             '''Compile this manifest (using self.compile()) and verify it with the given public key'''
-            self.bs.logger.warning(f'Compiling {self.m_name} for verification')
+            self.bs.logger.infop(f'Compiling {self.m_name} for verification')
             dat = bytes(self.compile())
             self.bs.logger.debug(f'Compiled:\n {dat}')
-            self.bs.logger.warning(f'Verifying {self.m_name} ({self.m_signature})')
+            self.bs.logger.infop(f'Verifying {self.m_name} ({self.m_signature})')
             self.bs.logger.debug(f'Key:\n {k.public_bytes_raw()}')
             k.verify(self.sig, dat)
             self.bs.logger.info(f'{self.m_name} passed verification')
         def upstream_manif(self, verify: bool = True, fail: bool = False) -> typing.Self:
             '''Fetches the upstream manifest from the manifest_upstream metadata field of this manifest'''
-            self.bs.logger.warning(f'Fetching {self.m_name} upstream from {self.m_manifest_upstream}')
+            self.bs.logger.infop(f'Fetching {self.m_name} upstream from {self.m_manifest_upstream}')
             try:
                 with request.urlopen(self.m_manifest_upstream, timeout=self.bs.dl_timeout) as r:
                     newmanif = self.__class__(self.bs, self.path, json.load(r))
@@ -267,9 +267,9 @@ class Bootstrapper:
                 - Fetches and writes the new manifest
                 - Creates and returns the new manifest object to be executed, or None if this manifest wishes to be ignored
             '''
-            self.bs.logger.warning(f'Updating manifest {self.m_name}')
+            self.bs.logger.infop(f'Updating manifest {self.m_name}')
             self.info()
-            self.bs.logger.warning(f'With new manifest {new_manif.m_name}')
+            self.bs.logger.infop(f'With new manifest {new_manif.m_name}')
             new_manif.info()
             if self.meta.get('ignore', False):
                 self.bs.logger.error(f'{self.m.name} would like to be ignored, skipping')
@@ -279,17 +279,17 @@ class Bootstrapper:
             stale = tuple(f for f in self.manif.keys() - new_manif.manif.keys() if not f.startswith('_'))
             if stale:
                 self.bs.logger.error(f'The following stale file(s) no longer exist in the new manifest:\n- {"\n- ".join(stale)}')
-            else: self.bs.logger.info('No stale files found')
+            else: self.bs.logger.infop('No stale files found')
             new = tuple(f for f in new_manif.manif.keys() - self.manif.keys() if not f.startswith('_'))
             if new: self.bs.logger.warning(f'The following new file(s) will need to be created:\n- {"\n- ".join(new)}')
-            else: self.bs.logger.info('No new files found')
+            else: self.bs.logger.infop('No new files found')
             with open(self.path, 'w') as f: f.write(new_manif.raw)
             return new_manif
         def info(self):
             c = self.m_creation
-            self.bs.logger.info(f' on {time.ctime(c["time"])} ({c["time"]})') # ctime c time
-            self.bs.logger.info(f' by {c["by"]}{"" if "aka" not in c else f""" AKA {c["aka"]}"""}')
-            self.bs.logger.info(f' for a(n) {c["for"]["os"]}{"" if c["system"] is None else f""" [{c["system"]["platform"]} {c["system"]["os_version"]} on {c["system"]["arch"]}]"""} system running {"Python" if c["system"] is None else c["system"]["py_implementation"]} {".".join(map(str, c["for"]["python"]))}')
+            self.bs.logger.infop(f' on {time.ctime(c["time"])} ({c["time"]})') # ctime c time
+            self.bs.logger.infop(f' by {c["by"]}{"" if "aka" not in c else f""" AKA {c["aka"]}"""}')
+            self.bs.logger.infop(f' for a(n) {c["for"]["os"]}{"" if c["system"] is None else f""" [{c["system"]["platform"]} {c["system"]["os_version"]} on {c["system"]["arch"]}]"""} system running {"Python" if c["system"] is None else c["system"]["py_implementation"]} {".".join(map(str, c["for"]["python"]))}')
         def execute(self):
             self.bs.logger.warning(f'Executing manifest {self.m_name}')
             try: self.verify(self.key)
