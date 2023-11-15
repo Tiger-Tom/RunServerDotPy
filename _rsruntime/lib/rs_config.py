@@ -64,7 +64,7 @@ class Config(FileBackedDict):
             for k,v in values.items():
                 self.set_default(f'{pfx}{k}', v)
             # Resume bg loop if needed
-            if resume: self.fbd.sync_all_bg_loop(intvl)
+            if resume: self.sync_all_bg_loop(intvl)
             else: self.start_autosync()
     def close(self):
         self.stop_autosync()
