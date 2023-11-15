@@ -9,6 +9,7 @@ import json
 import pysign
 import base64
 import time
+import re
 #</Imports
 
 #> Header
