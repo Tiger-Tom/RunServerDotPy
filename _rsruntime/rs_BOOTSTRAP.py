@@ -58,6 +58,7 @@ class Bootstrapper:
         log_l_grp = log_grp.add_mutually_exclusive_group()
         log_l_grp.add_argument('--verbose', help='Show more information in stderr logging (loglvl=INFO)', action='store_true')
         log_l_grp.add_argument('--debug', help='Show even more information in stderr logging (loglvl=DEBUG)', action='store_true')
+        log_l_grp.add_argument('--quiet', help='Show less information in stderr logging (loglvl=WARNING)', action='store_true')
         log_grp.add_argument('--verbose-headers', help='Show longer headers in stderr logs', action='store_true')
         p.add_argument('--update-only', help='Only download/update and execute the bootstrapper manifest, don\'t start the server', action='store_true')
         unat_grp_ = p.add_argument_group()
@@ -76,6 +77,12 @@ class Bootstrapper:
             self.date_fmt_long if self.args.verbose_headers else self.date_fmt_short,
             style='$')
         file_fmt = logging.Formatter(self.log_fmt_long, self.date_fmt_long, style='$')
+        # Create new logging level
+        logging.INFOPLUS = logging.INFO + ((logging.WARNING - logging.INFO) // 2)
+        def log_infop(self, message, *a, **kw):
+            if not self.isEnabledFor(logging.INFOPLUS): return
+            self._log(logging.INFOPLUS, message, *a, **kw)
+        logging.getLoggerClass().infop = log_infop
         # Configure logger
         logger = logging.getLogger('RS')
         logger.setLevel(logging.DEBUG)
@@ -84,7 +91,7 @@ class Bootstrapper:
         ### Stream handler
         stream_h = logging.StreamHandler()
         stream_h.setFormatter(stream_fmt)
-        stream_h.setLevel(logging.DEBUG if self.args.debug else logging.INFO if self.args.verbose else logging.WARNING)
+        stream_h.setLevel(logging.DEBUG if self.args.debug else logging.INFO if self.args.verbose else logging.WARNING if self.args.quiet else logging.INFOPLUS)
         logger.addHandler(stream_h)
         ### Main file handler
         # stores verbose logs (level=INFO)
@@ -110,11 +117,12 @@ class Bootstrapper:
         dfile_h.rotator = lambda src,dst: Path(src).unlink()
         logger.addHandler(dfile_h)
         # Set loglevel names
-        logging.addLevelName(logging.DEBUG, 'DBG')
-        logging.addLevelName(logging.INFO, 'INF')
-        logging.addLevelName(logging.WARNING, 'WRN')
-        logging.addLevelName(logging.ERROR, 'ERR')
-        logging.addLevelName(logging.CRITICAL, 'CRT')
+        logging.addLevelName(logging.DEBUG, 'DEBG')
+        logging.addLevelName(logging.INFO, 'INFO')
+        logging.addLevelName(logging.INFOPLUS, 'INF+')
+        logging.addLevelName(logging.WARNING, 'WARN')
+        logging.addLevelName(logging.ERROR, 'ERRO')
+        logging.addLevelName(logging.CRITICAL, 'CRIT')
         # Finish up
         self.root_logger = logger
         return logger
