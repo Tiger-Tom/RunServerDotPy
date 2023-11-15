@@ -88,18 +88,13 @@ def parse_args(args=None):
     sp = p.add_subparsers(dest='cmd')
     u = sp.add_parser('update')
     a = sp.add_parser('add')
-    # symmetric arguments
-    for sub in (u, a):
-        sub.add_argument('--output', help='The file to write to (defaults to stdout)', type=Path, default=None)
-        sub.add_argument('--sign', help='The path of the key to sign with (use pysign.py to generate)', type=Path)
-        sub.add_argument('--long', help='Store the public key, signature, and hashes in long format', action='store_true')
-        sub.add_argument('--compact', help='Compact output', action='store_true')
-        sub.add_argument('--extra-compact', help='Use extra compact output', action='store_true')
     # update-exclusive arguments
     u.add_argument('old_manifest', help='The manifest to read old values from', type=Path)
+    u.add_argument('sign', help='The path of the key to sign with (use pysign.py to generate)', type=Path)
     # add-exclusive arguments
     a.add_argument('name', help='The name of the manifest')
     a.add_argument('path', help='The path to create a manifest for', type=Path)
+    a.add_argument('sign', help='The path of the key to sign with (use pysign.py to generate)', type=Path)
     a.add_argument('manifest_upstream', help='The URI to fetch manifest updates from', nargs='?')
     a.add_argument('file_upstream', help='The URI to fetch file updates from', nargs='?')
     a.add_argument('--username', help='The username to add to the manifest', default=None)
@@ -108,6 +103,12 @@ def parse_args(args=None):
     a.add_argument('--desc', help='A description to add to the manifest', default=None)
     a.add_argument('--version', help='Version information to add to the manifest (not used for updating, only for user info)', default=None)
     a.add_argument('--no-system', help='Don\'t add system ID-ing info (such as OS version and hostname) to manifest', action='store_true')
+    # symmetric arguments #2
+    for sub in (u, a):
+        sub.add_argument('-l', '--long', help='Store the public key, signature, and hashes in long format', action='store_true')
+        sub.add_argument('-c', '--compact', help='Compact output', action='store_true')
+        sub.add_argument('-cc', '--extra-compact', help='Extra compact output', action='store_true')
+        sub.add_argument('-o', '--output', help='The file to write to (defaults to stdout)', type=Path, default=None)
     # parse arguments
     args = p.parse_args(args)
     # invalid cmd
