@@ -194,7 +194,7 @@ class Bootstrapper:
             def relocate(self, np: Path) -> typing.Self:
                 '''Create a new manifest with this manifest's dict and the supplied path'''
                 return self.__class__(np, self.manif)
-            # Module attributes
+            # Manifest attributes
             ## (Enc/De)coding
             @property
             def encoding(self) -> str:
