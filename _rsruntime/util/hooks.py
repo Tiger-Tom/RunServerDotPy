@@ -124,7 +124,7 @@ class SubHooks[HookType, SubHookType, FuncType](GenericHooks[SubHookType, FuncTy
         '''Removes all callbacks that would be called by __call__(hook, ...) (with ... being anything)'''
         if hook not in self.hooks: return
         del self.hooks[hook]
-    def __call__(self, hook: HookType, subhook: HookType, *args, **kwargs):
+    def __call__(self, hook: HookType, subhook: SubHookType, *args, **kwargs):
         '''Calls all hooks thet have been registered to be called by __call__(hook, subhook)'''
         if hook not in self.hooks: return
         self.hooks[hook](subhook, *args, **kwargs)
