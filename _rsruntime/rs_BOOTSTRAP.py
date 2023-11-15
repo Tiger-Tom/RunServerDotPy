@@ -11,6 +11,7 @@ import argparse
 # Files
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
+from zipfile import Path as zipPath
 import gzip
 import shutil
 # Logging / info
@@ -178,7 +179,7 @@ class Bootstrapper:
         class Manifest:
             __slots__ = ('path', 'raw', 'manif', 'meta')
 
-            def __init__(self, path: Path, manif: dict | None = None):
+            def __init__(self, path: Path | zipPath, manif: dict | None = None):
                 self.path = path
                 if manif is None:
                     with self.path.open('r') as f: self.raw = f.read()
@@ -191,7 +192,7 @@ class Bootstrapper:
                 elif (attr[2:] not in self.meta): raise AttributeError(attr[2:])
                 return self.meta[attr[2:]]
             # Relocation
-            def relocate(self, np: Path) -> typing.Self:
+            def relocate(self, np: Path | zipPath) -> typing.Self:
                 '''Create a new manifest with this manifest's dict and the supplied path'''
                 return self.__class__(np, self.manif)
             # Manifest attributes
@@ -289,7 +290,7 @@ class Bootstrapper:
                 new = tuple(f for f in new_manif.manif.keys() - self.manif.keys() if not f.startswith('_'))
                 if new: bs.logger.warning(f'The following new file(s) will need to be created:\n- '+('\n- '.join(new))) # not using \n in f-string {} to allow compilation against python<312
                 else: bs.logger.infop('No new files found')
-                with open(self.path, 'w') as f: f.write(new_manif.raw)
+                with self.path.open('w') as f: f.write(new_manif.raw)
                 return new_manif
             # Upstream
             def upstream_manif(self, verify: bool = True, fail: bool = False) -> typing.Self:
@@ -312,7 +313,8 @@ class Bootstrapper:
             def download_file(self, f: str):
                 '''Fetches a file from this manifest's upstream to this manifest's current path'''
                 bs.logger.warning(f'Downloading {Path(self.m_file_upstream, f)} to {self.path.parent / f}...')
-                request.urlretrieve(Path(self.m_file_upstream, f), self.path.parent / f)
+                with request.urlopen(Path(self.m_file_upstream, f), timeout=self.bs.dl_timeout) as uf, (self.path.parent / f).open('wb') as f:
+                    shutil.copyfileobj(uf, f)
             # Info
             def info(self):
                 '''Prints out various pieces of information on this manifest, meant for use in .update()'''
