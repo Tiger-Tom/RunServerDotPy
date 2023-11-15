@@ -28,7 +28,7 @@ class Config(FileBackedDict):
             self.logger.warning(f'Setting mass default on 1 value')
             self.get_set_default(*(*values.items(),))
             return
-        self.logger.warning(f'Setting mass default on {len(values)} values')
+        self.logger.infop(f'Setting mass default on {len(values)} values')
         with self.lock:
             # Store bg loop
             resume = self.is_autosyncing()

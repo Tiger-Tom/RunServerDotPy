@@ -140,7 +140,7 @@ class ServerManager:
             if c.real_bias <= 0:
                 raise RuntimeError(f'No suitable ServerManagers found (biases are all <= {c.real_bias}, which is <= 0) (tried for total of {total_pc})')
             # Debugging
-            logger.info(f'Staging ServerManager {c.name} (type {c.type}) (bias {c.real_bias}, index {i}) (T+{total_pc})...')
+            logger.infop(f'Staging ServerManager {c.name} (type {c.type}) (bias {c.real_bias}, index {i}) (T+{total_pc})...')
             ## Print out typing
             logger.debug(f'{c.name} typing:')
             logger.debug(f' _type: {c._type}')
@@ -165,7 +165,7 @@ class ServerManager:
             except Exception as e:
                 logger.error(f'Could not instantiate {c.name}:\n{"".join(format_exception(e))}\n (failed after {current_pc}, total of {total_pc})')
                 if i < len(order):
-                    logger.warning('Trying the next possible choice...')
+                    logger.infop('Trying the next possible choice...')
         raise RuntimeError('None of the ServerManagers could be staged (tried for total of {total_pc}, cannot continue')
     @classmethod
     def register(cls, manager_type: typing.Type[BaseServerManager]):
@@ -221,7 +221,7 @@ class RConManager(BaseServerManager):
             raise ModuleNotFoundError('RCon module is required for RConManager!')
         if not Config('minecraft/rcon/enabled', False): raise RuntimeError('RCon is not enabled! (set it up in config: minecraft/rcon/enabled)')
         self.remote = f'{Config("minecraft/rcon/host", "127.0.0.1")}:{Config("minecraft/rcon/port", 25575)}'
-        self.logger.warning(f'RCon remote: {self.remote} (can be set in config minecraft/rcon/)')
+        self.logger.infop(f'RCon remote: {self.remote} (can be set in config minecraft/rcon/)')
         self.rconpwd = Config('minecraft/rcon/password', None, Config.on_missing.SET_RETURN_DEFAULT)
         if self.rconpwd is None:
             self.rconpwd = getpass('Enter RCon password >')

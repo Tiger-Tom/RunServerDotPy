@@ -222,11 +222,11 @@ class FileBackedDict(UserDict, LockedResource):
     def readin_data(self, key: str):
         '''Reads in data from the JSON value corresponding to key (found via self.key_path)'''
         p = self.key_path(key)
-        self.logger.warning(f'Reading in {key} from {p}...')
+        self.logger.info(f'Reading in {key} from {p}...')
         pc = PerfCounter()
         with p.open() as f:
             self.data[key] = json.load(f)
-        self.logger.info(f'Readin {key} took {pc}')
+        self.logger.infop(f'Readin {key} took {pc}')
         self.watchdog_times[key] = p.stat().st_mtime
     @locked
     def readin_watchdog(self):
@@ -246,7 +246,7 @@ class FileBackedDict(UserDict, LockedResource):
             if nt <= t: continue
             self.watchdog_times[k] = nt
             self.readin_data(k)
-        self.logger.info(f'Readin {len(self.watchdog_times)} key(s) took {pc}')
+        self.logger.infop(f'Readin {len(self.watchdog_times)} key(s) took {pc}')
     ## Writing back
     @locked
     def writeback(self, key: str, *, clean: bool = True, force: bool = False) -> bool:
@@ -266,7 +266,7 @@ class FileBackedDict(UserDict, LockedResource):
         pc = PerfCounter()
         with p.open('w') as f:
             json.dump(self.data[key], f, indent=4)
-        self.logger.info(f'Writeback {key} took {pc}')
+        self.logger.infop(f'Writeback {key} took {pc}')
         self.watchdog_times[key] = p.stat().st_mtime
         if clean: self.dirty.remove(key)
         return True
@@ -277,7 +277,7 @@ class FileBackedDict(UserDict, LockedResource):
         nw = len(self.dirty); pc = PerfCounter()
         while len(self.dirty):
             self.writeback(self.dirty.pop(), clean=False, force=True)
-        self.logger.info(f'Writeback {nw} key(s) took {pc}')
+        self.logger.infop(f'Writeback {nw} key(s) took {pc}')
     ## Dual-ways sync
     @locked
     def sync_all(self):

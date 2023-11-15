@@ -84,7 +84,7 @@ class MCLang:
             with zipfile.ZipFile(jzf.open(f'META-INF/versions/{vers}/server-{vers}.jar')) as szf:
                 with szf.open(f'assets/minecraft/lang/{Config("minecraft/lang_parser/lang", "en_us")}.json') as lf:
                     self.lang = json.load(lf)
-                    self.logger.info(f'Loaded lang in {pc}')
+                    self.logger.infop(f'Loaded lang in {pc}')
                     return self.lang
             
 class LineParser:
