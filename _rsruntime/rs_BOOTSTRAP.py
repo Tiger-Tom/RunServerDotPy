@@ -170,6 +170,7 @@ class Bootstrapper:
         '''Binds the Manifest class'''
         class Manifest:
             __slots__ = ('path', 'raw', 'manif', 'meta')
+
             def __init__(self, path: Path, manif: dict | None = None):
                 self.path = path
                 if manif is None:
@@ -182,9 +183,19 @@ class Bootstrapper:
                     return super().__getattribute__(attr)
                 elif (attr[2:] not in self.meta): raise AttributeError(attr[2:])
                 return self.meta[attr[2:]]
+            # Module attributes
+            ## (Enc/De)coding
+            @property
+            def encoding(self) -> str:
+                '''The encoding type stored in this manifest, or the default if none is stored'''
+                if (f := self.m_creation.get('for')) is not None: return f.get('encoding', sys.getdefaultencoding())
+                return sys.getdefaultencoding()
+            ### Attribute decoder method
             @staticmethod
             def _decode(val: str | tuple[int] | list[int]) -> bytes:
+                '''Decodes manifest attributes, returns base64.b85decode(val) if val is a str otherwise directly casts to bytes(val)'''
                 return base64.b85decode(val) if isinstance(val, str) else bytes(val)
+            ## Signing
             @property
             def key(self) -> PubKey:
                 '''The public key stored in this manifest'''
@@ -193,11 +204,17 @@ class Bootstrapper:
             def sig(self) -> bytes:
                 '''The signature stored in this manifest'''
                 return self._decode(self.m_signature)
-            @property
-            def encoding(self) -> str:
-                '''The encoding type stored in this manifest, or the default if none is stored'''
-                if (f := self.m_creation.get('for')) is not None: return f.get('encoding', sys.getdefaultencoding())
-                return sys.getdefaultencoding()
+            # Verification & signings
+            def verify(self, k: PubKey):
+                '''Compile this manifest (using self.compile()) and verify it with the given public key'''
+                bs.logger.infop(f'Compiling {self.m_name} for verification')
+                dat = bytes(self.compile())
+                bs.logger.debug(f'Compiled:\n {dat}')
+                bs.logger.infop(f'Verifying {self.m_name} ({self.m_signature})')
+                bs.logger.debug(f'Key:\n {k.public_bytes_raw()}')
+                k.verify(self.sig, dat)
+                bs.logger.info(f'{self.m_name} passed verification')
+            ## Compilation
             @staticmethod
             def _compile(datas_heads: tuple[tuple[str | None]], datas_body: tuple[tuple[str, bytes]], encoding: str) -> bytes:
                 '''Joins data, just like compile() in the devel mkmanifest.py script'''
@@ -236,32 +253,7 @@ class Bootstrapper:
                     (tuple(((f, self._decode(h)) for f,h in self.manif.items() if not f.startswith('_')))),
                     self.encoding,
                 )
-            def verify(self, k: PubKey):
-                '''Compile this manifest (using self.compile()) and verify it with the given public key'''
-                bs.logger.infop(f'Compiling {self.m_name} for verification')
-                dat = bytes(self.compile())
-                bs.logger.debug(f'Compiled:\n {dat}')
-                bs.logger.infop(f'Verifying {self.m_name} ({self.m_signature})')
-                bs.logger.debug(f'Key:\n {k.public_bytes_raw()}')
-                k.verify(self.sig, dat)
-                bs.logger.info(f'{self.m_name} passed verification')
-            def upstream_manif(self, verify: bool = True, fail: bool = False) -> typing.Self:
-                '''Fetches the upstream manifest from the manifest_upstream metadata field of this manifest'''
-                bs.logger.infop(f'Fetching {self.m_name} upstream from {self.m_manifest_upstream}')
-                try:
-                    with request.urlopen(self.m_manifest_upstream, timeout=bs.dl_timeout) as r:
-                        newmanif = self.__class__(self.path, json.load(r))
-                except Exception as e:
-                    if fail: raise e from None
-                    bs.logger.error(f'An error occured whilst downloading upstream manifest:\n{"".join(traceback.format_exception(e))}\n Using current manifest instead')
-                    return self
-                if verify:
-                    try: newmanif.verify(self.key)
-                    except Exception as e:
-                        bs.logger.fatal(f'Upstream manifest {self.m_name} fetched from {self.m_manifest_upstream} failed verification! ({e})')
-                        if input('Use anyway? (y/N) >').lower().startswith('y'): return newmanif
-                        else: return self
-                return newmanif
+            # Updating
             def update(self, new_manif: typing.Self, override: bool = False) -> typing.Self | None:
                 '''
                     This function does three things:
@@ -287,12 +279,45 @@ class Bootstrapper:
                 else: bs.logger.infop('No new files found')
                 with open(self.path, 'w') as f: f.write(new_manif.raw)
                 return new_manif
+            # Upstream
+            def upstream_manif(self, verify: bool = True, fail: bool = False) -> typing.Self:
+                '''Fetches the upstream manifest from the manifest_upstream metadata field of this manifest'''
+                bs.logger.infop(f'Fetching {self.m_name} upstream from {self.m_manifest_upstream}')
+                try:
+                    with request.urlopen(self.m_manifest_upstream, timeout=bs.dl_timeout) as r:
+                        newmanif = self.__class__(self.path, json.load(r))
+                except Exception as e:
+                    if fail: raise e from None
+                    bs.logger.error(f'An error occured whilst downloading upstream manifest:\n{"".join(traceback.format_exception(e))}\n Using current manifest instead')
+                    return self
+                if verify:
+                    try: newmanif.verify(self.key)
+                    except Exception as e:
+                        bs.logger.fatal(f'Upstream manifest {self.m_name} fetched from {self.m_manifest_upstream} failed verification! ({e})')
+                        if input('Use anyway? (y/N) >').lower().startswith('y'): return newmanif
+                        else: return self
+                return newmanif
+            def download_file(self, f: str):
+                '''Fetches a file from this manifest's upstream to this manifest's current path'''
+                bs.logger.warning(f'Downloading {Path(self.m_file_upstream, f)} to {self.path.parent / f}...')
+                request.urlretrieve(Path(self.m_file_upstream, f), self.path.parent / f)
+            # Info
             def info(self):
+                '''Prints out various pieces of information on this manifest, meant for use in .update()'''
                 c = self.m_creation
                 bs.logger.infop(f' on {time.ctime(c["time"])} ({c["time"]})') # ctime c time
                 bs.logger.infop(f' by {"{unknown}" if c["by"] is None else c["by"]}{"" if "aka" not in c else f""" AKA {c["aka"]}"""}')
                 bs.logger.infop(f' for a(n) {c["for"]["os"]}{"" if c["system"] is None else f""" [{c["system"]["platform"]} {c["system"]["os_release"]} on {c["system"]["arch"]}]"""} system running {"Python" if c["system"] is None else c["system"]["py_implementation"]} {".".join(map(str, c["for"]["python"]))}')
+            # Manifest execution
             def execute(self):
+                '''
+                    Executes the manifest:
+                    - verifies it (NOTE: ONLY DISPLAYS A WARNING IF VERIFICATION FAILS, INSTALL FILES ANYWAY!)
+                    - checks for missing files
+                    - checks for outdated files
+                    - asks and (possibly) proceeds to download missing files
+                    - asks and (possibly) proceeds to download and replace outdated files
+                '''
                 bs.logger.warning(f'Executing manifest {self.m_name}')
                 try: self.verify(self.key)
                 except Exception as e: bs.logger.fatal(f'Local manifest {self.m_name} failed verification ({e!r}), continuing anyway')
@@ -337,9 +362,7 @@ class Bootstrapper:
                     for f in changes: print(f'- {f}')
                     if input('Filesystem changes were made; rerun execute to verify checksums? (Y/n) >').lower().startswith('n'):
                         self.execute()
-            def download_file(self, f: str):
-                bs.logger.warning(f'Downloading {Path(self.m_file_upstream, f)} to {self.path.parent / f}...')
-                request.urlretrieve(Path(self.m_file_upstream, f), self.path.parent / f)
+            
         return Manifest
 
     # Utility functions
