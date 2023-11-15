@@ -20,7 +20,7 @@ class Config(FileBackedDict):
         super().__init__(self.conf_path, 60.0)
         self.start_autosync()
         RS.BS.register_onclose(self.close)
-    def mass_set_default(self, **values):
+    def mass_set_default(self, pfx: str | None = None, **values):
         if len(values) == 0:
             self.logger.error(f'Instructed to set mass default of 0 values?')
             return
@@ -35,8 +35,10 @@ class Config(FileBackedDict):
             if resume: self.stop_autosync()
             # Final sync and begin setting defaults
             self.sync_all()
+            if pfx is None: pfx = ''
+            elif not pfx.endswith('/'): pfx = f'{pfx}/'
             for k,v in values.items():
-                self.set_default(k, v)
+                self.set_default(f'{pfx}{k}', v)
             # Resume bg loop if needed
             if resume: self.fbd.sync_all_bg_loop(intvl)
             else: self.start_autosync()
