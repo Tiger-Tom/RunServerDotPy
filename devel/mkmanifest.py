@@ -85,7 +85,7 @@ def jsonify(manif: dict, long_fmt: bool, compact: bool, extra_compact: bool) -> 
 def parse_args(args=None):
     # create parsers
     p = argparse.ArgumentParser(prog='mkmanifest.py')
-    sp = p.add_subparsers(dest='cmd')
+    sp = p.add_subparsers(dest='cmd', required=True)
     u = sp.add_parser('update')
     a = sp.add_parser('add')
     # update-exclusive arguments
@@ -111,10 +111,6 @@ def parse_args(args=None):
         sub.add_argument('-o', '--output', help='The file to write to (defaults to stdout)', type=Path, default=None)
     # parse arguments
     args = p.parse_args(args)
-    # invalid cmd
-    if args.cmd not in {'update', 'add'}:
-        p.print_help()
-        exit(1)
     # update subcommand
     if args.cmd == 'update':
         with args.old_manifest.open('r') as f:
