@@ -71,7 +71,7 @@ def manifest(name: str, path: Path, key: pysign.EdPrivK, creation_info: dict, mu
     eprint(f'Signing {len(compd)} bytes\n private: {tuple(key.private_bytes_raw()) if long_fmt else base64.b85encode(key.private_bytes_raw()).decode()}\n public:  {keydump}')
     sig = pysign.signstr(key, compd, long_fmt)
     eprint(f'Signature: {sig}')
-    man['_metadata'] = meta = manifest_metadata(name, keydump, sig, creation_info, mupstream, fupstream)
+    man['_metadata'] = manifest_metadata(name, keydump, sig, creation_info, mupstream, fupstream)
     return man
 def jsonify(manif: dict, long_fmt: bool, compact: bool, extra_compact: bool) -> str:
     jsn = json.dumps(manif, sort_keys=False,
