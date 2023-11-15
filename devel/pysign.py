@@ -76,6 +76,9 @@ if (__name__ == '__main__') and ('idlelib.run' not in sys.modules):
         with args.path.open('wb') as f:
             f.write(key.private_bytes_raw())
         exit()
+    elif args.mode != 'extract':
+        p.print_help()
+        exit(1)
     assert args.extract_pub or args.extract_priv, 'No keys selected for extraction'
     assert args.output or args.in_all, 'No output modes selected'
     if args.path is None: key = EdPrivK.from_private_bytes(sys.stdin.buffer.read())
