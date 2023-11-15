@@ -75,18 +75,18 @@ class MCLang:
         '''Extracts the language file from a server JAR file, sets and returns self.lang'''
         self.logger.debug('Extracting lang')
         pc = PerfCounter()
-        with zipfile.ZipFile(Path(Config('minecraft/path/base', './minecraft'), Config('minecraft/path/server_jar', 'server.jar'))) as jzf:
-            vers = Config('minecraft/lang_parser/version', None, on_missing=Config.on_missing.SET_RETURN_DEFAULT)
-            self.version_info = None
-            with jzf.open('version.json') as vf:
-                self.version_info = json.load(vf)
-            if vers is None: vers = self.version_info['id']
-            with zipfile.ZipFile(jzf.open(f'META-INF/versions/{vers}/server-{vers}.jar')) as szf:
-                with szf.open(f'assets/minecraft/lang/{Config("minecraft/lang_parser/lang", "en_us")}.json') as lf:
-                    self.lang = json.load(lf)
-                    self.logger.infop(f'Loaded lang in {pc}')
-                    return self.lang
-            
+        jzp = zipfile.Path(Path(Config('minecraft/path/base', './minecraft'), Config('minecraft/path/server_jar', 'server.jar')))
+        vers = Config('minecraft/lang_parser/version', None, on_missing=Config.on_missing.SET_RETURN_DEFAULT)
+        self.version_info = None
+        with (jzp / 'version.json').open('r') as vf:
+            self.version_info = json.load(vf)
+        if vers is None: vers = self.version_info['id']
+        with ((jzp / f'META-INF/versions/{vers}/server-{vers}.jar').open('rb') as vzf,
+              zipfile.Path(vzf, f'assets/minecraft/lang/{Config("minecraft/lang_parser/lang", "en_us")}.json').open('r') as lf):
+            self.lang = json.load(lf)
+            self.logger.infop(f'Loaded lang in {pc}')
+            return self.lang
+        
 class LineParser:
     __slots__ = ('logger', 'hooks_prefix', 'hooks_no_prefix', 'hooks_chat', 'chat_patt')
 
