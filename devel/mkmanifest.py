@@ -6,11 +6,8 @@ import sys, os
 from pathlib import Path
 import hashlib
 import json
-import subprocess
-from pprint import pprint
 import pysign
 import base64
-import re
 import time
 #</Imports
 
@@ -85,7 +82,6 @@ def jsonify(manif: dict, long_fmt: bool, compact: bool, extra_compact: bool) -> 
 
 #> Main >/
 def parse_args(args=None):
-    non_applic = 'N/A'
     # create parsers
     p = argparse.ArgumentParser(prog='mkmanifest.py')
     sp = p.add_subparsers(dest='cmd')
