@@ -6,9 +6,7 @@ import time
 import traceback
 # Files
 from pathlib import Path
-from zipfile import Path as zipPath, is_zipfile
 from importlib import util as iutil
-from zipimport import zipimporter
 # Types
 import typing
 #</Imports
@@ -23,18 +21,11 @@ class PluginManager:
     __slots__ = ('logger', 'ManifestLoader', 'ML', 'plugins')
 
     class Plugin:
-        __slots__ = ('source', 'name', 'from_zip', 'zip_importer', 'spec', 'module')
+        __slots__ = ('source', 'name', 'spec', 'module')
 
-        def __init__(self, src: Path | zipPath, name: str | None = None):
+        def __init__(self, src: Path, name: str | None = None):
             self.source = src
             self.name = '<anonymous plugin>' if name is None else name
-            self.from_zip = isinstance(src, zipPath)
-            if self.from_zip:
-                self.zip_importer = zipimporter(self.source)
-                self.spec = iutil.spec_from_file_location(self.name, self.source.root)
-                self.spec_or_zipimporter = zipimporter(self.source.root)
-                self.plugin_spec = self.zip_importer.find_spec(self.source)
-                return
             self.spec = iutil.spec_from_file_location(self.name, self.source)
             self.module = iutil.module_from_spec(self.spec)
             self.spec.loader.exec_module(self.module)
@@ -136,17 +127,10 @@ class PluginManager:
             
     def load_plugins(self):
         bp = Path(Config['plugins/plugins_path'])
-        self._traverse_plugins(sorted(set(bp.glob('**/__plugin__.py')) | set(bp.glob('**/*.rs.py')) | set(bp.glob('**/*.rs.zip'))), PerfCounter(sec='', secs=''), ())
-    def _traverse_plugins(self, paths: set, pc: PerfCounter, zip_name: tuple[str]):
+        self._traverse_plugins(sorted(set(bp.glob('**/__plugin__.py')) | set(bp.glob('**/*.rs.py'))), PerfCounter(sec='', secs=''))
+    def _traverse_plugins(self, paths: set, pc: PerfCounter):
         captured = set()
         for p in paths: # note: add follow_symlinks=True upon release of 3.13
-            if p.suffix.endswith('.zip'):
-                if not is_zipfile(p):
-                    self.logger.fatal(f'{p} is not a valid zipfile; cannot load, skipping')
-                    continue
-                zp = zipPath(p)
-                self._traverse_plugins(sorted(set(zp.glob('__plugin__.py')) | set(zp.glob('*.rs.py'))), pc, zip_name + (zp.parent.name,))
-                continue
             name = p.parent.name if (p.name == '__plugin__.py') else p.stem[:-3]
             self.logger.infop(f'Loading plugin: {name} (T+{pc})')
             if Config(f'plugins/skip_load/{name}', False):
@@ -163,7 +147,7 @@ class PluginManager:
                 self.logger.fatal(f'Name {name} already exists in loaded plugins: a plugin with the same name loaded first! Cannot load plugin, skipping')
                 continue
             captured.add(p)
-            self.plugins[name] = self.Plugin(p, m.m_name if ((m := self.ML.nearest_manifest(p.parent)) is not None) else '.'.join(zip_name) if zip_name else name)
+            self.plugins[name] = self.Plugin(p, m.m_name if ((m := self.ML.nearest_manifest(p.parent)) is not None) else name)
     def start(self):
         for n,p in self.plugins.items():
             if not hasattr(p, '__start__'): continue
