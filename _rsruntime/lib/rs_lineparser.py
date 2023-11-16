@@ -15,7 +15,7 @@ import typing
 # RunServer Module
 import RS
 from RS import Config
-from RS.Types import Hooks, PerfCounter
+from RS.Util import Hooks, PerfCounter
 
 #> Header >/
 class MCLang:

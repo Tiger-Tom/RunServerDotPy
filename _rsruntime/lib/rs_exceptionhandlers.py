@@ -15,7 +15,7 @@ from types import TracebackType
 
 # RunServer Module
 import RS
-from RS.Types import Hooks
+from RS.Util import Hooks
 
 #> Header >/
 class ExceptionHandlers:

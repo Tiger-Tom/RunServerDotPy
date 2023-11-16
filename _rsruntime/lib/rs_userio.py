@@ -16,7 +16,7 @@ from enum import Flag, IntEnum
 # RunServer Module
 import RS
 from RS import Bootstrapper, Config, MCLang, LineParser
-from RS.Types import FileBackedDict
+from RS.Util import FileBackedDict
 
 #> Header >/
 class UserManager:

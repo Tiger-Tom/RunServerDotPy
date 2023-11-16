@@ -22,7 +22,7 @@ except ModuleNotFoundError: RCONClient = None
 # RunServer Module
 import RS
 from RS import Config, LineParser
-from RS.Types import Hooks, PerfCounter
+from RS.Util import Hooks, PerfCounter
 
 #> Header >/
 # Base classes

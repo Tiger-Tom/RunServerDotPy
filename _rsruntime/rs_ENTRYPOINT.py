@@ -17,7 +17,7 @@ class RunServer(types.ModuleType):
         # Load: -1
         'Bootstrapper', 'BS',
         # Load: 0
-        'Types', 'T',
+        'Util', 'U',
         # Load: 1
         'Config', 'C',
         'ExceptionHandlers', 'EH',
@@ -54,14 +54,13 @@ class RunServer(types.ModuleType):
         types.SimpleNamespace(
             FileBackedDict = ...
         )
-        self.Types = self.T = types.SimpleNamespace()
-        self.Types.FileBackedDict = fbd.FileBackedDict
-        self.Types.Hooks = hooks.Hooks
-        self.Types.Lockers = locked_resource
-        self.Types.locked = locked_resource.locked
-        self.Types.PerfCounter = perftimer.PerfCounter
-        self.Types.Timer = timer.Timer
-        sys.modules['RS.Types'] = self.Types
+        self.Util = self.U = types.SimpleNamespace()
+        self.Util.FileBackedDict = fbd.FileBackedDict
+        self.Util.Hooks = hooks.Hooks
+        self.Util.Lockers = locked_resource
+        self.Util.PerfCounter = perftimer.PerfCounter
+        self.Util.Timer = timer.Timer
+        sys.modules['RS.Util'] = self.Util
         self.logger.debug(f'finish:load_0@T+{pc}')
         # Load: 1
         self.logger.debug(f'start:load_1@T+{pc}')

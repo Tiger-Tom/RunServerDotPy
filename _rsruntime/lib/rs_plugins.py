@@ -16,7 +16,7 @@ import typing
 # RunServer Module
 import RS
 from RS import Config, BS
-from RS.Types import PerfCounter
+from RS.Util import PerfCounter
 
 #> Header >/
 class PluginManager:

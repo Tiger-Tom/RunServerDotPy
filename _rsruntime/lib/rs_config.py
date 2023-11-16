@@ -7,7 +7,7 @@ import warnings
 
 # RunServer Module
 import RS
-from RS.Types import FileBackedDict
+from RS.Util import FileBackedDict
 
 #> Header >/
 class Config(FileBackedDict):
