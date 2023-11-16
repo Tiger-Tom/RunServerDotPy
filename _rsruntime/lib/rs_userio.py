@@ -224,10 +224,12 @@ class TellRaw(list):
 class ChatCommands:
     __slots__ = ('logger', 'commands', 'aliases')
 
-    class ArgParser: # not to be confused with the builtin
+    class ParamParser:
+        raise NotImplementedError # token-based args are more trouble than benefit
+    class ParamParser__:
         def __init__(self): raise TypeError(f'{self.__class__} should not be initialized')
 
-        ParamTok = Flag(('ParamTok', 'ERROR',
+        ParamTok = Flag('Params', ('ParamTok', 'ERROR',
                          'OPTIONAL', 'VARIADIC',             # argument
                          'NONE', 'STRING', 'TYPE', 'UNION')) # annotation
         @classmethod
@@ -235,10 +237,10 @@ class ChatCommands:
             for p in args:
                 argument = (ParamTok.VARIADIC,) if (p.kind == p.VAR_POSITITONAL) else (0,) if (p.default is p.empty) else (ParamTok.OPTIONAL, p.default)
                      
-                annotation = (paramTok.NONE,)                if (p.annotation is p.empty)
-                        else (ParamTok.STRING, p.annotation) if (isinstance(p.annotation, str))
-                        else (ParamTok.TYPE,   p.annotation) if (isinstance(p.annotation, str))
-                        else (ParamTok.UNION,  p.__args__)   if (isinstance(p.annotation, typing.Literal))
+                annotation = (paramTok.NONE,)                if (p.annotation is p.empty)                  \
+                        else (ParamTok.STRING, p.annotation) if (isinstance(p.annotation, str))            \
+                        else (ParamTok.TYPE,   p.annotation) if (isinstance(p.annotation, str))            \
+                        else (ParamTok.UNION,  p.__args__)   if (isinstance(p.annotation, typing.Literal)) \
                         else (ParamTok.ERROR,) # <--bad
 
                 yield (argument[0]|annotation[0], (p.name,)+argument[1:]+annot[1:])
@@ -246,32 +248,30 @@ class ChatCommands:
         #def render_annotation_part(ann: type | str | typing.Literal | typing.Any) -> str:
         #    if isinstance(ann, str): return ann
         #    if isinstance(ann, type): return ann.__qualname__
-
+        @classmethod
         def render_token(cls, token: ParamTok, args: tuple[str, ...]):
             assert not (token & ParamTok.ERROR)
             args = iter(args)
             name = next(args)
-            braks = Config('chat_commands/help/formatter/argument/brackets/optional', '[{argstr}]')    if (token & ParamTok.OPTIONAL)
-               else Config('chat_commands/help/formatter/argument/brackets/variadic', '({argstr}...)') if (token & ParamTok.VARIADIC)
+            braks = Config('chat_commands/help/formatter/argument/brackets/optional', '[{argstr}]')    if (token & ParamTok.OPTIONAL) \
+               else Config('chat_commands/help/formatter/argument/brackets/variadic', '({argstr}...)') if (token & ParamTok.VARIADIC) \
                else Config('chat_commands/help/formatter/argument/brackets/required', '{argstr}')
-            build = []
-            if token & ParamTok.NONE:
-                
-            
-            
+            build = [name]
+            # annotations
+            if not (token & ParamTok.NONE):
+                build.append(Config('chat_commands/help/formatter/argument/joiners/type', ':'))
+            if token & ParamTok.STRING: build.append(next(args))
+            elif token & ParamTok.TYPE: build.append(next(args).__qualname__)
+            elif token & ParamTok.UNION:
+                build.append(Config('chat_commands/help/formatter/argument/joiners/union', '|').join(next(args)))
+            # default
+            if token & ParamTok.OPTIONAL:
+                if (n := next(args)) is not None:
+                    build.append(Config('chat_commands/help/formatter/argument/joiners/default', '='))
+                    build.append(repr(n))
         @classmethod
-        def render_arg(cls, arg: inspect.Parameter) -> str:
-            Config('chat_commands/help/formatter/argument/joiners/union', '{literal_a}|{literal_b}')
-            Config('chat_commands/help/formatter/argument/joiners/type', '{argname}:{argtype}')
-            Config('chat_commands/help/formatter/argument/joiners/defaults', '{argname}={argdeflt}')
-            
-            
-            
-            
-            arg.name
-        @classmethod
-        def render_args(args: tuple[inspect.Parameter]) -> str:
-            return Config('chat_commands/help/formatter/argument/joiners/argsep', ' ').join(map(cls.render_arg, args))
+        def render_args(cls, args: tuple[inspect.Parameter]) -> str:
+            return Config('chat_commands/help/formatter/argument/joiners/argsep', ' ').join(map(cls.render_token, cls.tokenify_args(args)))
     
     class ChatCommand:
         '''
@@ -285,7 +285,7 @@ class ChatCommands:
                 Keyword-only args and varargs are ignored
             When arguments are provided by users, they are split via shlex.split
         '''
-        __slots__ = ('target', '__call__', 'permission', 'help_section')        
+        __slots__ = ('target', 'permission', 'help_section')        
 
         def __init__(self, target: typing.Callable[['User', ...], None], permission: UserManager.Perm, help_section: str | None = None):
             self.target = self.__call__ = target
@@ -301,12 +301,11 @@ class ChatCommands:
             # Call command
             #RS.CC
 
-    def __call__(self, func: functype.Callable):
+    def __call__(self, func: typing.Callable):
         ...
 
     def __init__(self):
         self.logger = RS.logger.getChild('CC')
-        self.ChatCommand = self._bind_ChatCommand()
         self.commands = {}
         self.aliases = {}
     def register(self, cmd: 'ChatCommand') -> bool:
