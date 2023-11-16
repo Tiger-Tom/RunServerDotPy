@@ -30,9 +30,11 @@ except ModuleNotFoundError:
     raise ModuleNotFoundError('Cannot find crytography module, perhaps you need to `pip install cryptography`?')
 #</Imports
 
+RS = NotImplemented
+
 #> Header >/
 class Bootstrapper:
-    __slots__ = ('args', 'args_unknown', 'root_logger', 'logger', 'Manifest', 'shutdown_callbacks')
+    __slots__ = ('args', 'args_unknown', 'root_logger', 'logger', 'Manifest', 'shutdown_callbacks', '__contained_RS_module', '__contained_RS')
     # Remotes
     #dl_man = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e/manifest.json'
     dl_man = 'http://0.0.0.0:8000/manifest.json'
@@ -142,11 +144,13 @@ class Bootstrapper:
         if self.args.update_only:
             self.logger.fatal('--update-only argument supplied, exiting')
             return
-        self.chainload_entrypoint(
-            self.stage_entrypoint(
-                self.access_entrypoint('_rsruntime/rs_ENTRYPOINT.py')
-            )
-        )
+        self.__contained_RS_module = self.access_entrypoint('_rsruntime/rs_ENTRYPOINT.py')
+        self.__contained_RS = self.stage_entrypoint(self.__contained_RS_module)
+        global RS
+        if RS != NotImplemented:
+            self.logger.warning(f'Tried to set {__file__}-level RS, but it appears to have already been set?')
+        else: RS = self.__contained_RS
+        self.chainload_entrypoint()
     ## Install and execute base manifest
     def base_manifest(self):
         mp = Path('_rsruntime/MANIFEST.json')

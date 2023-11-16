@@ -9,6 +9,7 @@ def chainload_bootstrapper():
     from _rsruntime.rs_BOOTSTRAP import Bootstrapper
     bs = Bootstrapper()
     bs.bootstrap()
+    return bs
 def fetch_bootstrapper():
     ...
 #</Header
@@ -19,4 +20,4 @@ if __name__ == '__main__':
         from _rsruntime.rs_BOOTSTRAP import Bootstrapper
     except ImportError as e:
         raise e
-    chainload_bootstrapper()
+    RS_Bootstrapper = chainload_bootstrapper()
