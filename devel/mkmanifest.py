@@ -10,6 +10,10 @@ import pysign
 import base64
 import time
 import re
+from configparser import ConfigParser
+import io
+from pprint import PrettyPrinter
+import typing
 #</Imports
 
 #> Header
@@ -77,8 +81,69 @@ def jsonify(manif: dict, long_fmt: bool, compact: bool, extra_compact: bool) -> 
     jsn = json.dumps(manif, sort_keys=False,
                      indent=None if compact or extra_compact else 4,
                      separators=(',', ':')  if extra_compact else None)
-    if compact or extra_compact: return jsn
-    return re.sub(r'^(\s*"[^"]*":\s*)(\[[\s\d,]*\])(,?\s*)$', lambda m: m.group(1)+(re.sub(fr'\s+', '', m.group(2)).replace(',', ', '))+m.group(3), jsn, flags=re.MULTILINE)
+    if not (compact or extra_compact):
+        jsn = re.sub(r'^(\s*"[^"]*":\s*)(\[[\s\d,]*\])(,?\s*)$', lambda m: m.group(1)+(re.sub(fr'\s+', '', m.group(2)).replace(',', ', '))+m.group(3), jsn, flags=re.MULTILINE)
+    eprint(jsn)
+    return jsn
+def configify(manif: dict, compact: bool) -> str:
+    def config(cfg: ConfigParser, section: tuple[str], data: dict):
+        cfg['.'.join(section)] = {}
+        for k,v in data.items():
+            if isinstance(v, dict): config(cfg, section+(k,), v)
+            else: cfg['.'.join(section)][k] = repr(v)
+    p = ConfigParser(interpolation=None)
+    config(p, ('metadata',), manif['_metadata'])
+    config(p, ('files',), {f: h for f,h in manif.items() if not f.startswith('_')})
+    sio = io.StringIO()
+    p.write(sys.stderr, not compact)
+    eprint()
+    p.write(sio, not compact)
+    return sio.getvalue()
+class BetterPPrinter: # the original one that _rsruntime/utils/betterprettyprinter.py is based on
+    __slots__ = ()
+    indent = '    '
+
+    @classmethod
+    def format(cls, obj, indent: int = 0) -> typing.Generator[str, None, None]:
+        if isinstance(obj, dict):
+            yield '{\n'
+            for k,v in obj.items():
+                yield cls.indent * (indent + 1)
+                yield from cls.format(k, indent + 1)
+                yield ': '
+                yield from cls.format(v, indent + 1)
+                yield ',\n'
+            yield cls.indent * indent
+            yield '}'
+        elif isinstance(obj, (tuple, list)):
+            istup = isinstance(obj, tuple)
+            brackets = '()' if istup else '[]'
+            if len(obj) == 0:
+                yield brackets
+                return
+            elif len(obj) == 1:
+                yield brackets[0]
+                yield from cls.format(obj[0], indent + 1)
+                if istuple: yield ','
+                yield brackets[1]
+            else:
+                yield brackets[0]
+                for i,o in enumerate(obj):
+                    newl = isinstance(o, (tuple, list, dict))
+                    if newl:
+                        yield '\n'; yield cls.indent * indent
+                    yield from cls.format(o, indent + 1)
+                    if newl: yield ','
+                    elif i < len(obj)-1: yield ', '
+                yield brackets[1]
+        else: yield repr(obj)
+def literalify(manif: dict, extra_compact: bool) -> str:
+    if extra_compact:
+        eprint(repr(manif))
+        return repr(manif)
+    fmt = ''.join((eprint('', end=tok) or tok) for tok in BetterPPrinter.format(manif))
+    eprint()
+    return fmt
 #</Header
 
 #> Main >/
@@ -106,9 +171,10 @@ def parse_args(args=None):
     # symmetric arguments
     for sub in (u, a):
         sub.add_argument('-l', '--long', help='Store the public key, signature, and hashes in long format', action='store_true')
-        sub.add_argument('-c', '--compact', help='Compact output', action='store_true')
-        sub.add_argument('-cc', '--extra-compact', help='Extra compact output', action='store_true')
+        sub.add_argument('-c', '--compact', help='Compact output in JSON and INI modes', action='store_true')
+        sub.add_argument('-cc', '--extra-compact', help='Extra compact output in JSON and Literal modes', action='store_true')
         sub.add_argument('-o', '--output', help='The file to write to (defaults to stdout)', type=Path, default=None)
+        sub.add_argument('-f', '--format', choices=('json', 'ini', 'literal'), help='The format to write in (default: "json")', default='json')
     # parse arguments
     args = p.parse_args(args)
     # update subcommand
@@ -152,9 +218,10 @@ def parse_args(args=None):
             {'version': args.version} if args.version is not None else {}
         ), args.manifest_upstream, args.file_upstream, args.long)
     # render manifest and dump to output
-    jsn = jsonify(man, args.long, args.compact, args.extra_compact)
-    eprint(jsn)
+    cfg = configify(man, args.compact or args.extra_compact) if (args.format == 'ini') \
+          else literalify(man, args.extra_compact) if (args.format == 'literal') \
+          else jsonify(man, args.long, args.compact, args.extra_compact)
     with sys.stdout if args.output is None else args.output.open('w') as f:
-        f.write(jsn)
+        f.write(cfg)
 if (__name__ == '__main__') and ('idlelib.run' not in sys.modules):
     parse_args()
