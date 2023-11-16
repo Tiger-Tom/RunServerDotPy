@@ -33,6 +33,7 @@ class ExceptionHandlers:
         self.exceptionhooks = Hooks.SingleHook()
         self.unraisablehooks = Hooks.SingleHook()
         self.threadexceptionhooks = Hooks.SingleHook()
+        RS.BS.register_onclose(self.hookout)
         self.hookin()
     def hookin(self):
         self._hookin_hooktype(sys, 'excepthook')
