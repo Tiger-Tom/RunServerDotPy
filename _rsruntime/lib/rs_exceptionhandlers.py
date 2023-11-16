@@ -10,7 +10,7 @@ from pathlib import Path
 import threading
 # Types
 import typing
-from types import TracebackType
+import types
 #</Imports
 
 # RunServer Module
@@ -33,10 +33,24 @@ class ExceptionHandlers:
         self.exceptionhooks = Hooks.SingleHook()
         self.unraisablehooks = Hooks.SingleHook()
         self.threadexceptionhooks = Hooks.SingleHook()
-        sys.excepthook = self._exception_caught
-        sys.unraisablehook = self._unraisable_caught
-        threading.excepthook = self._threaded_exception_caught
-    def register_exception_hook(self, callback: typing.Callable[[typing.Type[BaseException], typing.Any | None, TracebackType], None]):
+        self.hookin()
+    def hookin(self):
+        self._hookin_hooktype(sys, 'excepthook')
+        self._hookin_hooktype(sys, 'unraisablehook')
+        self._hookin_hooktype(threading, 'excepthook')
+    def _hookin_hooktype(self, module: types.ModuleType, name: str):
+        self.logger.warning(f'Hooking in at {module.__name__}.{name}')
+        setattr(module, name, getattr(self, f'_{module.__name__}__{name}'))
+        self.logger.infop(f'{module.__name__}.{name}=._{module.__name__}__{name}')
+    def hookout(self):
+        self._hookout_hooktype(sys, 'excepthook')
+        self._hookout_hooktype(sys, 'unraisablehook')
+        self._hookout_hooktype(threading, 'excepthook')
+    def _hookout_hooktype(self, module: types.ModuleType, name: str):
+        self.logger.warning(f'Hooking out from {module.__name__}.{name}')
+        setattr(module, name, getattr(module, f'__{name}__'))
+        self.logger.infop(f'{module.__name__}.{name}={module.__name__}.__{name}__')
+    def register_exception_hook(self, callback: typing.Callable[[typing.Type[BaseException], typing.Any | None, types.TracebackType], None]):
         self.exceptionhooks.register(callback)
     def register_unraisable_hook(self, callback: typing.Callable[['UnraisableHookArgs'], None]):
         self.unraisablehook.register(callback)
@@ -56,19 +70,19 @@ class ExceptionHandlers:
             msg = f'--EXCEPTION WHILST SAVING CONFIG AT {time.ctime()}--\n{"".join(traceback.format_exception(e))}'
             with self.conffail_dump_path.open('a') as f: f.write(msg)
             self.logger.fatal(msg)
-    def _exception_caught(self, type: typing.Type[BaseException], value: typing.Any | None, tback: TracebackType):
+    def _sys__excepthook(self, type: typing.Type[BaseException], value: typing.Any | None, tback: types.TracebackType):
         msg = f'--UNCAUGHT EXCEPTION AT {time.ctime()}--\n{"".join(traceback.format_exception(type, value=value, tb=tback))}'
         with self.exception_dump_path.open('a') as f: f.write(msg)
         self.logger.fatal(msg)
         self._try_hooks(self.exceptionhooks, type, value, tback)
         self._try_saveconfig()
-    def _unraisable_caught(self, unraisable: 'UnraisableHookArgs'):
+    def _sys__unraisablehook(self, unraisable: 'UnraisableHookArgs'):
         msg = f'--UNRAISABLE EXCEPTION ENCOUNTERED--\n {unraisable.err_msg or "Exception ignored in"}: {unraisable.object!r}\n{"".join(traceback.format_exception(unraisable.exc_type, value=unraisable.exc_value, tb=unraisable.exc_traceback))}'
         with self.unraisable_dump_path.open('a') as f: f.write(msg)
         self.logger.fatal(msg)
         self._try_hooks(self.unraisablehooks, unraisable)
         self._try_saveconfig()
-    def _threaded_exception_caught(self, args: threading.ExceptHookArgs):
+    def _threading__excepthook(self, args: threading.ExceptHookArgs):
         msg = f'--UNCAUGHT EXCEPTION ENCOUNTERED IN THREAD {args.thread!r} AT {time.ctime()}--\n{"".join(traceback.format_exception(args.exc_type, value=args.exc_value, tb=args.exc_traceback))}'
         with self.threadexception_dump_path.open('a') as f: f.write(msg)
         self.logger.fatal(msg)
