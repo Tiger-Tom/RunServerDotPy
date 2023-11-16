@@ -13,7 +13,7 @@ from collections import UserDict
 from enum import Enum
 from .timer import Timer
 from .locked_resource import basic
-from .perftimer import PerfCounter
+from .perfcounter import PerfCounter
 #</Imports
 
 #> Header >/
