@@ -7,7 +7,7 @@ import types
 import sys
 import importlib
 # RSModules
-from .util import fbd, hooks, locked_resource, perftimer, timer
+from . import util
 #</Imports
 
 #> Header >/
@@ -47,20 +47,11 @@ class RunServer(types.ModuleType):
             self.logger.fatal('RS already exists in sys.modules, continuing by overwriting but this may have consequences!')
         sys.modules['RS'] = self
         # Setup perf counter
-        pc = perftimer.PerfCounter(sec='', secs='')
+        pc = util.PerfCounter(sec='', secs='')
         self.logger.debug(f'start@T+{pc}')
         # Load: 0
         self.logger.debug(f'start:load_0@T+{pc}')
-        types.SimpleNamespace(
-            FileBackedDict = ...
-        )
-        self.Util = self.U = types.SimpleNamespace()
-        self.Util.FileBackedDict = fbd.FileBackedDict
-        self.Util.Hooks = hooks.Hooks
-        self.Util.Lockers = locked_resource
-        self.Util.PerfCounter = perftimer.PerfCounter
-        self.Util.Timer = timer.Timer
-        sys.modules['RS.Util'] = self.Util
+        sys.modules['RS.Util'] = self.Util = self.U = util
         self.logger.debug(f'finish:load_0@T+{pc}')
         # Load: 1
         self.logger.debug(f'start:load_1@T+{pc}')
@@ -111,7 +102,7 @@ class RunServer(types.ModuleType):
         # Final log
         self.logger.debug(f'finish@T+{pc}')
     def __setup_frommod(self, module: str, keys: dict[tuple[str, str], str], *, call: bool = True):
-        pc = perftimer.PerfCounter(sec='', secs='')
+        pc = util.PerfCounter(sec='', secs='')
         self.logger.info(f'Importing module: .lib.{module} [T+{pc}]')
         m = importlib.import_module(f'.lib.{module}', __package__)
         self.logger.info(f'.lib.{module} imported into {m} [T+{pc}]')
