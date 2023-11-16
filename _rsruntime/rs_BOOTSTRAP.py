@@ -139,7 +139,7 @@ class Bootstrapper:
     
     # Bootstrapping
     ## Base function
-    def bootstrap(self):
+    def bootstrap(self, close_after: bool = True):
         self.base_manifest()
         if self.args.update_only:
             self.logger.fatal('--update-only argument supplied, exiting')
@@ -151,6 +151,7 @@ class Bootstrapper:
             self.logger.warning(f'Tried to set {__file__}-level RS, but it appears to have already been set?')
         else: RS = self.__contained_RS
         self.chainload_entrypoint()
+        if close_after: self.close()
     ## Install and execute base manifest
     def base_manifest(self):
         mp = Path('_rsruntime/MANIFEST.json')
