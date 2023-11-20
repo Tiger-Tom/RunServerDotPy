@@ -47,21 +47,27 @@ class Manifest(UserDict):
     def from_ini(cls, ini: Path) -> typing.Self:
         ...
     # Compilation
+    ## Constants
+    COMPILED_KEY_ORDER = ('creation', 'metadata', 'system', 'files')
+    COMPILED_KEY_VALUE_SEP = 255
+    COMPILED_ENTRY_SEP = 0
+    ## Individual value compilers
     _val_compilers = {
         bytes: lambda b: b,
         str: lambda s: s.encode(),
         int: lambda n: n.to_bytes(((n.bit_length() + 1) + 7) // 8, signed=True),
-        type(None): lambda v: bytes(255),
+        type(None): lambda v: bytes((255,)),
     }
     @classmethod
     def _compile_value(cls, val: typing.Union[*_val_compilers] | tuple | list) -> bytes:
-        if type(val) in {tuple, list}:
+        if isinstance(val, (tuple, list)):
             return b''.join(cls._compile_value(v) for v in val)
         if type(val) not in cls._val_compilers:
-            raise TypeError(f'Cannot handle value {val} (type {type(val)})')
+            raise TypeError(f'Cannot handle type {type(val).__qualname__} (value {val!r})')
         return cls._val_compilers[type(val)](val)
+    ## Dictionary compiler
     @classmethod
-    def compile_manifest(cls, manif: dict[str, dict[str, ...]]) -> bytes:
+    def compile_dict(cls, manif: dict[str, dict[str, ...]]) -> bytes:
         '''
             Compiles dictionaries for signing
             Manifest dictionaries would normally, at this stage, have the following structure (keys and values are either types or literals):
@@ -93,8 +99,54 @@ class Manifest(UserDict):
                     str: bytes,
                     #...,
                 }
-            Each key and value is passed to _compile_value
+            These are compiled in the following order (by default, see COMPILED_KEY_ORDER):
+             - 'creation'
+             - 'metadata'
+             - 'system'
+             - 'files'
+            with each inner value being added to the compiled data as (where, by default, COMPILED_KEY_VALUE_SEP is 255 and COMPILED_ENTRY_SEP is 0):
+             - _compile_value(outer_key)
+             - COMPILED_KEY_VALUE_SEP
+             - _compile_value(inner_key)
+             - COMPILED_KEY_VALUE_SEP
+             - _compile_value(value)
+             - COMPILED_KEY_VALUE_SEP
+             - COMPILED_ENTRY_SEP
+            So, to add "manif['creation']['at']", where the value is 1700515559, the function would add:
+             - _compile_value('creation')
+             - COMPILED_KEY_VALUE_SEP
+             - _compile_value('at')
+             - COMPILED_KEY_VALUE_SEP
+             - _compile_value(1700515559)
+             - COMPILED_KEY_VALUE_SEP
+             - COMPILED_ENTRY_SEP
         '''
+        # Bring in values for readability (and I suppose for a tiny inner loop efficiency bonus)
+        compile_val = cls._compile_value
+        COMPILED_KEY_VAL_SEP = cls.COMPILED_KEY_VALUE_SEP; COMPILED_ENTRY_SEP = cls.COMPILED_ENTRY_SEP
+        # Generators
+        compiler = ((*compile_val(outer_key), COMPILED_KEY_VAL_SEP, *compile_val(inner_key), COMPILED_KEY_VAL_SEP, *compile_val(value), COMPILED_KEY_VAL_SEP, COMPILED_ENTRY_SEP)
+                    for outer_key in cls.COMPILED_KEY_ORDER for inner_key,value in manif[outer_key].items())
+        flattener = (byte for bytes_ in compiler for byte in bytes_)
+        # Evaluate and render into bytes
+        return bytes(flattener)
+    
+        # Why the generators above are all seperated:
+        #return bytes(byte for bytes_ in ((*compile_val(outer_key), COMPILED_KEY_VAL_SEP, *compile_val(inner_key), COMPILED_KEY_VAL_SEP, *compile_val(value), COMPILED_KEY_VAL_SEP, COMPILED_ENTRY_SEP)
+        #                                 for outer_key in cls.COMPILED_KEY_ORDER for inner_key,value in manif[outer_key].items()) for byte in bytes_)
+        
+        # Original prototype code for the sake of readability versus the monstrosity above:
+        #compd = bytearray()
+        #for k in cls.COMPILED_KEY_ORDER:
+        #    for ik,iv in manif[k].items():
+        #        compd.extend(cls._compile_value(k))
+        #        compd.append(cls.COMPILED_KEY_VALUE_SEP)
+        #        compd.extend(cls._compile_value(ik))
+        #        compd.append(cls.COMPILED_KEY_VALUE_SEP)
+        #        compd.extend(cls._compile_value(iv))
+        #        compd.extend((cls.COMPILED_KEY_VALUE_SEP, cls.COMPILED_ENTRY_SEP))
+        #return bytes(compd)
+        
 
     # methods for manifest generation
     class _ManifestFactory:
