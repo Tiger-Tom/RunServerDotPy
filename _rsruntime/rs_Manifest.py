@@ -10,42 +10,142 @@ import os
 import sys
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey as EdPrivK, Ed25519PublicKey as EdPubK
 import base64
+import hashlib
+import json
+import re
+from configparser import ConfigParser
+import io
+from ast import literal_eval
+import logging
+import traceback
 #</Imports
 
 #> Header >/
 class Manifest(UserDict):
-    __slots__ = ('_path', '_path_type')
+    __slots__ = ('own_path', 'base_path')
     type_to_suffix = {
-        'json': '.json',
         'ini': '.ini',
+        'json': '.json',
     }; suffix_to_type = {v: k for k,v in type_to_suffix.items()}
 
+    # Helper / compat function
+    @staticmethod
+    def _logger() -> logging.Logger:
+        '''Ensures compatability whether or not the logger is set up'''
+        logger = logging.getLogger('RS.BS.M')
+        if not hasattr(logger, 'infop'):
+            logger.infop = logger.warning
+        return logger
     # Constructors
     def __init__(self):
-        ...
+        '''Use from_dict or from_file instead (from_json and from_ini can be called through from_file or directly)'''
+        raise TypeError('Should not be initialized here, use from_dict or from_file')
+    ## Setters
+    def set_path(self, *, base: Path | None = None, own: Path | None = None) -> typing.Self:
+        '''Sets the manifest's "target" and "own" paths, and returns the Manifest object for chaining'''
+        if base is not None: self.base_path = base
+        if own is not None: self.own_path = own
+        return self
     ## From
     @classmethod
     def from_dict(cls, d: dict) -> typing.Self:
-        self = object.__init__(cls)
-        self.data = d
+        '''Initializes the UserDict superclass with a new instance of Manifest, setting d as its "data" attribute'''
+        self = object.__new__(cls)
+        UserDict.__init__(self, d)
         return self
+    ### From string types
+    @classmethod
+    def from_json(cls, jsn: str) -> typing.Self:
+        '''
+            Generates a Manifest instance from JSON text
+                Convenience method for Manifest.from_json(Manifest.dict_from_json_text(...))
+        '''
+        return cls.from_dict(cls.dict_from_json_text(jsn))
+    @classmethod
+    def from_ini(cls, ini: str) -> typing.Self:
+        '''
+            Generates a Manifest instance from INI text
+                Convenience method for Manifest.from_dict(Manifest.dict_from_ini_text(...))
+        '''
+        return cls.from_dict(cls.dict_from_ini_text(ini))
+    #### Dict from string types
+    @staticmethod
+    def dict_from_json_text(jsn: str) -> dict:
+        '''
+            Helper method to convert JSON text to a dictionary
+                Current implementation just calls json.loads
+        '''
+        return json.loads(jsn)
+    @staticmethod
+    def dict_from_ini_text(ini: str) -> dict:
+        '''
+            Helper method to convert INI text into a dict
+            Notes:
+              - interpolation is disabled
+              - keys are case-sensitive
+        '''
+        p = ConfigParser(interpolation=None)
+        p.optionxform = lambda o: o # prevents lowercasing of filenames
+        p.read_string(ini)
+        data = {}
+        for k,v in p.items():
+            if k == 'DEFAULT': continue
+            data[k] = {ik: literal_eval(iv) for ik,iv in v.items()}
+        return data
     ### From files
+    @classmethod
     def from_file(cls, path: Path, path_type: typing.Literal[*type_to_suffix] | None = None) -> typing.Self:
-        self.path = path
+        '''
+            Initializes Manifest from a file.
+            Can load from the following file types:
+                'json': .json files
+                'ini': .ini files
+            If path_type is given, then attempts to load a file of that type
+            Otherwise, path_type is guessed from path's suffix, using Manifest.suffix_to_type
+        '''
+        logger = cls._logger()
         if path_type is None:
             # Guess it through the path suffix
-            if path.suffix not in self.suffix_to_type:
-                raise NotImplementedError(f'Cannot parse manifest with extension {path.suffix!r}')
-            self.path_type = self.suffix_to_type[path.suffix]
-        else:
-            assert path_type in self.type_to_suffix
-            self.path_type = path_type
-    @classmethod
-    def from_json(cls, jsn: Path) -> typing.Self:
-        ...
-    @classmethod
-    def from_ini(cls, ini: Path) -> typing.Self:
-        ...
+            if path.suffix in cls.suffix_to_type:
+                path_type = cls.suffix_to_type[path.suffix]
+            else:
+                logger.warning(f'path_type not given, and guessing it via the path\'s suffix ({path.suffix=}) failed')
+                data = path.read_text()
+                for k,v in cls.type_to_handler:
+                    try:
+                        logger.infop(f'Trying {k!r} handler on contents of {path}')
+                        return v(data)
+                    except Exception as e:
+                        logger.error(f'{k!r} handler failed on contents of {path} failed:\n{traceback.format_exception(e)}')
+                raise NotImplementedError(f'Cannot parse manifest with extension {path.suffix!r}, no handlers succeeded')
+        if path_type not in cls.type_to_suffix:
+            raise TypeError(f'Illegal path type {path_type!r}')
+        data = path.read_text()
+        return getattr(cls, f'from_{path_type}')(data).set_paths(base=path.parent, own=path)
+    # Rendering
+    JSON_ARRAY_CLEANER_A = re.compile(r'^(\s*"[^"]*":\s*)(\[[^\]]*\])(,?\s*)$', re.MULTILINE)
+    JSON_ARRAY_CLEANER_B = staticmethod(lambda m: m.group(1)+(re.sub(r'\s+', '', m.group(2)).replace(',', ', '))+m.group(3))
+    def render_json(self, to: typing.TextIO | None = None) -> str:
+        data = self.JSON_ARRAY_CLEANER_A.sub(self.JSON_ARRAY_CLEANER_B, json.dumps(self.data, sort_keys=False, indent=4))
+        if to is not None: to.write(data)
+        return data
+    def render_ini(self, to: None | typing.TextIO = None) -> str | None:
+        p = ConfigParser(interpolation=None)
+        p.optionxform = lambda o: o # prevents lowercasing of filenames
+        for ok,ov in self.data.items():
+            p[ok] = {ik: repr(iv) for ik,iv in ov.items()}
+        if to is None:
+            sio = io.StringIO()
+            p.write(sio)
+            return sio.getvalue()
+        p.write(to)
+        return None
+    # Data extraction
+    def i_d_files(self) -> typing.Generator[tuple[Path, bytes], None, None]:
+        return (((self.base_path / k), base64.b85decode(v)) for k,v in self.data['files'].items())
+    @property
+    def d_files(self) -> dict[Path, bytes]:
+        return dict(self.i_d_files())
     # Compilation
     ## Constants
     COMPILED_KEY_ORDER = ('creation', 'metadata', 'system', 'files')
@@ -71,7 +171,7 @@ class Manifest(UserDict):
         '''
             Compiles dictionaries for signing
             Manifest dictionaries would normally, at this stage, have the following structure (keys and values are either types or literals):
-                '_cryptography': NotImplemented,
+                '_': NotImplemented,
                 'creation': {
                     'at': int,
                     'by': str,
@@ -131,7 +231,7 @@ class Manifest(UserDict):
         # Evaluate and render into bytes
         return bytes(flattener)
     
-        # Why the generators above are all seperated:
+        # Why the generators above are split and named:
         #return bytes(byte for bytes_ in ((*compile_val(outer_key), COMPILED_KEY_VAL_SEP, *compile_val(inner_key), COMPILED_KEY_VAL_SEP, *compile_val(value), COMPILED_KEY_VAL_SEP, COMPILED_ENTRY_SEP)
         #                                 for outer_key in cls.COMPILED_KEY_ORDER for inner_key,value in manif[outer_key].items()) for byte in bytes_)
         
@@ -154,14 +254,15 @@ class Manifest(UserDict):
         def __init__(self, manif: typing.Type['Manifest']):
             self.Manifest = Manifest
         def __call__(self) -> 'Manifest':
-            ...
+            '''Convenience wrapper for (self.)Manifest.from_dict(Manifest.ManifestFactory.generate_dict(...))'''
         # Fields
         ## "_" field
-        def gen_field__(self, pub_key: EdPubK, sig: bytes) -> dict[str, str]:
+        def gen_field__(self, *, hash_algorithm: typing.Literal[*hashlib.algorithms_available], pub_key: EdPubK, sig: bytes) -> dict:
             return {
                 'encoding': sys.getdefaultencoding(),
-                'pubkey': base64.b85encode(pub_key.public_bytes_raw()),
-                'signature': base64.b85encode(sig),
+                'hash_algorithm': hash_algorithm,
+                'pubkey': base64.b85encode(pub_key.public_bytes_raw()).decode(),
+                'signature': base64.b85encode(sig).decode(),
             }
         # "creation" field
         def gen_field_creation(self, *,
@@ -222,30 +323,64 @@ class Manifest(UserDict):
                 '_info_level': 0,
             }
         # File hashing
-        def files_from_path(self, path: Path, patterns: tuple[str] = ('**/*.py', '**/rs_*')):
-            ...
+        @staticmethod
+        def files_from_path(path: Path, patterns: tuple[str] = ('**/*.py', '**/rs_*'), exclude_suffixes: tuple[str] = ('.pyc',)) -> set[Path]:
+            files = set()
+            #for pat in patterns:
+            #    files |= set(p for p in path.glob(pat) if p.suffix not in exclude)
+            tuple(map(lambda pat: files.update(p.relative_to(path) for p in path.glob(pat) if p.suffix not in exclude_suffixes), patterns))
+            return files
+        @classmethod
+        def hash_files(cls, algorithm: str, files: set[Path]) -> dict[Path, bytes]:
+            assert algorithm in hashlib.algorithms_guaranteed
+            hashes = {}
+            for p in sorted((p for p in files), key=lambda p: (len(p.parents), p)):
+                with p.open('rb') as f:
+                    hashes[p] = hashlib.file_digest(f, algorithm).digest()
+            return hashes
         # Generation functions
-        def generate_metadatas(self, *,
-                               system_info_level: typing.Literal['full', 'lite', 'none'] = 'full',
-                               name: str, manifest_upstream: str, content_upstream: str,
-                               by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None) -> dict[str, dict]:
+        def generate_outline(self, *,
+                             system_info_level: typing.Literal['full', 'lite', 'none'] = 'full',
+                             name: str, manifest_upstream: str, content_upstream: str,
+                             by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None) -> dict[str, dict]:
             '''
                 Generates and completes the following fields:
                     creation, metadata, system
                 Creates but does not populate the following fields:
-                    _cryptography, files
+                    _, files
             '''
             assert system_info_level in {'full', 'lite', 'none'}
             return {
-                '_cryptography': NotImplemented,
+                '_': NotImplemented,
                 'creation': self.gen_field_creation(by=by, aka=aka, contact=contact, description=description),
                 'metadata': self.gen_field_metadata(name=name, manifest_upstream=manifest_upstream, content_upstream=content_upstream),
                 'system': getattr(self, f'field_system_info__{system_info_level}'),
                 'files': NotImplemented,
             }
-        def generate(self) -> 'Manifest':
+        def generate_cryptography(self, hash_algorithm: typing.Literal[*hashlib.algorithms_available], key: EdPrivK, data: bytes) -> dict:
+            '''Does everything necessary to populate the "_" field'''
+            return self.gen_field__(hash_algorithm=hash_algorithm, pub_key=key.public_key(), sig=key.sign(data))
+        def generate_files(self, algorithm: typing.Literal[*hashlib.algorithms_available], path: Path) -> dict[str, str]:
+            '''
+                Finds the files under path, then returns a dict with the key being:
+                    the posix representation of the files (relative to path)
+                and the value being:
+                    the base85 encoded hash
+            '''
+            return {k.as_posix(): base64.b85encode(v).decode() for k,v in
+                    self.hash_files(algorithm, self.files_from_path(path)).items()}
+        def generate_dict(self, *,
+                          path: Path,
+                          hash_algorithm: typing.Literal[*hashlib.algorithms_available] = 'sha1', key: EdPrivK,
+                          system_info_level: typing.Literal['full', 'lite', 'none'] = 'full',
+                          name: str, manifest_upstream: str, content_upstream: str,
+                          by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None) -> dict:
+            '''Generates a manifest-dict from the given attributes'''
+            data = self.generate_outline(system_info_level=system_info_level, name=name, manifest_upstream=manifest_upstream, content_upstream=content_upstream, by=by, aka=aka, contact=contact, description=description)
+            data['files'] = self.generate_files(hash_algorithm, path)
+            data['_'] = self.generate_cryptography(hash_algorithm, key, self.Manifest.compile_dict(data))
+            return data
             
-            self.Manifest
     @classmethod
     @property
     def ManifestFactory(cls) -> _ManifestFactory:
