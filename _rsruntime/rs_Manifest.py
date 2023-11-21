@@ -62,12 +62,12 @@ ManifestDict = typing.TypedDict('ManifestDict', {
 })
 # Manifest class
 class Manifest(UserDict):
-    __slots__ = ('own_path', 'base_path')
+    __slots__ = ('own_path', 'base_path', 'logger')
     type_to_suffix = {
         'ini': '.ini',
         'json': '.json',
     }; suffix_to_type = {v: k for k,v in type_to_suffix.items()}
-
+    
     # Helper / compat function
     @staticmethod
     def _logger() -> logging.Logger:
@@ -80,6 +80,12 @@ class Manifest(UserDict):
     def __init__(self):
         '''Use from_dict or from_file instead (from_json and from_ini can be called through from_file or directly)'''
         raise TypeError('Should not be initialized here, use from_dict or from_file')
+    @classmethod
+    def __internal_init(cls):
+        self = object.__new__(cls)
+        self.logger = self._logger()
+        return self
+        
     ## Setters
     def set_path(self, *, base: Path | None = None, own: Path | None = None) -> typing.Self:
         '''Sets the manifest's "target" and "own" paths, and returns the Manifest object for chaining'''
@@ -90,7 +96,7 @@ class Manifest(UserDict):
     @classmethod
     def from_dict(cls, d: ManifestDict) -> typing.Self:
         '''Initializes the UserDict superclass with a new instance of Manifest, setting d as its "data" attribute'''
-        self = object.__new__(cls)
+        self = cls.__internal_init()
         UserDict.__init__(self, d)
         return self
     ### From string types
@@ -111,19 +117,11 @@ class Manifest(UserDict):
     #### Dict from string types
     @staticmethod
     def dict_from_json_text(jsn: str) -> ManifestDict:
-        '''
-            Helper method to convert JSON text to a dictionary
-                Current implementation just calls json.loads
-        '''
+        '''Helper method to convert JSON text to a dictionary (current implementation just calls json.loads)'''
         return json.loads(jsn)
     @staticmethod
     def dict_from_ini_text(ini: str) -> ManifestDict:
-        '''
-            Helper method to convert INI text into a dict
-            Notes:
-              - interpolation is disabled
-              - keys are case-sensitive
-        '''
+        '''Helper method to convert INI text into a dict (note that interpolation is disabled and keys are case-sensitive)'''
         p = ConfigParser(interpolation=None)
         p.optionxform = lambda o: o # prevents lowercasing of filenames
         p.read_string(ini)
@@ -149,14 +147,15 @@ class Manifest(UserDict):
             if path.suffix in cls.suffix_to_type:
                 path_type = cls.suffix_to_type[path.suffix]
             else:
+                # Try every handler
                 logger.warning(f'path_type not given, and guessing it via the path\'s suffix ({path.suffix=}) failed')
                 data = path.read_text()
-                for k,v in cls.type_to_handler:
+                for k in cls.type_to_suffix:
                     try:
-                        logger.infop(f'Trying {k!r} handler on contents of {path}')
-                        return v(data)
+                        logger.infop(f'Trying {k} handler on contents of {path}')
+                        return getattr(cls, f'from_{k}')(data)
                     except Exception as e:
-                        logger.error(f'{k!r} handler failed on contents of {path} failed:\n{traceback.format_exception(e)}')
+                        logger.error(f'{k} handler failed on contents of {path} failed:\n{traceback.format_exception(e)}')
                 raise NotImplementedError(f'Cannot parse manifest with extension {path.suffix!r}, no handlers succeeded')
         if path_type not in cls.type_to_suffix:
             raise TypeError(f'Illegal path type {path_type!r}')
@@ -166,10 +165,12 @@ class Manifest(UserDict):
     JSON_ARRAY_CLEANER_A = re.compile(r'^(\s*"[^"]*":\s*)(\[[^\]]*\])(,?\s*)$', re.MULTILINE)
     JSON_ARRAY_CLEANER_B = staticmethod(lambda m: m.group(1)+(re.sub(r'\s+', '', m.group(2)).replace(',', ', '))+m.group(3))
     def render_json(self, to: typing.TextIO | None = None) -> str:
+        '''Render the Manifest dictionary to JSON (if `to` is given, write it to `to` and return the JSON string)'''
         data = self.JSON_ARRAY_CLEANER_A.sub(self.JSON_ARRAY_CLEANER_B, json.dumps(self.data, sort_keys=False, indent=4))
         if to is not None: to.write(data)
         return data
     def render_ini(self, to: None | typing.TextIO = None) -> str | None:
+        '''Render the Manifest dictionary to INI (if `to` is given, write it to `to` and return None)'''
         p = ConfigParser(interpolation=None)
         p.optionxform = lambda o: o # prevents lowercasing of filenames
         for ok,ov in self.data.items():
@@ -211,26 +212,11 @@ class Manifest(UserDict):
         '''
             Compiles dictionaries for signing
             Keys are compiled in the following order (by default, see COMPILED_KEY_ORDER):
-             - 'creation'
-             - 'metadata'
-             - 'system'
-             - 'files'
+                'creation', 'metadata', 'system', 'files'
             with each inner value being added to the compiled data as (where, by default, COMPILED_KEY_VALUE_SEP is 255 and COMPILED_ENTRY_SEP is 0):
-             - _compile_value(outer_key)
-             - COMPILED_KEY_VALUE_SEP
-             - _compile_value(inner_key)
-             - COMPILED_KEY_VALUE_SEP
-             - _compile_value(value)
-             - COMPILED_KEY_VALUE_SEP
-             - COMPILED_ENTRY_SEP
+                _compile_value(outer_key), COMPILED_KEY_VALUE_SEP, _compile_value(inner_key), COMPILED_KEY_VALUE_SEP, _compile_value(value), COMPILED_KEY_VALUE_SEP, COMPILED_ENTRY_SEP
             So, to add "manif['creation']['at']", where the value is 1700515559, the function would add:
-             - _compile_value('creation')
-             - COMPILED_KEY_VALUE_SEP
-             - _compile_value('at')
-             - COMPILED_KEY_VALUE_SEP
-             - _compile_value(1700515559)
-             - COMPILED_KEY_VALUE_SEP
-             - COMPILED_ENTRY_SEP
+                _compile_value('creation'), COMPILED_KEY_VALUE_SEP, _compile_value('at'), COMPILED_KEY_VALUE_SEP, _compile_value(1700515559), COMPILED_KEY_VALUE_SEP, COMPILED_ENTRY_SEP
         '''
         # Bring in values for readability (and I suppose for a tiny inner loop efficiency bonus)
         compile_val = cls._compile_value
@@ -241,11 +227,9 @@ class Manifest(UserDict):
         flattener = (byte for bytes_ in compiler for byte in bytes_)
         # Evaluate and render into bytes
         return bytes(flattener)
-    
         # Why the generators above are split and named:
         #return bytes(byte for bytes_ in ((*compile_val(outer_key), COMPILED_KEY_VAL_SEP, *compile_val(inner_key), COMPILED_KEY_VAL_SEP, *compile_val(value), COMPILED_KEY_VAL_SEP, COMPILED_ENTRY_SEP)
         #                                 for outer_key in cls.COMPILED_KEY_ORDER for inner_key,value in manif[outer_key].items()) for byte in bytes_)
-        
         # Original prototype code for the sake of readability versus the monstrosity above:
         #compd = bytearray()
         #for k in cls.COMPILED_KEY_ORDER:
@@ -257,13 +241,11 @@ class Manifest(UserDict):
         #        compd.extend(cls._compile_value(iv))
         #        compd.extend((cls.COMPILED_KEY_VALUE_SEP, cls.COMPILED_ENTRY_SEP))
         #return bytes(compd)
-        
 
     # methods for manifest generation
     class _ManifestFactory:
         __slots__ = ('Manifest',)
-        def __init__(self, manif: typing.Type['Manifest']):
-            self.Manifest = Manifest
+        def __init__(self, manif: typing.Type['Manifest']): self.Manifest = Manifest
         # Fields
         ## "_" field
         def gen_field__(self, *, hash_algorithm: typing.Literal[*hashlib.algorithms_available], pub_key: EdPubK, sig: bytes) -> ManifestDict__:
@@ -292,29 +274,6 @@ class Manifest(UserDict):
                 'content_upstream': content_upstream,
             }
         # system info field
-        @classmethod
-        @property
-        def field_system_info__full(cls) -> ManifestDict_system:
-            unam = os.uname()
-            return cls.field_system_info__lite | {
-                'platform': sys.platform,
-                'python_version': sys.version_info[:],
-                'os_release': unam.release,
-                'os_version': unam.version,
-                'hostname': unam.nodename,
-                '_info_level': 2,
-            }
-        @classmethod
-        @property
-        def field_system_info__lite(cls) -> ManifestDict_system:
-            unam = os.uname()
-            return cls.field_system_info__none | {
-                'os_name': os.name,
-                'architecture': unam.machine,
-                'python_version': sys.version_info[:3],
-                'python_implementation': sys.implementation.name,
-                '_info_level': 1,
-            }
         field_system_info__none: ManifestDict_system = {
             # more important system info
             'os_name': None,               # lite
@@ -330,21 +289,29 @@ class Manifest(UserDict):
             # metadata
             '_info_level': 0,
         }
+        field_system_info__lite: ManifestDict_system = field_system_info__none | {
+            'os_name': os.name,
+            'architecture': os.uname().machine,
+            'python_version': sys.version_info[:3],
+            'python_implementation': sys.implementation.name,
+            '_info_level': 1,
+        }
+        field_system_info__full: ManifestDict_system = field_system_info__lite | {
+            'platform': sys.platform,
+            'python_version': sys.version_info[:],
+            'os_release': os.uname().release,
+            'os_version': os.uname().version,
+            'hostname': os.uname().nodename,
+            '_info_level': 2,
+        }
         # File hashing
         @staticmethod
         def files_from_path(path: Path, patterns: tuple[str] = ('**/*.py', '**/rs_*'), exclude_suffixes: tuple[str] = ('.pyc',)) -> set[Path]:
-            files = set()
-            #for pat in patterns:
-            #    files |= set(p for p in path.glob(pat) if p.suffix not in exclude)
-            tuple(map(lambda pat: files.update(p.relative_to(path) for p in path.glob(pat) if p.suffix not in exclude_suffixes), patterns))
-            return files
+            return set(file.relative_to(path) for pattern in patterns for file in path.glob(pattern) if file.suffix not in exclude_suffixes)
         @classmethod
         def hash_files(cls, algorithm: str, files: set[Path]) -> dict[Path, bytes]:
             assert algorithm in hashlib.algorithms_guaranteed
-            hashes = {}
-            for p in sorted((p for p in files), key=lambda p: (len(p.parents), p)):
-                with p.open('rb') as f:
-                    hashes[p] = hashlib.file_digest(f, algorithm).digest()
+            return {p: hashlib.new(algorithm, p.read_bytes()).digest() for p in sorted(files, key=lambda p: p.parts)}
             return hashes
         # Generation functions
         def generate_outline(self, *,
@@ -352,10 +319,8 @@ class Manifest(UserDict):
                              name: str, manifest_upstream: str, content_upstream: str,
                              by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None) -> ManifestDict:
             '''
-                Generates and completes the following fields:
-                    creation, metadata, system
-                Creates but does not populate the following fields:
-                    _, files
+                Generates and completes the following fields: 'creation', 'metadata', 'system'
+                Creates but does not populate the following fields: '_', 'files'
             '''
             assert system_info_level in {'full', 'lite', 'none'}
             return {
@@ -370,10 +335,9 @@ class Manifest(UserDict):
             return self.gen_field__(hash_algorithm=hash_algorithm, pub_key=key.public_key(), sig=key.sign(data))
         def generate_files(self, algorithm: typing.Literal[*hashlib.algorithms_available], path: Path) -> ManifestDict_files:
             '''
-                Finds the files under path, then returns a dict with the key being:
-                    the posix representation of the files (relative to path)
-                and the value being:
-                    the base85 encoded hash
+                Finds the files under path, then returns a dict with the key being
+                 the posix representation of the files (relative to path)
+                 and the value being the base85 encoded hash
             '''
             return {k.as_posix(): base64.b85encode(v).decode() for k,v in
                     self.hash_files(algorithm, self.files_from_path(path)).items()}
@@ -382,8 +346,7 @@ class Manifest(UserDict):
                           hash_algorithm: typing.Literal[*hashlib.algorithms_available] = 'sha1', key: EdPrivK | Path,
                           system_info_level: typing.Literal['full', 'lite', 'none'] = 'full') -> ManifestDict:
             '''Generates a manifest-dict from the given attributes'''
-            if isinstance(key, Path):
-                key = EdPrivK.from_private_bytes(key.read_bytes())
+            if isinstance(key, Path): key = EdPrivK.from_private_bytes(key.read_bytes())
             data = self.generate_outline(system_info_level=system_info_level, name=name, manifest_upstream=manifest_upstream, content_upstream=content_upstream, by=by, aka=aka, contact=contact, description=description)
             data['files'] = self.generate_files(hash_algorithm, path)
             data['_'] = self.generate_cryptography(hash_algorithm, key, self.Manifest.compile_dict(data))
