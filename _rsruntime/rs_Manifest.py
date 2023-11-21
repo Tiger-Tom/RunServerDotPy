@@ -88,26 +88,32 @@ class Manifest(UserDict):
         if (not override) and self.get('ignore', {}).get('skip_upstream_upgrade', False):
             self.logger.fatal(f'Manifest {self.name} requested to not be upgraded, skipping')
             return
-        upstream = self['metadata']['manifest_upstream']
         owntype = getattr(self, 'own_type', self.suffix_to_type.get(self.own_path.suffix, None))
         if owntype is None:
             owntype = next(self.type_to_suffix.keys())
             self.logger.error(f'Could not automatically determine current type of manifest {self.name} at {self.own_path}, will write as {owntype}')
-        self.logger.infop(f'Updating manifest {self.name}, upstream is {upstream}')
-        try: newmanif = self.from_remote(upstream)
+        self.logger.infop(f'Updating manifest {self.name}, upstream is {self["metadata"]["manifest_upstream"]}')
+        try: newmanif = self.from_remote(self['metadata']['manifest_upstream']).set_path(base=self.base_path, own=self.own_path)
         except Exception as e:
-            self.logger.fatal(f'Could not update manifest {self.name} (from {upstream}), got error:\n{"".join(traceback.format_exception(e))}')
+            self.logger.fatal(f'Could not update manifest {self.name} (from {self["metadata"]["manifest_upstream"]}), got error:\n{"".join(traceback.format_exception(e))}')
             return
-        if self.data == newmanif.data or False:
+        if self.data == newmanif.data and False:
             self.logger.infop(f'Upstream manifest matches local manifest, no upgrade needed')
             return
         if self.d_pubkey != newmanif.d_pubkey:
-            self.logger.warning(f'Local manifest {self.name} has a different public key than upstream manifest:\n{self["_"]["pubkey"]}\n{newmanif["_"]["pubkey"]}')
+            self.logger.warning(f'Local manifest {self.name} has a different public key than upstream manifest, it will likely fail verification:\n{self["_"]["pubkey"]}\n{newmanif["_"]["pubkey"]}')
         self.logger.info(f'Verifying {newmanif.name} on {self["_"]["pubkey"]}')
         try: self.verify(newmanif)
         except InvalidSignature:
             self.logger.fatal('Manifest {newmanif.name} failed verification')
-        
+            if (not ask) or input('Install manifest anyway? (y/N').lower().startswith('y'): return
+        for f in (self.d_files.keys() - newmanif.d_files.keys()):
+            self.logger.error(f'Stale file {f} is in local manifest {self.name} but not upstream manifest (may need to be removed manually)')
+        for f in (newmanif.d_files.keys() - self.d_files.keys()):
+            self.logger.warning(f'New file {f} needs to be downloaded according to upstream manifest {newmanif.name}')
+        self |= newmanif
+        self.logger.infop(f'New manifest {self.name} folded into local, writing back local at {self.own_path} as {owntype}')
+        with self.own_path.open('w') as f: getattr(self, f'render_{owntype}')(f)
     # Execution
     def execute(self, ask: bool = True, override: bool = False):
         self.logger.infop(f'Executing manifest {self.name} on {self.base_path}')
