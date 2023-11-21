@@ -18,9 +18,49 @@ import io
 from ast import literal_eval
 import logging
 import traceback
+import functools
 #</Imports
 
 #> Header >/
+# Manifest typehints
+ManifestDict__ = typing.TypedDict("ManifestDict['_']", {
+    'encoding': str,
+    'hash_algorithm': typing.Literal[*hashlib.algorithms_available],
+    'pubkey': str,
+    'signature': str,
+})
+ManifestDict_creation = typing.TypedDict("ManifestDict['creation']", {
+    'at': int,
+    'by': str,
+    'aka': str | None,
+    'contact': str | None,
+    'description': str | None,
+})
+ManifestDict_metadata = typing.TypedDict("ManifestDict['metadata']", {
+    'name': str,
+    'manifest_upstream': str,
+    'content_upstream': str,
+})
+ManifestDict_system = typing.TypedDict('ManifestDict[\'system\']', {
+    'os_name': str | None,
+    'platform': str | None,
+    'architecture': str | None,
+    'python_version': tuple[int | str] | None,
+    'python_implementation': str | None,
+    'os_release': str | None,
+    'os_version': str | None,
+    'hostname': str | None,
+    '_info_level': int,
+})
+ManifestDict_files = typing.Dict[str, bytes]
+ManifestDict = typing.TypedDict('ManifestDict', {
+    '_': ManifestDict__,
+    'creation': ManifestDict_creation,
+    'metadata': ManifestDict_metadata,
+    'system': ManifestDict_system,
+    'files': ManifestDict_files,
+})
+# Manifest class
 class Manifest(UserDict):
     __slots__ = ('own_path', 'base_path')
     type_to_suffix = {
@@ -48,7 +88,7 @@ class Manifest(UserDict):
         return self
     ## From
     @classmethod
-    def from_dict(cls, d: dict) -> typing.Self:
+    def from_dict(cls, d: ManifestDict) -> typing.Self:
         '''Initializes the UserDict superclass with a new instance of Manifest, setting d as its "data" attribute'''
         self = object.__new__(cls)
         UserDict.__init__(self, d)
@@ -70,14 +110,14 @@ class Manifest(UserDict):
         return cls.from_dict(cls.dict_from_ini_text(ini))
     #### Dict from string types
     @staticmethod
-    def dict_from_json_text(jsn: str) -> dict:
+    def dict_from_json_text(jsn: str) -> ManifestDict:
         '''
             Helper method to convert JSON text to a dictionary
                 Current implementation just calls json.loads
         '''
         return json.loads(jsn)
     @staticmethod
-    def dict_from_ini_text(ini: str) -> dict:
+    def dict_from_ini_text(ini: str) -> ManifestDict:
         '''
             Helper method to convert INI text into a dict
             Notes:
@@ -144,8 +184,8 @@ class Manifest(UserDict):
     def i_d_files(self) -> typing.Generator[tuple[Path, bytes], None, None]:
         return (((self.base_path / k), base64.b85decode(v)) for k,v in self.data['files'].items())
     @property
-    def d_files(self) -> dict[Path, bytes]:
-        return dict(self.i_d_files())
+    def d_files(self) -> ManifestDict_files:
+        return ManifestDict_files(self.i_d_files())
     # Compilation
     ## Constants
     COMPILED_KEY_ORDER = ('creation', 'metadata', 'system', 'files')
@@ -167,39 +207,10 @@ class Manifest(UserDict):
         return cls._val_compilers[type(val)](val)
     ## Dictionary compiler
     @classmethod
-    def compile_dict(cls, manif: dict[str, dict[str, ...]]) -> bytes:
+    def compile_dict(cls, manif: ManifestDict) -> bytes:
         '''
             Compiles dictionaries for signing
-            Manifest dictionaries would normally, at this stage, have the following structure (keys and values are either types or literals):
-                '_': NotImplemented,
-                'creation': {
-                    'at': int,
-                    'by': str,
-                    'aka': str | None,
-                    'contact': str | None,
-                    'description': str | None,
-                },
-                'metadata': {
-                    'name': str,
-                    'manifest_upstream': str,
-                    'content_upstream': str,
-                },
-                'system': {
-                    'os_name': str | None,
-                    'platform': str | None,
-                    'architecture': str | None,
-                    'python_version': tuple[int | str] | None,
-                    'python_implementation': str | None,
-                    'os_release': str | None,
-                    'os_version': str | None,
-                    'hostname': str | None,
-                    '_info_level': int,
-                },
-                'files': {
-                    str: bytes,
-                    #...,
-                }
-            These are compiled in the following order (by default, see COMPILED_KEY_ORDER):
+            Keys are compiled in the following order (by default, see COMPILED_KEY_ORDER):
              - 'creation'
              - 'metadata'
              - 'system'
@@ -253,11 +264,9 @@ class Manifest(UserDict):
         __slots__ = ('Manifest',)
         def __init__(self, manif: typing.Type['Manifest']):
             self.Manifest = Manifest
-        def __call__(self) -> 'Manifest':
-            '''Convenience wrapper for (self.)Manifest.from_dict(Manifest.ManifestFactory.generate_dict(...))'''
         # Fields
         ## "_" field
-        def gen_field__(self, *, hash_algorithm: typing.Literal[*hashlib.algorithms_available], pub_key: EdPubK, sig: bytes) -> dict:
+        def gen_field__(self, *, hash_algorithm: typing.Literal[*hashlib.algorithms_available], pub_key: EdPubK, sig: bytes) -> ManifestDict__:
             return {
                 'encoding': sys.getdefaultencoding(),
                 'hash_algorithm': hash_algorithm,
@@ -268,7 +277,7 @@ class Manifest(UserDict):
         def gen_field_creation(self, *,
                                by: str | None, aka: str | None = None,
                                contact: str | None = None,
-                               description: str | None = None) -> dict[str, int | str | None]:
+                               description: str | None = None) -> ManifestDict_creation:
             return {
                 'at': round(time.time()),
                 'by': by, 'aka': aka,
@@ -276,17 +285,18 @@ class Manifest(UserDict):
                 'description': description,
             }
         # "metadata" field
-        def gen_field_metadata(self, *, name: str, manifest_upstream: str, content_upstream: str) -> dict[str, str]:
+        def gen_field_metadata(self, *, name: str, manifest_upstream: str, content_upstream: str) -> ManifestDict_metadata:
             return {
                 'name': name,
                 'manifest_upstream': manifest_upstream,
                 'content_upstream': content_upstream,
             }
         # system info field
+        @classmethod
         @property
-        def field_system_info__full(self) -> dict[str, str | tuple[str | int] | typing.Literal[2]]:
+        def field_system_info__full(cls) -> ManifestDict_system:
             unam = os.uname()
-            return self.field_system_info__lite | {
+            return cls.field_system_info__lite | {
                 'platform': sys.platform,
                 'python_version': sys.version_info[:],
                 'os_release': unam.release,
@@ -294,34 +304,32 @@ class Manifest(UserDict):
                 'hostname': unam.nodename,
                 '_info_level': 2,
             }
+        @classmethod
         @property
-        def field_system_info__lite(self) -> dict[str, str | tuple[int] | typing.Literal[1]]:
+        def field_system_info__lite(cls) -> ManifestDict_system:
             unam = os.uname()
-            return self.field_system_info__none | {
+            return cls.field_system_info__none | {
                 'os_name': os.name,
                 'architecture': unam.machine,
                 'python_version': sys.version_info[:3],
                 'python_implementation': sys.implementation.name,
                 '_info_level': 1,
             }
-        @property
-        def field_system_info__none(self) -> dict[str, None | typing.Literal[0]]:
-            # also serves as the base ordering
-            return {
-                # more important system info
-                'os_name': None,               # lite
-                'platform': None,              # full
-                'architecture': None,          # lite
-                # Python info
-                'python_version': None,        # lite
-                'python_implementation': None, # lite
-                # less important system info
-                'os_release': None,            # full
-                'os_version': None,            # full
-                'hostname': None,              # full
-                # metadata
-                '_info_level': 0,
-            }
+        field_system_info__none: ManifestDict_system = {
+            # more important system info
+            'os_name': None,               # lite
+            'platform': None,              # full
+            'architecture': None,          # lite
+            # Python info
+            'python_version': None,        # lite
+            'python_implementation': None, # lite
+            # less important system info
+            'os_release': None,            # full
+            'os_version': None,            # full
+            'hostname': None,              # full
+            # metadata
+            '_info_level': 0,
+        }
         # File hashing
         @staticmethod
         def files_from_path(path: Path, patterns: tuple[str] = ('**/*.py', '**/rs_*'), exclude_suffixes: tuple[str] = ('.pyc',)) -> set[Path]:
@@ -342,7 +350,7 @@ class Manifest(UserDict):
         def generate_outline(self, *,
                              system_info_level: typing.Literal['full', 'lite', 'none'] = 'full',
                              name: str, manifest_upstream: str, content_upstream: str,
-                             by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None) -> dict[str, dict]:
+                             by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None) -> ManifestDict:
             '''
                 Generates and completes the following fields:
                     creation, metadata, system
@@ -357,10 +365,10 @@ class Manifest(UserDict):
                 'system': getattr(self, f'field_system_info__{system_info_level}'),
                 'files': NotImplemented,
             }
-        def generate_cryptography(self, hash_algorithm: typing.Literal[*hashlib.algorithms_available], key: EdPrivK, data: bytes) -> dict:
+        def generate_cryptography(self, hash_algorithm: typing.Literal[*hashlib.algorithms_available], key: EdPrivK, data: bytes) -> ManifestDict__:
             '''Does everything necessary to populate the "_" field'''
             return self.gen_field__(hash_algorithm=hash_algorithm, pub_key=key.public_key(), sig=key.sign(data))
-        def generate_files(self, algorithm: typing.Literal[*hashlib.algorithms_available], path: Path) -> dict[str, str]:
+        def generate_files(self, algorithm: typing.Literal[*hashlib.algorithms_available], path: Path) -> ManifestDict_files:
             '''
                 Finds the files under path, then returns a dict with the key being:
                     the posix representation of the files (relative to path)
@@ -369,18 +377,24 @@ class Manifest(UserDict):
             '''
             return {k.as_posix(): base64.b85encode(v).decode() for k,v in
                     self.hash_files(algorithm, self.files_from_path(path)).items()}
-        def generate_dict(self, *,
-                          path: Path,
-                          hash_algorithm: typing.Literal[*hashlib.algorithms_available] = 'sha1', key: EdPrivK,
-                          system_info_level: typing.Literal['full', 'lite', 'none'] = 'full',
-                          name: str, manifest_upstream: str, content_upstream: str,
-                          by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None) -> dict:
+        def generate_dict(self, path: Path, name: str, manifest_upstream: str, content_upstream: str, *,
+                          by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None,
+                          hash_algorithm: typing.Literal[*hashlib.algorithms_available] = 'sha1', key: EdPrivK | Path,
+                          system_info_level: typing.Literal['full', 'lite', 'none'] = 'full') -> ManifestDict:
             '''Generates a manifest-dict from the given attributes'''
+            if isinstance(key, Path):
+                key = EdPrivK.from_private_bytes(key.read_bytes())
             data = self.generate_outline(system_info_level=system_info_level, name=name, manifest_upstream=manifest_upstream, content_upstream=content_upstream, by=by, aka=aka, contact=contact, description=description)
             data['files'] = self.generate_files(hash_algorithm, path)
             data['_'] = self.generate_cryptography(hash_algorithm, key, self.Manifest.compile_dict(data))
             return data
-            
+        @functools.wraps(generate_dict, assigned=('__annotations__', '__type_params__'))
+        def __call__(self, *args, **kwargs) -> 'Manifest':
+            '''
+                Convenience wrapper for {self.}Manifest.from_dict(Manifest.ManifestFactory{|self}.generate_dict(...))
+                    See Manifest.ManifestFactory.generate_dict for kwargs
+            '''
+            return self.Manifest.from_dict(self.generate_dict(*args, **kwargs))
     @classmethod
     @property
     def ManifestFactory(cls) -> _ManifestFactory:
