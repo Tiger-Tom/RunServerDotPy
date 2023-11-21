@@ -8,6 +8,7 @@ import logging
 import time
 import os
 import sys
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey as EdPrivK, Ed25519PublicKey as EdPubK
 import base64
 import hashlib
@@ -19,6 +20,7 @@ from ast import literal_eval
 import logging
 import traceback
 import functools
+from urllib import request
 #</Imports
 
 #> Header >/
@@ -41,7 +43,7 @@ ManifestDict_metadata = typing.TypedDict("ManifestDict['metadata']", {
     'manifest_upstream': str,
     'content_upstream': str,
 })
-ManifestDict_system = typing.TypedDict('ManifestDict[\'system\']', {
+ManifestDict_system = typing.TypedDict("ManifestDict['system']", {
     'os_name': str | None,
     'platform': str | None,
     'architecture': str | None,
@@ -53,39 +55,83 @@ ManifestDict_system = typing.TypedDict('ManifestDict[\'system\']', {
     '_info_level': int,
 })
 ManifestDict_files = typing.Dict[str, bytes]
+ManifestDict_ignore = typing.TypedDict("ManifestDict['ignore']", {
+    'skip_upstream_upgrade': bool,
+    'skip_all_files': bool,
+    'skip_files': tuple[str],
+}, total=False)
 ManifestDict = typing.TypedDict('ManifestDict', {
     '_': ManifestDict__,
     'creation': ManifestDict_creation,
     'metadata': ManifestDict_metadata,
     'system': ManifestDict_system,
     'files': ManifestDict_files,
+    'ignore': typing.NotRequired[ManifestDict_ignore],
 })
 # Manifest class
 class Manifest(UserDict):
-    __slots__ = ('own_path', 'base_path', 'logger')
+    __slots__ = ('own_path', 'own_type', 'base_path', 'logger')
     type_to_suffix = {
         'ini': '.ini',
         'json': '.json',
     }; suffix_to_type = {v: k for k,v in type_to_suffix.items()}
-    
+    DOWNLOAD_TIMEOUT = 5
+
+    def __call__(self, *,
+                 skip_update: bool = False, skip_execute: bool = False,
+                 ask_download: bool = True, ask_replace: bool = True, ask_install: bool = True):
+        self.logger
+
+    # Self-updating
+    def upgrade(self, ask: bool = True, override: bool = False):
+        '''Updates the local manifest, verifying it and notifying the user of modified and stale files'''
+        if (not override) and self.get('ignore', {}).get('skip_upstream_upgrade', False):
+            self.logger.fatal(f'Manifest {self.name} requested to not be upgraded, skipping')
+            return
+        upstream = self['metadata']['manifest_upstream']
+        owntype = getattr(self, 'own_type', self.suffix_to_type.get(self.own_path.suffix, None))
+        if owntype is None:
+            owntype = next(self.type_to_suffix.keys())
+            self.logger.error(f'Could not automatically determine current type of manifest {self.name} at {self.own_path}, will write as {owntype}')
+        self.logger.infop(f'Updating manifest {self.name}, upstream is {upstream}')
+        try: newmanif = self.from_remote(upstream)
+        except Exception as e:
+            self.logger.fatal(f'Could not update manifest {self.name} (from {upstream}), got error:\n{"".join(traceback.format_exception(e))}')
+            return
+        if self.data == newmanif.data or False:
+            self.logger.infop(f'Upstream manifest matches local manifest, no upgrade needed')
+            return
+        if self.d_pubkey != newmanif.d_pubkey:
+            self.logger.warning(f'Local manifest {self.name} has a different public key than upstream manifest:\n{self["_"]["pubkey"]}\n{newmanif["_"]["pubkey"]}')
+        self.logger.info(f'Verifying {newmanif.name} on {self["_"]["pubkey"]}')
+        try: self.verify(newmanif)
+        except InvalidSignature:
+            self.logger.fatal('Manifest {newmanif.name} failed verification')
+        
+    # Execution
+    def execute(self, ask: bool = True, override: bool = False):
+        self.logger.infop(f'Executing manifest {self.name} on {self.base_path}')
+        if (not override) and self.get('ignore', {}).get('skip_all_files', False):
+            self.logger.fatal(f'Manifest {self.name} requested that all files be skipped, not executing')
+            return
+        self.base_path
     # Helper / compat function
     @staticmethod
     def _logger() -> logging.Logger:
-        '''Ensures compatability whether or not the logger is set up'''
+        '''Ensures compatability, whether or not the logger is set up'''
         logger = logging.getLogger('RS.BS.M')
         if not hasattr(logger, 'infop'):
             logger.infop = logger.warning
         return logger
     # Constructors
     def __init__(self):
-        '''Use from_dict or from_file instead (from_json and from_ini can be called through from_file or directly)'''
+        '''Use from_dict, from_file, or from_remote instead'''
         raise TypeError('Should not be initialized here, use from_dict or from_file')
     @classmethod
     def __internal_init(cls):
-        self = object.__new__(cls)
+        self = super().__new__(cls)
         self.logger = self._logger()
         return self
-        
     ## Setters
     def set_path(self, *, base: Path | None = None, own: Path | None = None) -> typing.Self:
         '''Sets the manifest's "target" and "own" paths, and returns the Manifest object for chaining'''
@@ -97,23 +143,21 @@ class Manifest(UserDict):
     def from_dict(cls, d: ManifestDict) -> typing.Self:
         '''Initializes the UserDict superclass with a new instance of Manifest, setting d as its "data" attribute'''
         self = cls.__internal_init()
-        UserDict.__init__(self, d)
+        UserDict.__init__(self, d); self.data = d
         return self
     ### From string types
     @classmethod
     def from_json(cls, jsn: str) -> typing.Self:
-        '''
-            Generates a Manifest instance from JSON text
-                Convenience method for Manifest.from_json(Manifest.dict_from_json_text(...))
-        '''
-        return cls.from_dict(cls.dict_from_json_text(jsn))
+        '''Generates a Manifest instance from JSON text (Convenience method for Manifest.from_json(Manifest.dict_from_json_text(...)))'''
+        self = cls.from_dict(cls.dict_from_json_text(jsn))
+        self.own_type = 'json'
+        return self
     @classmethod
     def from_ini(cls, ini: str) -> typing.Self:
-        '''
-            Generates a Manifest instance from INI text
-                Convenience method for Manifest.from_dict(Manifest.dict_from_ini_text(...))
-        '''
-        return cls.from_dict(cls.dict_from_ini_text(ini))
+        '''Generates a Manifest instance from INI text (Convenience method for Manifest.from_dict(Manifest.dict_from_ini_text(...)))'''
+        self = cls.from_dict(cls.dict_from_ini_text(ini))
+        self.own_type = 'ini'
+        return self
     #### Dict from string types
     @staticmethod
     def dict_from_json_text(jsn: str) -> ManifestDict:
@@ -142,6 +186,7 @@ class Manifest(UserDict):
             Otherwise, path_type is guessed from path's suffix, using Manifest.suffix_to_type
         '''
         logger = cls._logger()
+        data = path.read_text()
         if path_type is None:
             # Guess it through the path suffix
             if path.suffix in cls.suffix_to_type:
@@ -149,18 +194,39 @@ class Manifest(UserDict):
             else:
                 # Try every handler
                 logger.warning(f'path_type not given, and guessing it via the path\'s suffix ({path.suffix=}) failed')
-                data = path.read_text()
                 for k in cls.type_to_suffix:
                     try:
                         logger.infop(f'Trying {k} handler on contents of {path}')
-                        return getattr(cls, f'from_{k}')(data)
+                        return getattr(cls, f'from_{k}')(data).set_path(base=path.parent, own=path)
                     except Exception as e:
-                        logger.error(f'{k} handler failed on contents of {path} failed:\n{traceback.format_exception(e)}')
-                raise NotImplementedError(f'Cannot parse manifest with extension {path.suffix!r}, no handlers succeeded')
+                        logger.error(f'{k} handler failed on contents of {path}:\n{"".join(traceback.format_exception(e))}')
+                raise NotImplementedError(f'Cannot parse manifest from {path}, no handlers succeeded')
         if path_type not in cls.type_to_suffix:
             raise TypeError(f'Illegal path type {path_type!r}')
-        data = path.read_text()
-        return getattr(cls, f'from_{path_type}')(data).set_paths(base=path.parent, own=path)
+        return getattr(cls, f'from_{path_type}')(data).set_path(base=path.parent, own=path)
+    @classmethod
+    def from_remote(cls, url: str, path_type: typing.Literal[*type_to_suffix] | None = None) -> typing.Self:
+        '''Initializes Manifest from a file, has the same path_type properties of from_file'''
+        logger = cls._logger()
+        with request.urlopen(url, timeout=cls.DOWNLOAD_TIMEOUT) as r: data = r.read().decode()
+        if path_type is None:
+            # Guess it through the URL's suffix
+            suffix = url[url.rindex('.'):] if ('.' in url) else ''
+            if suffix in cls.suffix_to_type:
+                path_type = cls.suffix_to_type[suffix]
+            else:
+                # Try every handler
+                logger.warning(f'path_type not given, and guessing it via the URL\'s extension ({suffix=!r}) failed')
+                for k in cls.type_to_suffix:
+                    try:
+                        logger.infop(f'Trying {k} handler on contents of {url}')
+                        return getattr(cls, f'from_{k}')(data)
+                    except Exception as e:
+                        logger.error(f'{k} handler failed on contents of {url}:\n{"".join(traceback.format_exception(e))}')
+                raise NotImplementedError(f'Cannot parse manifest from {url}, no handlers succeeded')
+        if path_type not in cls.type_to_suffix:
+            raise TypeError(f'Illegal path type {path_type!r}')
+        return getattr(cls, f'from_{path_type}')(data)
     # Rendering
     JSON_ARRAY_CLEANER_A = re.compile(r'^(\s*"[^"]*":\s*)(\[[^\]]*\])(,?\s*)$', re.MULTILINE)
     JSON_ARRAY_CLEANER_B = staticmethod(lambda m: m.group(1)+(re.sub(r'\s+', '', m.group(2)).replace(',', ', '))+m.group(3))
@@ -181,13 +247,24 @@ class Manifest(UserDict):
             return sio.getvalue()
         p.write(to)
         return None
+    # Property shortcuts
+    @property
+    def name(self) -> str: return self['metadata']['name']
     # Data extraction
     def i_d_files(self) -> typing.Generator[tuple[Path, bytes], None, None]:
         return (((self.base_path / k), base64.b85decode(v)) for k,v in self.data['files'].items())
     @property
-    def d_files(self) -> ManifestDict_files:
-        return ManifestDict_files(self.i_d_files())
+    def d_files(self) -> dict[Path, bytes]:
+        return dict(self.i_d_files())
+    @property
+    def d_sig(self) -> bytes:
+        return base64.b85decode(self['_']['signature'])
+    @property
+    def d_pubkey(self) -> EdPubK:
+        return EdPubK.from_public_bytes(base64.b85decode(self['_']['pubkey']))
     # Compilation
+    def compile(self):
+        return self.compile_dict(self.data)
     ## Constants
     COMPILED_KEY_ORDER = ('creation', 'metadata', 'system', 'files')
     COMPILED_KEY_VALUE_SEP = 255
@@ -241,6 +318,11 @@ class Manifest(UserDict):
         #        compd.extend(cls._compile_value(iv))
         #        compd.extend((cls.COMPILED_KEY_VALUE_SEP, cls.COMPILED_ENTRY_SEP))
         #return bytes(compd)
+    # Verification
+    def verify(self, other: typing.Self | None = None):
+        '''Verifies either this manifest or another with this manifest's public key'''
+        target = self if other is None else other
+        self.d_pubkey.verify(target.d_sig, target.compile())
 
     # methods for manifest generation
     class _ManifestFactory:
