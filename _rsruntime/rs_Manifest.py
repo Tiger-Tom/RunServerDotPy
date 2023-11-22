@@ -78,9 +78,15 @@ class Manifest(UserDict):
     DOWNLOAD_TIMEOUT = 5
 
     def __call__(self, *,
-                 skip_update: bool = False, skip_execute: bool = False,
-                 ask_download: bool = True, ask_replace: bool = True, ask_install: bool = True):
-        self.logger
+                 skip_verify_local: bool = False, skip_update: bool = False, skip_execute: bool = False,
+                 ask_download: bool = True, ask_execute: bool = True):
+        '''Verifies, upgrades, and executes this manifest'''
+        if not skip_verify_local:
+            try: self.verify()
+            except InvalidSignature:
+                self.logger.fatal(f'Local manifest has an invalid signature! Will continue anyway, but keep in mind that upstream manifests may fail as well')
+        self.upgrade(ask_download)
+        self.execute(ask_execute)
 
     # Self-updating
     def upgrade(self, ask: bool = True, override: bool = False):
@@ -93,7 +99,7 @@ class Manifest(UserDict):
             owntype = next(self.type_to_suffix.keys())
             self.logger.error(f'Could not automatically determine current type of manifest {self.name} at {self.own_path}, will write as {owntype}')
         self.logger.infop(f'Updating manifest {self.name}, upstream is {self["metadata"]["manifest_upstream"]}')
-        try: newmanif = self.from_remote(self['metadata']['manifest_upstream']).set_path(base=self.base_path, own=self.own_path)
+        try: newmanif = self.from_remote(self['metadata']['manifest_upstream'])
         except Exception as e:
             self.logger.fatal(f'Could not update manifest {self.name} (from {self["metadata"]["manifest_upstream"]}), got error:\n{"".join(traceback.format_exception(e))}')
             return
@@ -115,12 +121,47 @@ class Manifest(UserDict):
         self.logger.infop(f'New manifest {self.name} folded into local, writing back local at {self.own_path} as {owntype}')
         with self.own_path.open('w') as f: getattr(self, f'render_{owntype}')(f)
     # Execution
+    
     def execute(self, ask: bool = True, override: bool = False):
+        '''Executes the manifest, installing new files and replacing files that don't match the stored hashes'''
         self.logger.infop(f'Executing manifest {self.name} on {self.base_path}')
         if (not override) and self.get('ignore', {}).get('skip_all_files', False):
             self.logger.fatal(f'Manifest {self.name} requested that all files be skipped, not executing')
             return
-        self.base_path
+        alg = self["_"]["hash_algorithm"]
+        ignore = self.get('ignore', {}).get('skip_files', set())
+        to_install = []; to_replace = []
+        for fn,target_hash in self.i_d_files():
+            self.logger.info(f'Checking file {fn} against {self["files"][fn]} via {alg}')
+            if fn in ignore:
+                self.logger.fatal(f'Manifest {self.name} requested that file {fn} be skipped')
+                continue
+            if not (self.base_path / fn).exists():
+                to_install.append(fn)
+                continue
+            real_hash = hashlib.new(alg, (self.base_path / fn).read_bytes()).digest()
+            self.logger.info(f'{fn}:\n target: {self["files"][fn]}\n actual: {base64.b85encode(real_hash).decode()}')
+            if real_hash != target_hash:
+                self.logger.warning(f'{fn} actual hash differs from target hash, will replace')
+                to_replace.append(fn)
+        fetch = set()
+        if to_install:
+            self.logger.warning(f'Te following new files will be installed:\n - {"\n - ".join(str(self.base_path / p) for p in to_install)}')
+            if not (ask and input('Install files? (Y/n) >').lower().startswith('n')): fetch.update(to_install)
+        if to_replace:
+            self.logger.warning(f'The following local files will be replaced:\n - {"\n - ".join(str(self.base_path / p) for p in to_replace)}')
+            if (not ask) or input('Replace files? (y/N) >').lower().startswith('y'): fetch.update(to_replace)
+        if not fetch:
+            self.logger.warning(f'Nothing to do')
+            return
+        self.logger.warning('Fetching {len(fetch)} file(s)')
+        for url, path in (('/'.join((self['metadata']['content_upstream'].rstrip('/'), fn)), self.base_path / fn) for fn in fetch):
+            if path.exists():
+                op = path.with_suffix('.'.join((path.suffix, 'old')))
+                self.logger.infop(f'Moving {path} to {op}')
+                op.write_bytes(path.read_bytes())
+            self.logger.info(f'Fetching {url} to {path}')
+            with urllib.request.urlopen(url) as r: path.write_bytes(r.read())
     # Helper / compat function
     @staticmethod
     def _logger() -> logging.Logger:
@@ -257,8 +298,8 @@ class Manifest(UserDict):
     @property
     def name(self) -> str: return self['metadata']['name']
     # Data extraction
-    def i_d_files(self) -> typing.Generator[tuple[Path, bytes], None, None]:
-        return (((self.base_path / k), base64.b85decode(v)) for k,v in self.data['files'].items())
+    def i_d_files(self) -> typing.Generator[tuple[str, bytes], None, None]:
+        return ((k, base64.b85decode(v)) for k,v in self.data['files'].items())
     @property
     def d_files(self) -> dict[Path, bytes]:
         return dict(self.i_d_files())
