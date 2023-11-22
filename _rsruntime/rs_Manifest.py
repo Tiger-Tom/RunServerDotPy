@@ -87,7 +87,6 @@ class Manifest(UserDict):
                 self.logger.fatal(f'Local manifest has an invalid signature! Will continue anyway, but keep in mind that upstream manifests may fail as well')
         self.upgrade(ask_download)
         self.execute(ask_execute)
-
     # Self-updating
     def upgrade(self, ask: bool = True, override: bool = False):
         '''Updates the local manifest, verifying it and notifying the user of modified and stale files'''
@@ -121,7 +120,6 @@ class Manifest(UserDict):
         self.logger.infop(f'New manifest {self.name} folded into local, writing back local at {self.own_path} as {owntype}')
         with self.own_path.open('w') as f: getattr(self, f'render_{owntype}')(f)
     # Execution
-    
     def execute(self, ask: bool = True, override: bool = False):
         '''Executes the manifest, installing new files and replacing files that don't match the stored hashes'''
         self.logger.infop(f'Executing manifest {self.name} on {self.base_path}')
