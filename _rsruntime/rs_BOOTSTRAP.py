@@ -15,12 +15,10 @@ import functools
 # Files
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
-from zipfile import Path as zipPath
 import gzip
 import shutil
 # Logging / info
-import logging
-import logging.handlers
+import logging, logging.handlers
 import traceback
 # Typing
 import typing
