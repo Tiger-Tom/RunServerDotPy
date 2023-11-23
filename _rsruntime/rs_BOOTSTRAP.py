@@ -544,7 +544,7 @@ class Manifest(UserDict):
             if isinstance(key, Path): key = EdPrivK.from_private_bytes(key.read_bytes())
             data = self.generate_outline(system_info_level=system_info_level, name=name, manifest_upstream=manifest_upstream, content_upstream=content_upstream, by=by, aka=aka, contact=contact, description=description)
             data['files'] = self.gen_field_files(hash_algorithm, path)
-            data['_'] = self.gen_field__(hash_algorithm, key, self.Manifest.compile_dict(data))
+            data['_'] = self.gen_field__(hash_algorithm=hash_algorithm, key=key, data=self.Manifest.compile_dict(data))
             return data
         @functools.wraps(generate_dict, assigned=('__annotations__', '__type_params__'))
         def __call__(self, *args, **kwargs) -> 'Manifest':
