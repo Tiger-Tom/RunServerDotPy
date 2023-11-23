@@ -24,6 +24,7 @@ import time
 from ast import literal_eval
 from collections import UserDict
 import functools
+from io import StringIO
 ## Parser/writers
 from configparser import ConfigParser
 import json
@@ -440,7 +441,7 @@ class Manifest(UserDict):
         p = ConfigParser(interpolation=None); p.optionxform = lambda o: o
         for ok,ov in self.data.items(): p[ok] = {ik: repr(iv) for ik,iv in ov.items()}
         if to is not None: p.write(to)
-        sio = io.StringIO(); p.write(sio); return sio.getvalue()
+        sio = StringIO(); p.write(sio); return sio.getvalue()
     # Property shortcuts
     @property
     def name(self) -> str: return self['metadata']['name']
