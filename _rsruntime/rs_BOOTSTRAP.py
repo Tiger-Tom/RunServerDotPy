@@ -200,11 +200,13 @@ ManifestDict__ = typing.TypedDict("ManifestDict['_']", {
     'signature': str,
 })
 ManifestDict_creation = typing.TypedDict("ManifestDict['creation']", {
-    'at': int,
+    'created_at': int,
+    'updated_at': int,
     'by': str,
     'aka': str | None,
     'contact': str | None,
     'description': str | None,
+    'nupdates': int,
 })
 ManifestDict_metadata = typing.TypedDict("ManifestDict['metadata']", {
     'name': str,
@@ -496,7 +498,8 @@ class Manifest(UserDict):
                     'signature': base64.b85encode(key.sign(data)).decode()}
         @staticmethod
         def gen_field_creation(*, by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None) -> ManifestDict_creation:
-            return {'at': round(time.time()), 'by': by, 'aka': aka, 'contact': contact, 'description': description}
+            crtime = round(time.time())
+            return {'created_at': crtime, 'updated_at': crtime, 'by': by, 'aka': aka, 'contact': contact, 'description': description, 'nupdates': 0}
         @staticmethod
         def gen_field_metadata(*, name: str, manifest_upstream: str, content_upstream: str) -> ManifestDict_metadata:
             return {'name': name, 'manifest_upstream': manifest_upstream, 'content_upstream': content_upstream}
