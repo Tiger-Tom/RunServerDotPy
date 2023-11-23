@@ -86,6 +86,9 @@ class BaseServerManager(ABC):
             server_args = Config('minecraft/server_args', '--nogui'),
         ))
 
+    # Set config defaults
+    cli_line()
+
     # Abstract methods
     @abstractmethod
     def start(self): pass
@@ -135,6 +138,9 @@ class BasePopenManager(BaseServerManager):
     
     def start(self):
         self.popen = subprocess.Popen(self.cli_line(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, text=True, cwd=Config('minecraft/path/base', './minecraft'))
+
+    # Set config defaults
+    Config('minecraft/path/base', './minecraft')
 # Manager
 class ServerManager:
     managers = SimpleNamespace()
@@ -221,6 +227,11 @@ class ScreenManager(BaseServerManager):
             self.run_screen_noout('-X', 'kill')
     def start(self): raise NotImplementedError
     def write(self): raise NotImplementedError
+
+    # Set config defaults
+    Config('server_manager/screen/binary', 'screen')
+    Config('server_manager/screen/name', 'RS_ScreenManager_mcserverprocess')
+    Config('server_manager/screen/encoding', sys.getdefaultencoding())
     
     cap_arbitrary_read = True
     cap_arbitrary_write = True
@@ -233,6 +244,7 @@ class ScreenManager(BaseServerManager):
 class RConManager(BaseServerManager):
     __slots__ = ()
     _type = ('remote', 'passwd')
+    
     def __init__(self):
         super().__init__()
         if RCONClient is None:
@@ -247,6 +259,11 @@ class RConManager(BaseServerManager):
         raise NotImplementedError
     def start(self): raise NotImplementedError
     def write(self): raise NotImplementedError
+
+    # Set config defaults
+    Config('minecraft/rcon/host', '127.0.0.1')
+    Config('minecraft/rcon/port', 25575)
+    Config('minecraft/rcon/password', None, Config.on_missing.SET_RETURN_DEFAULT)
 
     cap_arbitrary_read = False
     cap_arbitrary_write = True
