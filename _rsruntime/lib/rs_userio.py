@@ -61,22 +61,22 @@ class UserManager:
         last_disconnected: time.struct_time | None = None
 
     
-        @staticmethod
+        @classmethod
         @property
         def default_perm_str(cls) -> str:
             return Config('permissions/default_level', 'USER').upper()
         @classmethod
-        def perm_from_value(cls, val: str | int | typing.ForwardRef('Perm') | ...):
-            if isinstance(val, Perm): return val
+        def perm_from_value(cls, val: str | int | typing.ForwardRef('Permission')):
+            if isinstance(val, RS.UM.Perm): return val
             if not isinstance(val, (str, int)):
                 return cls.perm_from_value(cls.default_perm_str)
             try:
-                if isinstance(val, int): return Perm(p)
-                return Perm[p.upper()]
+                if isinstance(val, int): return Perm(val.upper())
+                return RS.UM.Perm[val.upper()]
             except ValueError: return cls.perm_from_value(cls.default_perm_str)
         @property
         def permission(self) -> 'Perm':
-            return perm_from_value(RS.UserManager.fbd(f'{self.uuid}/ChatCommand Permission Level'), self.default_perm_str)
+            return self.perm_from_value(RS.UserManager.fbd(f'{self.uuid}/ChatCommand Permission Level', self.default_perm_str))
         @permission.setter
         def permission(self, val: 'Perm'):
             RS.UserManager.fbd[f'{self.uuid}/ChatCommand Permission Level'] = int(val)
@@ -285,21 +285,19 @@ class ChatCommands:
                 Keyword-only args and varargs are ignored
             When arguments are provided by users, they are split via shlex.split
         '''
-        __slots__ = ('target', 'permission', 'help_section')        
+        __slots__ = ('target', 'permission', 'help_section', 'params')        
 
         def __init__(self, target: typing.Callable[['User', ...], None], permission: UserManager.Perm, help_section: str | None = None):
-            self.target = self.__call__ = target
+            self.target = target
             self.permission = permission
             self.help_section = help_section
-            
+            self.params = RS.CC.Params(target)
         def __call__(self, user: UserManager.User, *args):
             # Validate permissions
             if user.permission > self.permission:
-                raise PermissionError('{user} not allowed to run ChatCommand, insufficent permission: have {user.permission.name), need {self.permission.name}')
-            # Validate arguments
-            ...
-            # Call command
-            #RS.CC
+                raise PermissionError(f'{user} not allowed to run ChatCommand, insufficent permission: have {user.permission.name}, need {self.permission.name}')
+            # Validate arguments and call command
+            self.target(user, *self.params.parse_args(*args))
 
     def __call__(self, func: typing.Callable):
         ...
@@ -310,3 +308,8 @@ class ChatCommands:
         self.aliases = {}
     def register(self, cmd: 'ChatCommand') -> bool:
         ...
+
+    @staticmethod
+    def do_test():
+        def test(user: 'User', arg0: int, arg1: typing.Literal['arg1_1', 'arg1_2'], arg2: str = 'abc', arg3=None, arg4: int = None, *varargs): pass
+        return RS.CC.ChatCommand(test, RS.UM.Perm.USER, '')
