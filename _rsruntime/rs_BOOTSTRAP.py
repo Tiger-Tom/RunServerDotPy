@@ -318,12 +318,12 @@ class Manifest(UserDict):
             if real_hash != target_hash:
                 self.logger.warning(f'{fn} actual hash differs from target hash, will replace')
                 to_replace.append(fn)
-        fetch = set()
+        fetch = set(); sep = '\n - '
         if to_install:
-            self.logger.warning(f'The following new files will be installed:\n - {"\n - ".join(str(self.base_path / p) for p in to_install)}')
+            self.logger.warning(f'The following new files will be installed:{sep}{sep.join(str(self.base_path / p) for p in to_install)}')
             if not (ask and input('Install files? (Y/n) >').lower().startswith('n')): fetch.update(to_install)
         if to_replace:
-            self.logger.warning(f'The following local files will be replaced:\n - {"\n - ".join(str(self.base_path / p) for p in to_replace)}')
+            self.logger.warning(f'The following local files will be replaced:{sep}{sep.join(str(self.base_path / p) for p in to_replace)}')
             if (not ask) or input('Replace files? (y/N) >').lower().startswith('y'): fetch.update(to_replace)
         if not fetch:
             self.logger.warning(f'Nothing to do')
