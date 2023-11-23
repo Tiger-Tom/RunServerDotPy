@@ -283,30 +283,32 @@ class ChatCommands:
         def render_arg(arg: inspect.Parameter) -> str:
             if (arg.kind == inspect.Parameter.KEYWORD_ONLY) or (arg.kind == arg.VAR_KEYWORD):
                 raise TypeError(f'Cannot handle param kind {arg.kind} (parameter {arg})')
-            braks = Config('chat_commands/help/formatter/argument/brackets/variadic', '({argstr}...)') if (arg.kind == arg.VAR_POSITIONAL) \
-               else Config('chat_commands/help/formatter/argument/brackets/optional', '[{argstr}]')    if (arg.default is not arg.empty) \
-               else Config('chat_commands/help/formatter/argument/brackets/required', '{argstr}')
+            braks = Config('chat_commands/help/formatter/argument/brackets/variadic', '[{argstr}...]')           if (arg.kind == arg.VAR_POSITIONAL) \
+                    else Config('chat_commands/help/formatter/argument/brackets/optional', '[{argstr}]')         if (arg.default is not arg.empty) \
+                    else Config('chat_commands/help/formatter/argument/brackets/required_literal', '({argstr})') if (getattr(arg.annotation, '__origin__', None) is typing.Literal) \
+                    else Config('chat_commands/help/formatter/argument/brackets/required', '<{argstr}>')
+                
             build = [arg.name]
             if (a := arg.annotation) is not arg.empty:
                 build.append(Config('chat_commands/help/formatter/argument/joiners/type', ':'))
                 if getattr(a, '__origin__', None) is typing.Literal:
-                    build.append('|'.join(str(aa) for aa in a.__args__))
+                    build.append(Config('chat_commands/help/formatter/argument/joiners/literals', '|').join(str(aa) for aa in a.__args__))
                 elif isinstance(a, str): build.append(a)
                 else: build.append(a.__qualname__)
             if (arg.default is not arg.empty) and (arg.default is not None):
                 build.append(Config('chat_commands/help/formatter/argument/joiners/default', '='))
                 build.append(str(arg.default))
-            return braks.format(argstr=''.join(build))
+            return braks.format(argstr=Config('chat_commands/help/formatter/argument/joiners/tokens', '').join(build))
     
     class ChatCommand:
         '''
             Help for the command is specified by the doc-string of the target function
             The target function must have at least an argument for the object of the calling user
-            The command-line string (A.E. "arg0:int arg1:arg1_1|arg1_2 [arg2:str=abc] [arg3] [arg4:int] (varargs...)") is generated automatically using the target function's arguments
+            The command-line string (A.E. "<arg0:int> (arg1:arg1_1|arg1_2) [arg2:str=abc] [arg3] [arg4:int] [varargs...]") is generated automatically using the target function's arguments
                 That command-line string would be generated from a function such as: `def test(user: 'User', arg0: int, arg1: typing.Literal['arg1_1', 'arg1_2'], arg2: str = 'abc', arg3=None, arg4: int = None, *varargs)`
-                Annotations of multiple possible literal arguments should be given as `typing.Literal[literal0, literal1, ...]`, which results in `[literal0|literal1|...]`
-                Annotations and default values are detected from the function signature, as in: `arg: int = 0`, which results in `{arg:int=0}`
-                    A default value of "None" indicates the argument as optional without hinting the default, as in: `arg=None`, which results in `{arg}`
+                Annotations of multiple possible literal arguments should be given as `typing.Literal[literal0, literal1, ...]`, which results in `(literal0|literal1|...)`
+                Annotations and default values are detected from the function signature, as in: `arg: int = 0`, which results in `[arg:int=0]`
+                    A default value of "None" indicates the argument as optional without hinting the default, as in: `arg=None`, which results in `[arg]`
                 Keyword-only args and varargs are ignored
             When arguments are provided by users, they are split via shlex.split
         '''
