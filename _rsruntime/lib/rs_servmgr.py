@@ -3,6 +3,9 @@
 #> Imports
 from inspect import isabstract
 from traceback import format_exception
+import threading
+from select import select
+import sys
 # Shell
 import shlex
 from getpass import getpass
@@ -44,6 +47,11 @@ class BaseServerManager(ABC):
         ServerManager.register(cls)
         
     # Non-abstract methods
+    def handle_line(self, line: str):
+        sys.stdout.write(line)
+        RS.LP.handle_line(line)
+    def handle_input(self, line: str):
+        self.write(line)
     @classmethod
     def _bias_config(cls) -> float:
         return (-float('inf') if Config(f'server_manager/blacklist/{cls.name}', False) else 0.0) + \
@@ -58,7 +66,7 @@ class BaseServerManager(ABC):
         return cls.bias + cls._bias_config()
     @classmethod
     def register_base(cls):
-        setattr(cls.basemanagers, cls.name, cls)
+        setattr(cls.basemanagers, cls.name.replace('.', '_'), cls)
     @classmethod
     @property
     def name(cls) -> str:
@@ -119,14 +127,13 @@ class BasePopenManager(BaseServerManager):
     _type = ('popen_writer',)
     def __init__(self):
         super().__init__()
-        import subprocess
 
     cap_arbitrary_write = True
     cap_restartable = True
     
     def start(self):
-        #Config('minecraft/path/base', './minecraft')
-        ...
+        import subprocess
+        self.popen = subprocess.Popen(self.cli_line(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, text=True, cwd=Config('minecraft/path/base', './minecraft'))
 # Manager
 class ServerManager:
     managers = SimpleNamespace()
@@ -144,7 +151,7 @@ class ServerManager:
             ## Print out typing
             logger.debug(f'{c.name} typing:')
             logger.debug(f' _type: {c._type}')
-            logger.debug(f' Chain (MRO):')
+            logger.debug(' Chain (MRO):')
             for i,m in enumerate(c.__mro__[:(c.__mro__.index(ABC) if ABC in c.__mro__ else c.__mro__.index(object))]):
                 logger.debug(f'  {"^" if i else ">"} {getattr(m, "name", f"[unnamed?]{m.__module__}.{m.__qualname__}")}<{"abstract" if isabstract(m) else "concrete"}>')
             ## Capabilities
@@ -166,10 +173,10 @@ class ServerManager:
                 logger.error(f'Could not instantiate {c.name}:\n{"".join(format_exception(e))}\n (failed after {current_pc}, total of {total_pc})')
                 if i < len(order):
                     logger.infop('Trying the next possible choice...')
-        raise RuntimeError('None of the ServerManagers could be staged (tried for total of {total_pc}, cannot continue')
+        raise RuntimeError(f'None of the ServerManagers could be staged (tried for total of {total_pc}, cannot continue')
     @classmethod
     def register(cls, manager_type: typing.Type[BaseServerManager]):
-        setattr(cls.managers, manager_type.name, manager_type)
+        setattr(cls.managers, manager_type.name.replace('.', '_'), manager_type)
     @classmethod
     def preferred_order(cls) -> list[typing.Type[BaseServerManager]]:
         return sorted(cls.managers.__dict__.values(), key=lambda t: t.real_bias, reverse=True)
@@ -247,11 +254,20 @@ class RConManager(BaseServerManager):
 class SelectManager(BasePopenManager):
     __slots__ = ()
     _type = ('select',)
-    def __init__(self):
-        super().__init__()
-        raise NotImplementedError
-    def start(self): raise NotImplementedError
-    def write(self): raise NotImplementedError
+    def start(self):
+        super().start()
+        outno = self.popen.stdout.fileno()
+        inno = sys.stdin.fileno()
+        # IO loop
+        while self.popen.poll() is None:
+            reads,_,_ = select((outno, inno), (), ())
+            if inno in reads: self.handle_input(sys.stdin.readline())
+            if outno in reads: self.handle_line(self.popen.stdout.readline())
+        # Handle remaining lines
+        for line in self.popen.stdout.readlines():
+            self.handle_line(line)
+    def write(self, line: str):
+        self.popen.stdin.write(line)
 
     cap_arbitrary_read = True
     
