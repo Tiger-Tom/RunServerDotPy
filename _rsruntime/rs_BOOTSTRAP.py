@@ -214,11 +214,11 @@ ManifestDict_creation = typing.TypedDict("ManifestDict['creation']", {
     'by': str,
     'aka': str | None,
     'contact': str | None,
-    'description': str | None,
     'nupdates': int,
 })
 ManifestDict_metadata = typing.TypedDict("ManifestDict['metadata']", {
     'name': str,
+    'description': str | None,
     'manifest_upstream': str,
     'content_upstream': str,
 })
@@ -506,12 +506,12 @@ class Manifest(UserDict):
                     'pubkey': base64.b85encode(key.public_key().public_bytes_raw()).decode(),
                     'signature': base64.b85encode(key.sign(data)).decode()}
         @staticmethod
-        def gen_field_creation(*, by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None) -> ManifestDict_creation:
+        def gen_field_creation(*, by: str | None, aka: str | None = None, contact: str | None = None) -> ManifestDict_creation:
             crtime = round(time.time())
-            return {'created_at': crtime, 'updated_at': crtime, 'by': by, 'aka': aka, 'contact': contact, 'description': description, 'nupdates': 0}
+            return {'created_at': crtime, 'updated_at': crtime, 'by': by, 'aka': aka, 'contact': contact, 'nupdates': 0}
         @staticmethod
-        def gen_field_metadata(*, name: str, manifest_upstream: str, content_upstream: str) -> ManifestDict_metadata:
-            return {'name': name, 'manifest_upstream': manifest_upstream, 'content_upstream': content_upstream}
+        def gen_field_metadata(*, name: str, manifest_upstream: str, content_upstream: str, description: str | None = None) -> ManifestDict_metadata:
+            return {'name': name, 'description': description, 'manifest_upstream': manifest_upstream, 'content_upstream': content_upstream}
         field_system_info__none: ManifestDict_system = {'_info_level': 0,
             'os_name': None, 'platform': None, 'architecture': None, # more important system info
             'python_version': None, 'python_implementation': None, # Python info
@@ -537,8 +537,8 @@ class Manifest(UserDict):
             '''Creates the '_' and 'files' fields and populates the 'creation', 'metadata', and 'system' fields'''
             assert system_info_level in {'full', 'lite', 'none'}
             return {'_': NotImplemented,
-                    'creation': self.gen_field_creation(by=by, aka=aka, contact=contact, description=description),
-                    'metadata': self.gen_field_metadata(name=name, manifest_upstream=manifest_upstream, content_upstream=content_upstream),
+                    'creation': self.gen_field_creation(by=by, aka=aka, contact=contact),
+                    'metadata': self.gen_field_metadata(name=name, manifest_upstream=manifest_upstream, content_upstream=content_upstream, description=description),
                     'system': getattr(self, f'field_system_info__{system_info_level}'),
                     'files': NotImplemented}
         def generate_dict(self, path: Path, name: str, manifest_upstream: str, content_upstream: str, *,
