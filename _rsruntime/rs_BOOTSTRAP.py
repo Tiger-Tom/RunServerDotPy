@@ -158,7 +158,7 @@ class Bootstrapper:
         if RS != NotImplemented:
             self.logger.warning(f'Tried to set {__file__}-level RS, but it appears to have already been set?')
         else: RS = self.__contained_RS
-        self.chainload_entrypoint()
+        self.chainload_entrypoint(RS)
         if close_after: self.close()
     ## Install and execute base manifest
     def base_manifest(self):
