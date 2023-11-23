@@ -12,6 +12,7 @@ import base64
 import typing
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey as EdPrivK
+import time
 #</Imports
 
 # E-print
@@ -111,6 +112,7 @@ def mode_update(args: argparse.Namespace):
     eprint(f'Updating manifest: files from {args.manifest}, algorithm {halg}')
     man['files'] = ManifestFactory.gen_field_files(halg, args.path)
     man['creation']['nupdates'] += 1
+    man['creation']['updated_at'] = round(time.time())
     common_output(man, args)
     try: man.verify()
     except InvalidSignature:
