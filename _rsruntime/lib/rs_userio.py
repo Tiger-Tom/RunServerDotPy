@@ -224,60 +224,60 @@ class TellRaw(list):
 class ChatCommands:
     __slots__ = ('logger', 'commands', 'aliases')
 
-    class ParamParser:
-        raise NotImplementedError # token-based args are more trouble than benefit
-    class ParamParser__:
-        def __init__(self): raise TypeError(f'{self.__class__} should not be initialized')
+    class Params:
+        __slots__ = ('params', 'args_line')
+        def __init__(self, func: typing.Callable):
+            self.params = tuple(inspect.signature(func).parameters.values())[1:]
+            self.args_line = self.render_args(self.params)
+        def parse_args(self, *args) -> typing.Generator[typing.Any, None, None]:
+            eargs = enumerate(args)
+            prms = iter(self.params)
+            for i,a in eargs:
+                try: p = next(prms)
+                except StopIteration:
+                    raise TypeError(f'Too many arguments, expected at most {len(self.params)}')
+                if p.kind == p.VAR_POSITIONAL: yield (a, *(a for ei,ea in eargs))
+                elif p.annotation is p.empty: yield a
+                elif getattr(p.annotation, '__origin__', None) is typing.Literal:
+                    if a not in p.annotation.__args__:
+                        raise ValueError(f'Expected one of {p.annotation.__args__}, not {a}')
+                    yield a
+                elif isinstance(p.annotation, type): yield p.annotation(a)
+                else: yield a
+            for p in prms:
+                if p.kind == p.VAR_POSITIONAL: yield ()
+                elif p.default is p.empty:
+                    raise TypeError(f'Not enough arguments, expected at least {len(tuple(p for p in self.params if p.default is p.empty))-1}')
+                else: yield p.default
 
-        ParamTok = Flag('Params', ('ParamTok', 'ERROR',
-                         'OPTIONAL', 'VARIADIC',             # argument
-                         'NONE', 'STRING', 'TYPE', 'UNION')) # annotation
-        @classmethod
-        def tokenify_args(cls, args: tuple[inspect.Parameter]) -> typing.Generator[tuple[ParamTok, tuple[str, ...]], None, None]:
-            for p in args:
-                argument = (ParamTok.VARIADIC,) if (p.kind == p.VAR_POSITITONAL) else (0,) if (p.default is p.empty) else (ParamTok.OPTIONAL, p.default)
-                     
-                annotation = (paramTok.NONE,)                if (p.annotation is p.empty)                  \
-                        else (ParamTok.STRING, p.annotation) if (isinstance(p.annotation, str))            \
-                        else (ParamTok.TYPE,   p.annotation) if (isinstance(p.annotation, str))            \
-                        else (ParamTok.UNION,  p.__args__)   if (isinstance(p.annotation, typing.Literal)) \
-                        else (ParamTok.ERROR,) # <--bad
-
-                yield (argument[0]|annotation[0], (p.name,)+argument[1:]+annot[1:])
-        #@classmethod
-        #def render_annotation_part(ann: type | str | typing.Literal | typing.Any) -> str:
-        #    if isinstance(ann, str): return ann
-        #    if isinstance(ann, type): return ann.__qualname__
-        @classmethod
-        def render_token(cls, token: ParamTok, args: tuple[str, ...]):
-            assert not (token & ParamTok.ERROR)
-            args = iter(args)
-            name = next(args)
-            braks = Config('chat_commands/help/formatter/argument/brackets/optional', '[{argstr}]')    if (token & ParamTok.OPTIONAL) \
-               else Config('chat_commands/help/formatter/argument/brackets/variadic', '({argstr}...)') if (token & ParamTok.VARIADIC) \
-               else Config('chat_commands/help/formatter/argument/brackets/required', '{argstr}')
-            build = [name]
-            # annotations
-            if not (token & ParamTok.NONE):
-                build.append(Config('chat_commands/help/formatter/argument/joiners/type', ':'))
-            if token & ParamTok.STRING: build.append(next(args))
-            elif token & ParamTok.TYPE: build.append(next(args).__qualname__)
-            elif token & ParamTok.UNION:
-                build.append(Config('chat_commands/help/formatter/argument/joiners/union', '|').join(next(args)))
-            # default
-            if token & ParamTok.OPTIONAL:
-                if (n := next(args)) is not None:
-                    build.append(Config('chat_commands/help/formatter/argument/joiners/default', '='))
-                    build.append(repr(n))
         @classmethod
         def render_args(cls, args: tuple[inspect.Parameter]) -> str:
-            return Config('chat_commands/help/formatter/argument/joiners/argsep', ' ').join(map(cls.render_token, cls.tokenify_args(args)))
+            return Config('chat_commands/help/formatter/argument/joiners/argsep', ' ').join(map(cls.render_arg, args))
+
+        @staticmethod
+        def render_arg(arg: inspect.Parameter) -> str:
+            if (arg.kind == inspect.Parameter.KEYWORD_ONLY) or (arg.kind == arg.VAR_KEYWORD):
+                raise TypeError(f'Cannot handle param kind {arg.kind} (parameter {arg})')
+            braks = Config('chat_commands/help/formatter/argument/brackets/variadic', '({argstr}...)') if (arg.kind == arg.VAR_POSITIONAL) \
+               else Config('chat_commands/help/formatter/argument/brackets/optional', '[{argstr}]')    if (arg.default is not arg.empty) \
+               else Config('chat_commands/help/formatter/argument/brackets/required', '{argstr}')
+            build = [arg.name]
+            if (a := arg.annotation) is not arg.empty:
+                build.append(Config('chat_commands/help/formatter/argument/joiners/type', ':'))
+                if getattr(a, '__origin__', None) is typing.Literal:
+                    build.append('|'.join(str(aa) for aa in a.__args__))
+                elif isinstance(a, str): build.append(a)
+                else: build.append(a.__qualname__)
+            if (arg.default is not arg.empty) and (arg.default is not None):
+                build.append(Config('chat_commands/help/formatter/argument/joiners/default', '='))
+                build.append(str(arg.default))
+            return braks.format(argstr=''.join(build))
     
     class ChatCommand:
         '''
             Help for the command is specified by the doc-string of the target function
             The target function must have at least an argument for the object of the calling user
-            The command-line string (A.E. "test|t [arg0:int] [arg1_1|arg1_2] {arg1:str='abc'} {arg2} {arg3:int} (varargs...)") is generated automatically using the target function's arguments
+            The command-line string (A.E. "arg0:int arg1:arg1_1|arg1_2 [arg2:str=abc] [arg3] [arg4:int] (varargs...)") is generated automatically using the target function's arguments
                 That command-line string would be generated from a function such as: `def test(user: 'User', arg0: int, arg1: typing.Literal['arg1_1', 'arg1_2'], arg2: str = 'abc', arg3=None, arg4: int = None, *varargs)`
                 Annotations of multiple possible literal arguments should be given as `typing.Literal[literal0, literal1, ...]`, which results in `[literal0|literal1|...]`
                 Annotations and default values are detected from the function signature, as in: `arg: int = 0`, which results in `{arg:int=0}`
