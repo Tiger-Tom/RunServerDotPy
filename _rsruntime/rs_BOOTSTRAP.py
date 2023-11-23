@@ -8,6 +8,10 @@ import json
 from urllib import request
 import time
 import argparse
+from collections import UserDict
+import re
+import os
+import functools
 # Files
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -52,7 +56,7 @@ class Bootstrapper:
         self.ensure_python_version()
         self.parse_arguments()
         self.logger = self.setup_logger().getChild('BS')
-        self.Manifest = self._bind_Manifest(self)
+        self.Manifest = Manifest
         self.shutdown_callbacks = set()
 
     # Pre-bootstrap setup
@@ -154,7 +158,7 @@ class Bootstrapper:
         if close_after: self.close()
     ## Install and execute base manifest
     def base_manifest(self):
-        mp = Path('_rsruntime/MANIFEST.json')
+        mp = Path('_rsruntime/MANIFEST.ini')
         if not mp.exists():
             self.logger.error(f'Manifest at {mp} does not exist, attempting to download')
             try: request.urlretrieve(self.dl_man, mp)
@@ -162,8 +166,9 @@ class Bootstrapper:
                 self.logger.fatal(f'Could not fetch manifest from {self.dl_man}:\n{"".join(traceback.format_exception(e))}')
                 return
         self.logger.info(f'Loading in {mp}')
-        man = self.Manifest(mp)
-        man.update(man.upstream_manif()).execute()
+        man = Manifest.from_file(mp)
+        man.upgrade()
+        man.execute()
     ## Load entrypoint
     def access_entrypoint(self, ep: str) -> types.ModuleType:
         fl = SourceFileLoader(f'{__package__}.RS', ep)
@@ -177,214 +182,6 @@ class Bootstrapper:
         rs()
         self.logger.fatal('EXITED ENTRYPOINT')
 
-    # Manifest
-    @staticmethod
-    def _bind_Manifest(bs: 'Bootstrapper'):
-        '''Binds the Manifest class'''
-        class Manifest:
-            __slots__ = ('path', 'raw', 'manif', 'meta')
-
-            def __init__(self, path: Path | zipPath, manif: dict | None = None):
-                self.path = path
-                if manif is None:
-                    with self.path.open('r') as f: self.raw = f.read()
-                    self.manif = json.loads(self.raw)
-                else: self.manif = manif
-                self.meta = self.manif['_metadata']
-            def __getattr__(self, attr: str):
-                if not attr.startswith('m_'):
-                    return super().__getattribute__(attr)
-                elif (attr[2:] not in self.meta): raise AttributeError(attr[2:])
-                return self.meta[attr[2:]]
-            # Relocation
-            def relocate(self, np: Path | zipPath) -> typing.Self:
-                '''Create a new manifest with this manifest's dict and the supplied path'''
-                return self.__class__(np, self.manif)
-            # Manifest attributes
-            ## (Enc/De)coding
-            @property
-            def encoding(self) -> str:
-                '''The encoding type stored in this manifest, or the default if none is stored'''
-                f = self.m_creation.get('for') # use instead of := to allow successful compilation against python<38
-                if f in None: return sys.getdefaultencoding()
-                return f.get('encoding', sys.getdefaultencoding())
-            ### Attribute decoder method
-            @staticmethod
-            def _decode(val: str | tuple[int] | list[int]) -> bytes:
-                '''Decodes manifest attributes, returns base64.b85decode(val) if val is a str otherwise directly casts to bytes(val)'''
-                return base64.b85decode(val) if isinstance(val, str) else bytes(val)
-            ## Signing
-            @property
-            def key(self) -> PubKey:
-                '''The public key stored in this manifest'''
-                return PubKey.from_public_bytes(self._decode(self.m_public_key))
-            @property
-            def sig(self) -> bytes:
-                '''The signature stored in this manifest'''
-                return self._decode(self.m_signature)
-            # Verification & signings
-            def verify(self, k: PubKey):
-                '''Compile this manifest (using self.compile()) and verify it with the given public key'''
-                bs.logger.infop(f'Compiling {self.m_name} for verification')
-                dat = bytes(self.compile())
-                bs.logger.debug(f'Compiled:\n {dat}')
-                bs.logger.infop(f'Verifying {self.m_name} ({self.m_signature})')
-                bs.logger.debug(f'Key:\n {k.public_bytes_raw()}')
-                k.verify(self.sig, dat)
-                bs.logger.info(f'{self.m_name} passed verification')
-            ## Compilation
-            @staticmethod
-            def _compile(datas_heads: tuple[tuple[str | None]], datas_body: tuple[tuple[str, bytes]], encoding: str) -> bytes:
-                '''Joins data, just like compile() in the devel mkmanifest.py script'''
-                ba = bytearray()
-                byte_me = lambda n: bytes((*(byte_me(n // 256) if n >= 256 else b''), n % 256))
-                for dh in datas_heads:
-                    for d in dh:
-                        if d is None: ba.append(255)
-                        elif isinstance(d, int):
-                            if d < 0: raise ValueError(f'Cannot compile negative numbers ({d})')
-                            ba.extend(byte_me(d))
-                        elif isinstance(d, str): ba.extend(d.encode(encoding))
-                        elif isinstance(d, (tuple, list)): ba.extend(d)
-                        else: raise TypeError(f'Cannot compile {d!r} (type {type(d)})')
-                        ba.append(0)
-                    ba.append(0)
-                ba.append(0)
-                for d0,d1 in datas_body:
-                    ba.extend(d0.encode(encoding))
-                    ba.append(255)
-                    ba.extend(d1)
-                    ba.append(0)
-                return bytes(ba)
-            def compile(self) -> bytearray:
-                '''
-                    Join all important parts of the manifest, useful for hashing or signing
-                        works the same as the similar part of the mkmanifest.py devel utility
-                '''
-                return self._compile(
-                    (
-                        (self.m_name, self.m_manifest_upstream, self.m_file_upstream),
-                        tuple(v for v in self.m_creation.values() if not isinstance(v, dict)),
-                        ((None,) if self.m_creation['system'] is None else self.m_creation['system'].values()),
-                        self.m_creation['for'].values(),
-                    ),
-                    (tuple(((f, self._decode(h)) for f,h in self.manif.items() if not f.startswith('_')))),
-                    self.encoding,
-                )
-            # Updating
-            def update(self, new_manif: typing.Self, override: bool = False) -> typing.Self | None:
-                '''
-                    This function does three things:
-                    - Prints out debug information
-                    - Fetches and writes the new manifest
-                    - Creates and returns the new manifest object to be executed, or None if this manifest wishes to be ignored
-                '''
-                bs.logger.infop(f'Updating manifest {self.m_name}')
-                self.info()
-                bs.logger.infop(f'With new manifest {new_manif.m_name}')
-                new_manif.info()
-                if self.meta.get('ignore', False):
-                    bs.logger.error(f'{self.m.name} would like to be ignored, skipping')
-                    return self
-                for f in self.manif.keys() - new_manif.manif.keys():
-                    if f.startswith('_'): continue
-                stale = tuple(f for f in self.manif.keys() - new_manif.manif.keys() if not f.startswith('_'))
-                if stale:
-                    bs.logger.error('The following stale file(s) no longer exist in the new manifest:\n- '+('\n- '.join(stale))) # not using \n in f-string {} to allow compilation against python<312
-                else: bs.logger.infop('No stale files found')
-                new = tuple(f for f in new_manif.manif.keys() - self.manif.keys() if not f.startswith('_'))
-                if new: bs.logger.warning(f'The following new file(s) will need to be created:\n- '+('\n- '.join(new))) # not using \n in f-string {} to allow compilation against python<312
-                else: bs.logger.infop('No new files found')
-                with self.path.open('w') as f: f.write(new_manif.raw)
-                return new_manif
-            # Upstream
-            def upstream_manif(self, verify: bool = True, fail: bool = False) -> typing.Self:
-                '''Fetches the upstream manifest from the manifest_upstream metadata field of this manifest'''
-                bs.logger.infop(f'Fetching {self.m_name} upstream from {self.m_manifest_upstream}')
-                try:
-                    with request.urlopen(self.m_manifest_upstream, timeout=bs.dl_timeout) as r:
-                        newmanif = self.__class__(self.path, json.load(r))
-                except Exception as e:
-                    if fail: raise e from None
-                    bs.logger.error(f'An error occured whilst downloading upstream manifest:\n{"".join(traceback.format_exception(e))}\n Using current manifest instead')
-                    return self
-                if verify:
-                    try: newmanif.verify(self.key)
-                    except Exception as e:
-                        bs.logger.fatal(f'Upstream manifest {self.m_name} fetched from {self.m_manifest_upstream} failed verification! ({e})')
-                        if input('Use anyway? (y/N) >').lower().startswith('y'): return newmanif
-                        else: return self
-                return newmanif
-            def download_file(self, f: str):
-                '''Fetches a file from this manifest's upstream to this manifest's current path'''
-                bs.logger.warning(f'Downloading {Path(self.m_file_upstream, f)} to {self.path.parent / f}...')
-                print(f'{str(Path(self.m_file_upstream, f))=!r}')
-                with request.urlopen(str(Path(self.m_file_upstream, f)), timeout=bs.dl_timeout) as uf, (self.path.parent / f).open('wb') as f:
-                    shutil.copyfileobj(uf, f)
-            # Info
-            def info(self):
-                '''Prints out various pieces of information on this manifest, meant for use in .update()'''
-                c = self.m_creation
-                bs.logger.infop(f' on {time.ctime(c["time"])} ({c["time"]})') # ctime c time
-                bs.logger.infop(f' by {"{unknown}" if c["by"] is None else c["by"]}{"" if "aka" not in c else f""" AKA {c["aka"]}"""}')
-                bs.logger.infop(f' for a(n) {c["for"]["os"]}{"" if c["system"] is None else f""" [{c["system"]["platform"]} {c["system"]["os_release"]} on {c["system"]["arch"]}]"""} system running {"Python" if c["system"] is None else c["system"]["py_implementation"]} {".".join(map(str, c["for"]["python"]))}')
-            # Manifest execution
-            def execute(self):
-                '''
-                    Executes the manifest:
-                    - verifies it (NOTE: ONLY DISPLAYS A WARNING IF VERIFICATION FAILS, INSTALLS FILES ANYWAY!)
-                    - checks for missing files
-                    - checks for outdated files
-                    - asks and (possibly) proceeds to download missing files
-                    - asks and (possibly) proceeds to download and replace outdated files
-                '''
-                bs.logger.warning(f'Executing manifest {self.m_name}')
-                try: self.verify(self.key)
-                except Exception as e: bs.logger.fatal(f'Local manifest {self.m_name} failed verification ({e!r}), continuing anyway')
-                to_install = []
-                to_replace = []
-                for f,h in self.manif.items():
-                    if f.startswith('_'): continue
-                    if not (self.path.parent / f).exists():
-                        bs.logger.error(f'Local {f} does not exist, redownloading')
-                        to_install.append(f)
-                        continue
-                    bs.logger.info(f'Checking {f}')
-                    bs.logger.debug(self.path.parent / f)
-                    with open(self.path.parent / f, 'rb') as fd:
-                        dig = hashlib.file_digest(fd, bs.algorithm).digest()
-                        fh = base64.b85encode(dig).decode() if isinstance(h, str) else tuple(dig)
-                    bs.logger.debug(f'manif: {h}')
-                    bs.logger.debug(f'local: {fh}')
-                    if h == fh:
-                        bs.logger.info(f'Local {f} matches manifest')
-                        continue
-                    bs.logger.warning(f'Local {f} does not match manifest, need to redownload!')
-                    to_replace.append(f)
-                changes = set()
-                if to_install:
-                    print('Files to install:')
-                    for f in to_install:
-                        print(f'{Path(self.m_file_upstream, f)} -> {self.path.parent / f}')
-                    if (bs.args.unattended) or (bs.args.unattended_install) or not input('Install okay? (Y/n) >').lower().startswith('n'):
-                        for f in to_install:
-                            self.download_file(f)
-                            changes.add(f)
-                if to_replace:
-                    print('Files to replace:')
-                    for f in to_replace: print(f'- {f}')
-                    if (bs.args.unattended) or (bs.args.unattended_replace) or input('Replace okay? (y/N) >').lower().startswith('y'):
-                        for f in to_replace:
-                            self.download_file(f)
-                            changes.add(f)
-                if changes:
-                    print(f'{len(to_install+to_replace)} files were downloaded')
-                    for f in changes: print(f'- {f}')
-                    if input('Filesystem changes were made; rerun execute to verify checksums? (Y/n) >').lower().startswith('n'):
-                        self.execute()
-            
-        return Manifest
-
     # Utility functions
     ## Shutdown functions
     def close(self, do_exit: bool | int = False):
@@ -395,3 +192,360 @@ class Bootstrapper:
         if do_exit is not False: exit(do_exit)
     def register_onclose(self, cb: typing.Callable[[None], None]):
         self.shutdown_callbacks.add(cb)
+
+# Manifests
+## Manifest typing
+ManifestDict__ = typing.TypedDict("ManifestDict['_']", {
+    'encoding': str,
+    'hash_algorithm': typing.Literal[*hashlib.algorithms_available],
+    'pubkey': str,
+    'signature': str,
+})
+ManifestDict_creation = typing.TypedDict("ManifestDict['creation']", {
+    'at': int,
+    'by': str,
+    'aka': str | None,
+    'contact': str | None,
+    'description': str | None,
+})
+ManifestDict_metadata = typing.TypedDict("ManifestDict['metadata']", {
+    'name': str,
+    'manifest_upstream': str,
+    'content_upstream': str,
+})
+ManifestDict_system = typing.TypedDict("ManifestDict['system']", {
+    'os_name': str | None,
+    'platform': str | None,
+    'architecture': str | None,
+    'python_version': tuple[int | str] | None,
+    'python_implementation': str | None,
+    'os_release': str | None,
+    'os_version': str | None,
+    'hostname': str | None,
+    '_info_level': int,
+})
+ManifestDict_files = typing.Dict[str, bytes]
+ManifestDict_ignore = typing.TypedDict("ManifestDict['ignore']", {
+    'skip_upstream_upgrade': bool,
+    'skip_all_files': bool,
+    'skip_files': tuple[str],
+}, total=False)
+ManifestDict = typing.TypedDict('ManifestDict', {
+    '_': ManifestDict__,
+    'creation': ManifestDict_creation,
+    'metadata': ManifestDict_metadata,
+    'system': ManifestDict_system,
+    'files': ManifestDict_files,
+    'ignore': typing.NotRequired[ManifestDict_ignore],
+})
+## Manifest class
+class Manifest(UserDict):
+    __slots__ = ('own_path', 'own_type', 'base_path', 'logger')
+    type_to_suffix = {
+        'ini': '.ini',
+        'json': '.json',
+    }; suffix_to_type = {v: k for k,v in type_to_suffix.items()}
+    DOWNLOAD_TIMEOUT = 5
+
+    def __call__(self, *,
+                 skip_verify_local: bool = False, skip_update: bool = False, skip_execute: bool = False,
+                 ask_download: bool = True, ask_execute: bool = True):
+        '''Verifies, upgrades, and executes this manifest'''
+        if not skip_verify_local:
+            try: self.verify()
+            except InvalidSignature:
+                self.logger.fatal(f'Local manifest has an invalid signature! Will continue anyway, but keep in mind that upstream manifests may fail as well')
+        self.upgrade(ask_download)
+        self.execute(ask_execute)
+    # Self-updating
+    def upgrade(self, ask: bool = True, override: bool = False):
+        '''Updates the local manifest, verifying it and notifying the user of modified and stale files'''
+        if (not override) and self.get('ignore', {}).get('skip_upstream_upgrade', False):
+            self.logger.fatal(f'Manifest {self.name} requested to not be upgraded, skipping')
+            return
+        owntype = getattr(self, 'own_type', self.suffix_to_type.get(self.own_path.suffix, None))
+        if owntype is None:
+            owntype = next(self.type_to_suffix.keys())
+            self.logger.error(f'Could not automatically determine current type of manifest {self.name} at {self.own_path}, will write as {owntype}')
+        self.logger.infop(f'Updating manifest {self.name}, upstream is {self["metadata"]["manifest_upstream"]}')
+        try: newmanif = self.from_remote(self['metadata']['manifest_upstream'])
+        except Exception as e:
+            self.logger.fatal(f'Could not update manifest {self.name} (from {self["metadata"]["manifest_upstream"]}), got error:\n{"".join(traceback.format_exception(e))}')
+            return
+        if self.data == newmanif.data and False:
+            self.logger.infop(f'Upstream manifest matches local manifest, no upgrade needed')
+            return
+        if self.d_pubkey != newmanif.d_pubkey:
+            self.logger.warning(f'Local manifest {self.name} has a different public key than upstream manifest, it will likely fail verification:\n{self["_"]["pubkey"]}\n{newmanif["_"]["pubkey"]}')
+        self.logger.info(f'Verifying {newmanif.name} on {self["_"]["pubkey"]}')
+        try: self.verify(newmanif)
+        except InvalidSignature:
+            self.logger.fatal('Manifest {newmanif.name} failed verification')
+            if (not ask) or input('Install manifest anyway? (y/N').lower().startswith('y'): return
+        for f in (self.d_files.keys() - newmanif.d_files.keys()):
+            self.logger.error(f'Stale file {f} is in local manifest {self.name} but not upstream manifest (may need to be removed manually)')
+        for f in (newmanif.d_files.keys() - self.d_files.keys()):
+            self.logger.warning(f'New file {f} needs to be downloaded according to upstream manifest {newmanif.name}')
+        self |= newmanif
+        self.logger.infop(f'New manifest {self.name} folded into local, writing back local at {self.own_path} as {owntype}')
+        with self.own_path.open('w') as f: getattr(self, f'render_{owntype}')(f)
+    # Execution
+    def execute(self, ask: bool = True, override: bool = False):
+        '''Executes the manifest, installing new files and replacing files that don't match the stored hashes'''
+        self.logger.infop(f'Executing manifest {self.name} on {self.base_path}')
+        if (not override) and self.get('ignore', {}).get('skip_all_files', False):
+            self.logger.fatal(f'Manifest {self.name} requested that all files be skipped, not executing')
+            return
+        alg = self["_"]["hash_algorithm"]
+        ignore = self.get('ignore', {}).get('skip_files', set())
+        to_install = []; to_replace = []
+        for fn,target_hash in self.i_d_files():
+            self.logger.info(f'Checking file {fn} against {self["files"][fn]} via {alg}')
+            if fn in ignore:
+                self.logger.fatal(f'Manifest {self.name} requested that file {fn} be skipped')
+                continue
+            if not (self.base_path / fn).exists():
+                to_install.append(fn)
+                continue
+            real_hash = hashlib.new(alg, (self.base_path / fn).read_bytes()).digest()
+            self.logger.info(f'{fn}:\n target: {self["files"][fn]}\n actual: {base64.b85encode(real_hash).decode()}')
+            if real_hash != target_hash:
+                self.logger.warning(f'{fn} actual hash differs from target hash, will replace')
+                to_replace.append(fn)
+        fetch = set()
+        if to_install:
+            self.logger.warning(f'Te following new files will be installed:\n - {"\n - ".join(str(self.base_path / p) for p in to_install)}')
+            if not (ask and input('Install files? (Y/n) >').lower().startswith('n')): fetch.update(to_install)
+        if to_replace:
+            self.logger.warning(f'The following local files will be replaced:\n - {"\n - ".join(str(self.base_path / p) for p in to_replace)}')
+            if (not ask) or input('Replace files? (y/N) >').lower().startswith('y'): fetch.update(to_replace)
+        if not fetch:
+            self.logger.warning(f'Nothing to do')
+            return
+        self.logger.warning('Fetching {len(fetch)} file(s)')
+        for url, path in (('/'.join((self['metadata']['content_upstream'].rstrip('/'), fn)), self.base_path / fn) for fn in fetch):
+            if path.exists():
+                op = path.with_suffix('.'.join((path.suffix, 'old')))
+                self.logger.infop(f'Moving {path} to {op}')
+                op.write_bytes(path.read_bytes())
+            self.logger.info(f'Fetching {url} to {path}')
+            with urllib.request.urlopen(url) as r: path.write_bytes(r.read())
+    # Helper / compat function
+    @staticmethod
+    def _logger() -> logging.Logger:
+        '''Ensures compatability, whether or not the logger is set up'''
+        logger = logging.getLogger('RS.BS.M')
+        if not hasattr(logger, 'infop'):
+            logger.infop = logger.warning
+        return logger
+    # Constructors
+    def __init__(self):
+        '''Use from_dict, from_file, or from_remote instead'''
+        raise TypeError('Should not be initialized here, use from_dict or from_file')
+    @classmethod
+    def __internal_init(cls):
+        self = super().__new__(cls)
+        self.logger = self._logger()
+        return self
+    ## Setters
+    def set_path(self, *, base: Path | None = None, own: Path | None = None) -> typing.Self:
+        '''Sets the manifest's "target" and "own" paths, and returns the Manifest object for chaining'''
+        if base is not None: self.base_path = base
+        if own is not None: self.own_path = own
+        return self
+    ## From
+    @classmethod
+    def from_dict(cls, d: ManifestDict) -> typing.Self:
+        '''Initializes the UserDict superclass with a new instance of Manifest, setting d as its "data" attribute'''
+        self = cls.__internal_init()
+        UserDict.__init__(self, d); self.data = d
+        return self
+    ### From string types
+    @classmethod
+    def from_json(cls, jsn: str) -> typing.Self:
+        '''Generates a Manifest instance from JSON text (Convenience method for Manifest.from_json(Manifest.dict_from_json_text(...)))'''
+        self = cls.from_dict(cls.dict_from_json_text(jsn))
+        self.own_type = 'json'
+        return self
+    @classmethod
+    def from_ini(cls, ini: str) -> typing.Self:
+        '''Generates a Manifest instance from INI text (Convenience method for Manifest.from_dict(Manifest.dict_from_ini_text(...)))'''
+        self = cls.from_dict(cls.dict_from_ini_text(ini))
+        self.own_type = 'ini'
+        return self
+    #### Dict from string types
+    @staticmethod
+    def dict_from_json_text(jsn: str) -> ManifestDict:
+        '''Helper method to convert JSON text to a dictionary (current implementation just calls json.loads)'''
+        return json.loads(jsn)
+    @staticmethod
+    def dict_from_ini_text(ini: str) -> ManifestDict:
+        '''Helper method to convert INI text into a dict (note that interpolation is disabled and keys are case-sensitive)'''
+        p = ConfigParser(interpolation=None); p.optionxform = lambda o: o; p.read_string(ini)
+        return {k: {ik: literal_eval(iv) for ik,iv in v.items()} for k,v in p.items() if k != 'DEFAULT'}
+    ### From files
+    @classmethod
+    def from_file(cls, path: Path, path_type: typing.Literal[*type_to_suffix] | None = None) -> typing.Self:
+        '''
+            Initializes Manifest from a file.
+            Can load from the following file types:
+                'json': .json files
+                'ini': .ini files
+            If path_type is given, then attempts to load a file of that type
+            Otherwise, path_type is guessed from path's suffix, using Manifest.suffix_to_type
+        '''
+        logger = cls._logger(); data = path.read_text()
+        if path_type is None: path_type = cls.suffix_to_type.get(path.suffix, None) # Guess it through the suffix
+        if path_type is None: # Try every handler
+            logger.warning(f'path_type not given, and guessing it via the path\'s suffix ({path.suffix=}) failed')
+            for k in cls.type_to_suffix:
+                try:
+                    logger.infop(f'Trying {k} handler on contents of {path}')
+                    return getattr(cls, f'from_{k}')(data).set_path(base=path.parent, own=path)
+                except Exception as e:
+                    logger.error(f'{k} handler failed on contents of {path}:\n{"".join(traceback.format_exception(e))}')
+            raise NotImplementedError(f'Cannot parse manifest from {path}, no handlers succeeded')
+        if path_type not in cls.type_to_suffix: raise TypeError(f'Illegal path type {path_type!r}')
+        return getattr(cls, f'from_{path_type}')(data).set_path(base=path.parent, own=path)
+    @classmethod
+    def from_remote(cls, url: str, path_type: typing.Literal[*type_to_suffix] | None = None) -> typing.Self:
+        '''Initializes Manifest from a file, has the same path_type properties of from_file'''
+        logger = cls._logger()
+        with request.urlopen(url, timeout=cls.DOWNLOAD_TIMEOUT) as r: data = r.read().decode()
+        if path_type is None: path_type = cls.suffix_to_type.get(url[url.rindex('.'):] if ('.' in url) else '', None) # Guess it through the suffix
+        if path_type is None: # Try every handler
+                logger.warning(f'path_type not given, and guessing it via the URL\'s extension ({suffix=!r}) failed')
+                for k in cls.type_to_suffix:
+                    logger.infop(f'Trying {k} handler on contents of {url}')
+                    try: return getattr(cls, f'from_{k}')(data)
+                    except Exception as e:
+                        logger.error(f'{k} handler failed on contents of {url}:\n{"".join(traceback.format_exception(e))}')
+                raise NotImplementedError(f'Cannot parse manifest from {url}, no handlers succeeded')
+        if path_type not in cls.type_to_suffix: raise TypeError(f'Illegal path type {path_type!r}')
+        return getattr(cls, f'from_{path_type}')(data)
+    # Rendering
+    JSON_ARRAY_CLEANER_A = re.compile(r'^(\s*"[^"]*":\s*)(\[[^\]]*\])(,?\s*)$', re.MULTILINE)
+    JSON_ARRAY_CLEANER_B = staticmethod(lambda m: m.group(1)+(re.sub(r'\s+', '', m.group(2)).replace(',', ', '))+m.group(3))
+    def render_json(self, to: typing.TextIO | None = None) -> str:
+        '''Render the Manifest dictionary to JSON (if `to` is given, write it to `to` and return the JSON string)'''
+        data = self.JSON_ARRAY_CLEANER_A.sub(self.JSON_ARRAY_CLEANER_B, json.dumps(self.data, sort_keys=False, indent=4))
+        if to is not None: to.write(data)
+        return data
+    def render_ini(self, to: None | typing.TextIO = None) -> str:
+        '''Render the Manifest dictionary to INI (if `to` is given, write it to `to` and return the INI string)'''
+        p = ConfigParser(interpolation=None); p.optionxform = lambda o: o
+        for ok,ov in self.data.items(): p[ok] = {ik: repr(iv) for ik,iv in ov.items()}
+        if to is not None: p.write(to)
+        sio = io.StringIO(); p.write(sio); return sio.getvalue()
+    # Property shortcuts
+    @property
+    def name(self) -> str: return self['metadata']['name']
+    # Data extraction
+    def i_d_files(self) -> typing.Generator[tuple[str, bytes], None, None]:
+        return ((k, base64.b85decode(v)) for k,v in self.data['files'].items())
+    @property
+    def d_files(self) -> dict[Path, bytes]: return dict(self.i_d_files())
+    @property
+    def d_sig(self) -> bytes: return base64.b85decode(self['_']['signature'])
+    @property
+    def d_pubkey(self) -> EdPubK: return EdPubK.from_public_bytes(base64.b85decode(self['_']['pubkey']))
+    # Compilation
+    def compile(self): return self.compile_dict(self.data)
+    ## Constants
+    COMPILED_KEY_ORDER = ('creation', 'metadata', 'system', 'files')
+    COMPILED_KEY_VALUE_SEP = 255
+    COMPILED_ENTRY_SEP = 0
+    ## Individual value compilers
+    _val_compilers = {
+        bytes: lambda b: b, str: lambda s: s.encode(),
+        int: lambda n: n.to_bytes(((n.bit_length() + 1) + 7) // 8, signed=True),
+        type(None): lambda v: bytes((255,)),
+    }
+    @classmethod
+    def _compile_value(cls, val: typing.Union[*_val_compilers] | tuple | list) -> bytes:
+        if isinstance(val, (tuple, list)):
+            return b''.join(cls._compile_value(v) for v in val)
+        if type(val) not in cls._val_compilers:
+            raise TypeError(f'Cannot handle type {type(val).__qualname__} (value {val!r})')
+        return cls._val_compilers[type(val)](val)
+    ## Dictionary compiler
+    @classmethod
+    def compile_dict(cls, manif: ManifestDict) -> bytes:
+        '''
+            Compiles dictionaries for signing
+            Keys are compiled in the following order (by default, see COMPILED_KEY_ORDER): 'creation', 'metadata', 'system', 'files'
+            with each inner value being added to the compiled data as (where, by default, COMPILED_KEY_VALUE_SEP is 255 and COMPILED_ENTRY_SEP is 0):
+                _compile_value(outer_key), COMPILED_KEY_VALUE_SEP, _compile_value(inner_key), COMPILED_KEY_VALUE_SEP, _compile_value(value), COMPILED_KEY_VALUE_SEP, COMPILED_ENTRY_SEP
+        '''
+        # Bring in values for readability (and I suppose for a tiny inner loop efficiency bonus)
+        compile_val = cls._compile_value
+        COMPILED_KEY_VAL_SEP = cls.COMPILED_KEY_VALUE_SEP; COMPILED_ENTRY_SEP = cls.COMPILED_ENTRY_SEP
+        return bytes(byte for bytes_ in ((*compile_val(outer_key), COMPILED_KEY_VAL_SEP, *compile_val(inner_key), COMPILED_KEY_VAL_SEP, *compile_val(value), COMPILED_KEY_VAL_SEP, COMPILED_ENTRY_SEP)
+                    for outer_key in cls.COMPILED_KEY_ORDER for inner_key,value in manif[outer_key].items()) for byte in bytes_) # I'm sorry...
+    # Verification
+    def verify(self, other: typing.Self | None = None):
+        '''Verifies either this manifest or another with this manifest's public key'''
+        self.d_pubkey.verify((self if other is None else other).d_sig, (self if other is None else other).compile())
+    # Generation
+    class _ManifestFactory:
+        __slots__ = ('Manifest',)
+        def __init__(self, manif: typing.Type['Manifest']): self.Manifest = Manifest
+        # Fields
+        @staticmethod
+        def gen_field__(*, hash_algorithm: typing.Literal[*hashlib.algorithms_available], key: EdPrivK, data: bytes) -> ManifestDict__:
+            return {'encoding': sys.getdefaultencoding(), 'hash_algorithm': hash_algorithm,
+                    'pubkey': base64.b85encode(key.public_key().public_bytes_raw()).decode(),
+                    'signature': base64.b85encode(key.sign(data)).decode()}
+        @staticmethod
+        def gen_field_creation(*, by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None) -> ManifestDict_creation:
+            return {'at': round(time.time()), 'by': by, 'aka': aka, 'contact': contact, 'description': description}
+        @staticmethod
+        def gen_field_metadata(*, name: str, manifest_upstream: str, content_upstream: str) -> ManifestDict_metadata:
+            return {'name': name, 'manifest_upstream': manifest_upstream, 'content_upstream': content_upstream}
+        field_system_info__none: ManifestDict_system = {'_info_level': 0,
+            'os_name': None, 'platform': None, 'architecture': None, # more important system info
+            'python_version': None, 'python_implementation': None, # Python info
+            'os_release': None, 'os_version': None, 'hostname': None} # less important system info
+        field_system_info__lite: ManifestDict_system = field_system_info__none | {'_info_level': 1,
+            'os_name': os.name, 'architecture': os.uname().machine, 'python_version': sys.version_info[:3],
+            'python_implementation': sys.implementation.name}
+        field_system_info__full: ManifestDict_system = field_system_info__lite | {'_info_level': 2,
+            'platform': sys.platform, 'os_release': os.uname().release, 'os_version': os.uname().version, 'hostname': os.uname().nodename,
+            'python_version': sys.version_info[:]}
+        FILE_PATTERNS = ('**/*',)
+        FILE_EXCLUDED_SUFFIXES = {'.pyc', '.json', '.ini', '.old'}
+        @classmethod
+        def gen_field_files(cls, algorithm: typing.Literal[*hashlib.algorithms_available], path: Path) -> ManifestDict_files:
+            return {file.relative_to(path).as_posix():
+                        base64.b85encode(hashlib.new(algorithm, file.read_bytes()).digest())
+                    for patt in cls.FILE_PATTERNS for file in path.glob(patt) if file.suffix not in cls.FILE_EXCLUDED_SUFFIXES}
+        # Generation functions
+        def generate_outline(self, *,
+                             system_info_level: typing.Literal['full', 'lite', 'none'] = 'full',
+                             name: str, manifest_upstream: str, content_upstream: str,
+                             by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None) -> ManifestDict:
+            '''Creates the '_' and 'files' fields and populates the 'creation', 'metadata', and 'system' fields'''
+            assert system_info_level in {'full', 'lite', 'none'}
+            return {'_': NotImplemented,
+                    'creation': self.gen_field_creation(by=by, aka=aka, contact=contact, description=description),
+                    'metadata': self.gen_field_metadata(name=name, manifest_upstream=manifest_upstream, content_upstream=content_upstream),
+                    'system': getattr(self, f'field_system_info__{system_info_level}'),
+                    'files': NotImplemented}
+        def generate_dict(self, path: Path, name: str, manifest_upstream: str, content_upstream: str, *,
+                          by: str | None, aka: str | None = None, contact: str | None = None, description: str | None = None,
+                          hash_algorithm: typing.Literal[*hashlib.algorithms_available] = 'sha1', key: EdPrivK | Path,
+                          system_info_level: typing.Literal['full', 'lite', 'none'] = 'full') -> ManifestDict:
+            '''Generates a manifest-dict from the given attributes'''
+            if isinstance(key, Path): key = EdPrivK.from_private_bytes(key.read_bytes())
+            data = self.generate_outline(system_info_level=system_info_level, name=name, manifest_upstream=manifest_upstream, content_upstream=content_upstream, by=by, aka=aka, contact=contact, description=description)
+            data['files'] = self.gen_field_files(hash_algorithm, path)
+            data['_'] = self.gen_field__(hash_algorithm, key, self.Manifest.compile_dict(data))
+            return data
+        @functools.wraps(generate_dict, assigned=('__annotations__', '__type_params__'))
+        def __call__(self, *args, **kwargs) -> 'Manifest':
+            '''Convenience wrapper for {self.}Manifest.from_dict(Manifest.ManifestFactory{|self}.generate_dict(...))'''
+            return self.Manifest.from_dict(self.generate_dict(*args, **kwargs))
+    @classmethod
+    @property
+    def ManifestFactory(cls) -> _ManifestFactory:
+        cls.ManifestFactory = cls._ManifestFactory(cls); return cls.ManifestFactory
