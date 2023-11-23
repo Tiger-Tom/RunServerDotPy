@@ -42,7 +42,7 @@ RS = NotImplemented
 
 #> Header >/
 class Bootstrapper:
-    __slots__ = ('args', 'args_unknown', 'root_logger', 'logger', 'Manifest', 'shutdown_callbacks', '__contained_RS_module', '__contained_RS')
+    __slots__ = ('args', 'args_unknown', 'root_logger', 'logger', 'Manifest', 'shutdown_callbacks', 'is_closed', '__contained_RS_module', '__contained_RS')
     # Remotes
     #dl_man = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e/manifest.json'
     dl_man = 'http://0.0.0.0:8000/manifest.json'
@@ -62,6 +62,7 @@ class Bootstrapper:
         self.logger = self.setup_logger().getChild('BS')
         self.Manifest = Manifest
         self.shutdown_callbacks = set()
+        self.is_closed = False
 
     # Pre-bootstrap setup
     ## Check Python version
@@ -189,11 +190,13 @@ class Bootstrapper:
     # Utility functions
     ## Shutdown functions
     def close(self, do_exit: bool | int = False):
+        if self.is_closed: return
         self.logger.fatal('Instructed to perform orderly shutdown, executing shutdown callbacks...')
         for h in self.shutdown_callbacks: h()
         self.logger.error(f'Closing logger{f" and exiting with code {do_exit}" if do_exit is not False else ""}, goodbye!')
         logging.shutdown()
-        if do_exit is not False: exit(do_exit)
+        if do_exit is False: self.is_closed = True
+        else: exit(do_exit)
     def register_onclose(self, cb: typing.Callable[[None], None]):
         self.shutdown_callbacks.add(cb)
 
