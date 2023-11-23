@@ -48,8 +48,8 @@ class Bootstrapper:
     dl_man = 'http://0.0.0.0:8000/manifest.json'
     dl_timeout = 10
     # Logger formats
-    log_fmt_short = '[$asctime] [$name/$threadName/$levelname] $message'
-    log_fmt_long = '[$asctime] [$name/$processName:$threadName<$module.$funcName[$lineno]>/$levelname] $message'
+    log_fmt_short = '[$asctime] [$name/$threadName/$levelname]: $message'
+    log_fmt_long = '[$asctime] [$name/$processName:$threadName<$module.$funcName[$lineno]>/$levelname]: $message'
     date_fmt_short = '%H:%M:%S'
     date_fmt_long = '%Y-%m-%d %H:%M:%S'
     # Misc. config
