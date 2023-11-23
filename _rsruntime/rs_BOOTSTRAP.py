@@ -4,14 +4,8 @@ from __future__ import annotations
 
 #> Imports
 import sys
-import json
 from urllib import request
-import time
 import argparse
-from collections import UserDict
-import re
-import os
-import functools
 # Files
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -23,11 +17,21 @@ import traceback
 # Typing
 import typing
 import types
-# Cryptography
+# Manifest dependencies
+import os
+import re
+import time
+from ast import literal_eval
+from collections import UserDict
+import functools
+## Parser/writers
+from configparser import ConfigParser
+import json
+## Cryptography
 import hashlib
 import base64
 try:
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey as PubKey
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey as EdPrivK, Ed25519PublicKey as PubKey
 except ModuleNotFoundError:
     raise ModuleNotFoundError('Cannot find crytography module, perhaps you need to `pip install cryptography`?')
 #</Imports
