@@ -6,9 +6,11 @@ from traceback import format_exception
 import threading
 from select import select
 import sys
+import os
 # Shell
 import shlex
 from getpass import getpass
+import subprocess
 # Files
 from pathlib import Path
 import shutil
@@ -132,7 +134,6 @@ class BasePopenManager(BaseServerManager):
     cap_restartable = True
     
     def start(self):
-        import subprocess
         self.popen = subprocess.Popen(self.cli_line(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, text=True, cwd=Config('minecraft/path/base', './minecraft'))
 # Manager
 class ServerManager:
@@ -182,33 +183,42 @@ class ServerManager:
         return sorted(cls.managers.__dict__.values(), key=lambda t: t.real_bias, reverse=True)
 # Implementations
 class ScreenManager(BaseServerManager):
-    __slots__ = ()
+    __slots__ = ('screen',)
     _type = ('screen',)
     def __init__(self):
         super().__init__()
         if shutil.which(Config('server_manager/screen/binary', 'screen')) is None:
             raise FileNotFoundError('ScreenManager requires the `screen` binary!')
-        Config('server_manager/screen/name', 'RS_ScreenManager_mcserverprocess')
+        self.screen = self.Screen(Config('server_manager/screen/name', 'RS_ScreenManager_mcserverprocess'), self.cli_line())
     class Screen:
-        __slots__ = ('name',)
-        def __init__(self, name: str):
+        __slots__ = ('name', 'cmdline')
+        def __init__(self, name: str, cmdline: tuple[str]):
             self.name = shlex.quote(name)
+            self.cmdline = ' '.join(cmdline)
         @property
-        def _cmd_pfx(self) -> tuple[str]: return ('screen', '-x', self.name)
+        def _cmd_pfx(self) -> tuple[str]: return (Config('server_manager/screen/binary', 'screen'), '-x', self.name)
         # Commands
-        def run_screen_cmd(self, cmd: tuple[str]) -> str:
-            return subprocess.check_output(self._cmd_pfx+cmd).decode(Config('encoding', sys.getdefaultencoding()))
+        def run_screen_cmd(self, *cmd: tuple[str]) -> str:
+            return subprocess.check_output(self._cmd_pfx+cmd).decode(Config('server_manager/screen/encoding', sys.getdefaultencoding()))
+        def run_screen_noout(self, *cmd: tuple[str]) -> int:
+            return subprocess.call(self._cmd_pfx+cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         # Status
         @property
         def is_alive(self) -> bool:
-            return not not subprocess.call(('screen', '-x', 'rssm', '-X', 'info'), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return not self.run_screen_noout('-X', 'info')
         # Logging
         def setup_logfifo(self) -> Path:
-            if Config('server_manager/screen/reset_log', True): self.run_screen_cmd('log', 'off')
-            path = Path(Config('server_manager/screen/log_fifo', f'./screen.{Config["server_manager/screen/name"]}.fifo'))
-            os.mkfifo(path)
-            self.run_screen_cmd('logfile', path)
-            self.run_screen_cmd('logfile', 'flush', str(Config('server_manager/screen/log_flush_secs', 1)))
+            if Config('server_manager/screen/reset_log', True): self.run_screen_cmd('-X', 'log', 'off')
+            path = Path(Config('server_manager/screen/log_fifo', f'./_rslog/screen.{self.name}.fifo'))
+            if not path.exists(): os.mkfifo(path)
+            self.run_screen_cmd('-X', 'log', 'on')
+            self.run_screen_cmd('-X', 'logfile', str(path))
+            self.run_screen_cmd('-X', 'logfile', 'flush', str(Config('server_manager/screen/log_flush_secs', 1)))
+        # Start/stop
+        def start(self):
+            subprocess.call((shutil.which(Config('server_manager/screen/binary', 'screen')), '-dmS', self.name))
+        def stop(self):
+            self.run_screen_noout('-X', 'kill')
     def start(self): raise NotImplementedError
     def write(self): raise NotImplementedError
     
@@ -218,7 +228,8 @@ class ScreenManager(BaseServerManager):
     cap_attachable = True
     cap_restartable = True
     
-    bias = -float('inf') if shutil.which(Config('server_manager/screen/binary', 'screen')) is None else 10.0
+    #bias = -float('inf') if shutil.which(Config('server_manager/screen/binary', 'screen')) is None else 10.0
+    bias = -float('inf') # not implemented yet
 class RConManager(BaseServerManager):
     __slots__ = ()
     _type = ('remote', 'passwd')
