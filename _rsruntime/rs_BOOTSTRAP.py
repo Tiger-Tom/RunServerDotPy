@@ -6,6 +6,7 @@ from __future__ import annotations
 import sys
 from urllib import request
 import argparse
+import functools
 # Files
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
@@ -23,7 +24,6 @@ import re
 import time
 from ast import literal_eval
 from collections import UserDict
-import functools
 from io import StringIO
 ## Parser/writers
 from configparser import ConfigParser
@@ -98,10 +98,7 @@ class Bootstrapper:
         file_fmt = logging.Formatter(self.log_fmt_long, self.date_fmt_long, style='$')
         # Create new logging level
         logging.INFOPLUS = logging.INFO + ((logging.WARNING - logging.INFO) // 2)
-        def log_infop(self, message, *a, **kw):
-            if not self.isEnabledFor(logging.INFOPLUS): return
-            self._log(logging.INFOPLUS, message, a, **kw)
-        logging.getLoggerClass().infop = log_infop
+        logging.getLoggerClass().infop = functools.partialmethod(logging.getLoggerClass().log, logging.INFOPLUS)
         # Configure logger
         logger = logging.getLogger('RS')
         logger.setLevel(logging.DEBUG)
