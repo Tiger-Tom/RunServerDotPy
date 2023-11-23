@@ -300,3 +300,16 @@ class PyInterpreterServerManager(DummyServerManager):
     - self.interpreter is the InteractiveConsole instance
     - tc() is a function that tries to enable tab completion
     Use CTRL+D to exit subinterpreter, as exit() exits both the sub and main interpreters''')
+class NullServerManager(BaseServerManager):
+    __slots__ = ()
+    _type = ('null',)
+    def start(self): pass
+    def write(self, line: str): pass
+
+    cap_arbitrary_read = True
+    cap_arbitrary_write = True
+    cap_restartable = True
+
+    attr_is_dummy = True
+
+    bias = -60.0
