@@ -33,7 +33,7 @@ import hashlib
 import base64
 try:
     from cryptography.exceptions import InvalidSignature
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey as EdPrivK, Ed25519PublicKey as PubKey
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey as EdPrivK, Ed25519PublicKey as EdPubK
 except ModuleNotFoundError:
     raise ModuleNotFoundError('Cannot find crytography module, perhaps you need to `pip install cryptography`?')
 #</Imports
