@@ -523,7 +523,7 @@ class Manifest(UserDict):
         @classmethod
         def gen_field_files(cls, algorithm: typing.Literal[*hashlib.algorithms_available], path: Path) -> ManifestDict_files:
             return {file.relative_to(path).as_posix():
-                        base64.b85encode(hashlib.new(algorithm, file.read_bytes()).digest())
+                        base64.b85encode(hashlib.new(algorithm, file.read_bytes()).digest()).decode()
                     for patt in cls.FILE_PATTERNS for file in path.glob(patt) if (file.suffix not in cls.FILE_EXCLUDED_SUFFIXES) and file.is_file()}
         # Generation functions
         def generate_outline(self, *,
