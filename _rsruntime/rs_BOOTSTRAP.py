@@ -190,7 +190,7 @@ class Bootstrapper:
     ## Shutdown functions
     def close(self, do_exit: bool | int = False):
         self.logger.fatal('Instructed to perform orderly shutdown, executing shutdown callbacks...')
-        for h in self.shutdown_handlers: h()
+        for h in self.shutdown_callbacks: h()
         self.logger.error(f'Closing logger{f" and exiting with code {do_exit}" if do_exit is not False else ""}, goodbye!')
         logging.shutdown()
         if do_exit is not False: exit(do_exit)
