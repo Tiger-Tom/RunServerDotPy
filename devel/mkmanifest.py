@@ -110,6 +110,7 @@ def mode_update(args: argparse.Namespace):
     halg = man['_']['hash_algorithm'] = man['_']['hash_algorithm'] if (args.hash_algorithm is None) else args.hash_algorithm
     eprint(f'Updating manifest: files from {args.manifest}, algorithm {halg}')
     man['files'] = ManifestFactory.gen_field_files(halg, args.path)
+    man['creation']['nupdates'] += 1
     common_output(man, args)
     try: man.verify()
     except InvalidSignature:
