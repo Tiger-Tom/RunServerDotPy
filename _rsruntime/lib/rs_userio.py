@@ -45,12 +45,12 @@ class UserManager:
         for n,v in Config.get_item('permissions/levels', unsafe_allow_get_subkey=True).items()
         if not n.startswith('_')
     })
-    
+
     @dataclasses.dataclass(slots=True)
     class User:
         name: str
         old_name: str | None = None
-        uuid: str | None = None
+        uuid: str | object | None = None
         connected: bool = False
         ip: str | None = None
         port: int | None = None
@@ -60,7 +60,10 @@ class UserManager:
         last_connected: time.struct_time | None = None
         last_disconnected: time.struct_time | None = None
 
-    
+        _no_cache: bool = False
+
+        _console_uuid: typing.ClassVar[object] = object()
+
         @classmethod
         @property
         def default_perm_str(cls) -> str:
@@ -74,12 +77,29 @@ class UserManager:
                 if isinstance(val, int): return Perm(val.upper())
                 return RS.UM.Perm[val.upper()]
             except ValueError: return cls.perm_from_value(cls.default_perm_str)
+
+        @property
+        def is_console(self) -> bool:
+            return getattr(self, 'uuid', None) is self._console_uuid
+        @property
+        def is_selector(self) -> bool:
+            return getattr(self, 'name', None).startswith('@')
+        
         @property
         def permission(self) -> 'Perm':
-            return self.perm_from_value(RS.UserManager.fbd(f'{self.uuid}/ChatCommand Permission Level', self.default_perm_str))
+            if self.is_console: return RS.UM.Perm.OWNER
+            return self.perm_from_value(RS.UM.fbd(f'{self.uuid}/ChatCommand Permission Level', self.default_perm_str))
         @permission.setter
         def permission(self, val: 'Perm'):
+            if self.is_console: raise AttributeError('Cannot set permission of console')
             RS.UserManager.fbd[f'{self.uuid}/ChatCommand Permission Level'] = int(val)
+
+        def tell(self, text: typing.ForwardRef('TellRaw') | tuple[str | dict] | str):
+            if not (hasattr(self, 'name') or self.is_console):
+                raise TypeError(f'User {self} has no name; cannot tell')
+            if isinstance(text, TellRaw): text = text.render()
+            if self.is_console: print(f'CONSOLE.tell: {text if isinstance(text, str) else json.dumps(text, indent=4)}')
+            else: RS.SM.write(f'tellraw {self.name} {json.dumps(text)}')
 
         store_attrs: typing.ClassVar = {
             'name': ('Username', None),
@@ -90,19 +110,24 @@ class UserManager:
             'last_connected': ('Last joined time', time.asctime),
             'last_disconnected': ('Last left time', time.asctime),
         }
-        
         def __setattr__(self, attr, val):
+            if self.is_console: raise AttributeError('Cannot mutate attributes of console')
             object.__setattr__(self, attr, val)
-            if attr not in self.store_attrs: return
-            if getattr(self, 'uuid', None) is None: return
+            if attr.startswith('_') or getattr(self, '_no_cache', False) or (attr not in self.store_attrs) or (getattr(self, 'uuid', None) is None): return
             if val is None:
                 RS.UserManager.fbd.set_default(f'{self.uuid}/{self.store_attrs[attr][0]}', None)
                 return
             RS.UserManager.fbd[f'{self.uuid}/{self.store_attrs[attr][0]}'] = val if (self.store_attrs[attr][1] is None) else self.store_attrs[attr][1](val)
-            print(f'set {self.uuid}/{self.store_attrs[attr][0]} to {val if (self.store_attrs[attr][1] is None) else self.store_attrs[attr][1](val)}')
         def __call__(self, **attrs: dict[str, ...]):
             for a,v in attrs.items(): setattr(self, a, v)
             return self
+        
+        def __str__(self):
+            return '<CONSOLE>' if self.is_console else \
+                   f'"{getattr(self, "name", "[NAME UNKNOWN]")}" ({user.uuid})'
+        def __repr__(self):
+            return '<User CONSOLE>' if self.is_console else f'<User "{getattr(self, "name", "[NAME UNKNOWN]")}" {user.uuid}>'
+    CONSOLE = User(_no_cache=True, name='<CONSOLE>'); CONSOLE.uuid=User._console_uuid
 
     def __init__(self):
         self.logger = RS.logger.getChild('UM')
@@ -218,7 +243,7 @@ class TellRaw(list):
     def line_break(self, count: int = 1):
         '''Append n newlines to self (where n >= 0)'''
         if count < 0: raise ValueError('Cannot append a negative amount of newlines')
-        for _ in range(count): self.append('\n')
+        for _ in range(count): self.append(r'\n')
         return self
     
 class ChatCommands:
