@@ -118,5 +118,3 @@ class RunServer(types.ModuleType):
         self.PM.start()
         # Start server
         self.SM.start()
-        # Finalize
-        self.BS.close()
