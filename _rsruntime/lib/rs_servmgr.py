@@ -249,7 +249,7 @@ class RConManager(BaseServerManager):
     def bias(cls) -> float:
         if RCONClient is None: return -float('inf')
         if Config('minecraft/rcon/enabled', False):
-            return 10
+            return 10.0
         return -255.0 #RConManager should be manually selected
 class SelectManager(BasePopenManager):
     __slots__ = ()
