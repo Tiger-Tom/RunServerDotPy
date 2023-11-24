@@ -196,17 +196,14 @@ class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Dese
     '''A FileBackedDict implementation that uses ConfigParser as a backend'''
     __slots__ = ()
 
+    file_suffix = '.ini'
+
     def _init_topkey(self, topkey: str):
         self._data[topkey] = ConfigParser()
         self._data[topkey].optionxoption = lambda o: o
     def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> SectionProxy | None:
         '''Gets the section that contains key[-1]'''
-        if key[0] not in self._data:
-            if fetch_if_missing and self.path_from_topkey(key[0]).exists():
-                self.readin(key[0])
-            elif make_if_missing: self._init_topkey(key[0])
-            elif no_raise_keyerror: return None
-            else: raise KeyError(f'{key}[0]')
+        self._gettop(key[0], make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)
         ck = '.'.join(key[1:-1])
         if not ck: raise ValueError(f'{key} is too short')
         if ck not in self._data[key[0]]:
@@ -234,8 +231,6 @@ class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Dese
         elif isinstance(desv, set): return frozenset(desv)
         return desv
 
-    file_suffix = '.ini'
-
 # JSON implementation
 _JSON_Serializable = typing.Union[type(None),       # simple type
                                   bool, int, float, # numeric types
@@ -255,6 +250,7 @@ class JSONBackedDict(FileBackedDict[_JSON_Serializable, _JSON_Serialized, _JSON_
     def _init_topkey(self, topkey: str, *, _val: dict = {}):
         self._data[topkey] = _val
     def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = True) -> dict | None:
+        '''Gets the section that contains key[-1]'''
         cwd = self._gettop(key[0], make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)
         if cwd is None: return cwd
         for i,k in enumerate(key):
