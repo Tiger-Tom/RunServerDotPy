@@ -2,306 +2,315 @@
 
 #> Imports
 from pathlib import Path
-import functools
-import logging
+from io import StringIO
 # Parsing
-import json
 import re
+## For ConfigParser
+from ast import literal_eval
+from configparser import ConfigParser, SectionProxy
+## For JSON
+import json
 # Types
 import typing
-from collections import UserDict
-from enum import Enum
+from typing import MutableMapping
+from enum import Enum, IntEnum
+# Abstract
+from abc import ABC, abstractmethod, abstractproperty
+# Local types
+from .locked_resource import LockedResource, locked
 from .timer import Timer
-from .locked_resource import basic
-from .perfcounter import PerfCounter
 #</Imports
 
 #> Header >/
-__all__ = ('serializable', 'FileBackedDict')
+__all__ = ('JSONBackedDict', 'INIBackedDict')
 
-serializable = (dict, list, str, int, float, bool, type(None))
-
-class FileBackedDict(UserDict, basic.LockedResource):
+# ABC
+class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource):
     '''
-        A dictionary backed by an on-disk JSON file
-        Asynchronously synchronizes entries with a file on disk when enabled
-        Detects file changes by checking its modification time
-        Detects dict changes by adding keys to a "dirty" flag
-        Sub-dictionaries can be accessed with "/" notation
+        A dictionary-like class that is backed by an on-disk file
+        Asynchronously synchronizes entries with a file on disk
+        Subfields are accessed with `key_sep` (default: "/")
     '''
-    __slots__ = ('path', 'logger', 'dirty', 'watchdog', 'watchdog_times')
-    key_patt_shrt = re.compile(r'^[\w\d][\w\d\t .\-;()[\]]*$')
-    key_patt_long = re.compile(fr'^{key_patt_shrt.pattern[1:-1]}/.*?[^/]$')
-    # Ironic that the word "short" is longer than the word "long"...
+    __slots__ = ('path', '_data', 'watchdog', 'mtimes', 'dirty')
 
-    def __init__(self, path: Path, interval: float = 120.0):
-        basic.LockedResource.__init__(self)
-        UserDict.__init__(self)
-        self.path = Path(path) # path path path
-        self.logger = logging.getLogger(f'FBD[{self.path.name.replace(".", "_")}]')
-        self.dirty = set()
-        self.watchdog = Timer.set_interval(self.sync_all, interval, False); self.watchdog_times = {}
-    def __hash__(self):
-        '''Exclusively for functools.cache'''
-        return hash((self.path, self.key_patt_long.pattern, self.key_patt_shrt.pattern))
+    key_sep = '/'
+    key_topp_patt = re.compile(r'^[a-zA-Z\d][\w\d\-]*')
+    key_part_patt = re.compile(r'^[a-zA-Z][\w\d\- ;]*$')
+
+    Behavior = Enum('Behavior', ('DEFAULT', 'IGNORE', 'RAISE', 'FORCE'))
+    Behavior.__doc__ = \
+        '''
+            Various behavior modifiers for different methods
+                Most functions only specify a subset of accepted Behaviors, see annotations for typing.Literal[]s containing Behaviors
+        '''
+
+    @abstractproperty
+    def file_suffix() -> str: NotImplemented
+    
+    _transaction_types = IntEnum('TransactionTypes', ('PRE_GETITEM', 'POST_GETITEM', 'SETITEM'))
+    def _validate_transaction(self, key: tuple[str], ttype: _transaction_types, args: tuple[typing.Any] = (), *, _tree: MutableMapping | None = None) -> None:
+        '''Allows subclasses to place extra restrictions on types of transactions by throwing exceptions to cancel them. Is a no-op by default'''
+
+    # Concrete methods #
+    def __init__(self, path: Path, intvl: float = 120.0):
+        LockedResource.__init__(self)
+        self.path = path
+        self._data = {}
+        self.watchdog = Timer.set_interval(self.sync, intvl, False)
+        self.mtimes = {}; self.dirty = set()
 
     # Key functions
-    @functools.cache
-    def key(self, key: str | tuple[str], *, allow_top_lvl_key: bool = False) -> tuple[str]:
-        '''
-            Converts a str a key, ensures that it matches against key_patt_long
-                (or key_patt_shrt if allow_top_lvl_key is truthy)
-            When passed a tuple of str, simply checks if it meets length requirements
-        '''
-        if isinstance(key, str):
-            if self.key_patt_long.fullmatch(key) is not None:
-                key = tuple(key.split('/'))
-            elif allow_top_lvl_key:
-                if self.key_patt_shrt.fullmatch(key) is None:
-                    raise ValueError(f'Key must match pattern {self.key_patt_shrt.pattern} or {self.key_patt_long.pattern}')
-                return (key,)
-            else:
-                raise ValueError(f'Key must match pattern: {self.key_patt_long.pattern}')
-        if len(key) == 0: raise ValueError('Key cannot have a length of 0')
-        elif len(key) == 1 and not allow_top_lvl_key:
-            raise ValueError(f'Key cannot be a top-level key')
-        return key
-    @functools.cache
-    def key_path(self, key: str | tuple[str]) -> Path:
-        '''Converts the key with self.key(), returns the Path corresponding to its JSON file'''
-        return self.path / f'{self.key(key, allow_top_lvl_key=True)[0]}.json'
+    Key = str | tuple[str]
+    @classmethod
+    def key(cls, key: Key, top_level: bool = False, /) -> tuple[str]: # key key key
+        '''Transform a string / tuple of strings into a key'''
+        if isinstance(key, str): key = key.split(cls.key_sep)
+        if not key: raise ValueError('Empty key')
+        if any(cls.key_sep in part for part in key):
+            raise ValueError(f'Part of {key} contains a "{cls.key_sep}"')
+        elif (not top_level) and (len(key) == 1):
+            raise ValueError('Top-level key disallowed')
+        elif not cls.key_topp_patt.fullmatch(key[0]):
+            raise ValueError(f'Top-level part of key {key} does not match pattern {cls.key_topp_patt.pattern}')
+        elif not all(map(cls.key_part_patt.fullmatch, key[1:])):
+            raise ValueError(f'Part of sub-key {key[1:]} (full: {key}) not match pattern {cls.key_part_patt.pattern}')
+        return tuple(key)
+    def path_from_topkey(self, topkey: str):
+        '''Returns the Path corresponding to the top-key's file'''
+        return (self.path / topkey).with_suffix(self.file_suffix)
+    # Syncing functions
+    @locked
+    def sync(self):
+        '''Convenience method for writeback_dirty and readin_changed'''
+        self.writeback_dirty()
+        self.readin_changed()
+    ## Write-back
+    @locked
+    def writeback_dirty(self):
+        while self.dirty:
+            self.writeback(self.dirty.pop(), only_if_dirty=False, clean=False)
+    @locked
+    def writeback(self, topkey: str, *, only_if_dirty: bool = True, clean: bool = True):
+        '''Writes back a top-level key'''
+        if topkey in self.dirty:
+            if clean: self.dirty.remove(topkey)
+        elif only_if_dirty: return
+        self.path_from_topkey(topkey).write_text(self._to_string(topkey))
+    @abstractmethod
+    def _to_string(self, topkey: str): NotImplemented
+    ## Read-in
+    @locked
+    def readin_modified(self):
+        '''Reads in top-level keys that have been changed'''
+        raise NotImplementedError
+    @locked
+    def readin(self, topkey: str):
+        '''Reads in a top-level key'''
+        self._from_string(topkey, self.path_from_topkey(topkey).read_text())
+    @abstractmethod
+    def _from_string(self, topkey: str, value: str): NotImplemented
 
-    # Dict functions
-    @basic.locked
-    def _get_(self, key: tuple[str], *, make_if_missing: bool = False, no_raise: bool = False) -> dict | None:
-        '''Gets the dictionary referenced by the key, useful for mutating'''
-        d = self.data
-        for i,k in enumerate(key):
-            if k not in d:
-                if not make_if_missing:
-                    if no_raise: return None
-                    raise KeyError(f'{key}[{i}]')
-                d[k] = {}
-            d = d[k]
-            if not isinstance(d, dict):
-                if no_raise: return None
-                raise TypeError(f'{key}[{i}] referenced as subkey, but it is a value')
-        return d
+    # High-level item manipulation
+    def bettergetter(self, key: Key, default: typing.Literal[Behavior.RAISE] | typing.Any = Behavior.RAISE, set_default: bool = True) -> Deserialized | typing.Any:
+        '''
+            Gets the value of key
+                If the key is missing, then:
+                    if default is Behavior.RAISE: raises KeyError
+                    otherwise: returns default, and if set_default is truthy then sets the key to default
+        '''
+        key = self.key(key)
+        _tree = self._gettree(key, make_if_missing=(default is not self.Behavior.RAISE) and set_default, fetch_if_missing=True, no_raise_keyerror=(default is not self.Behavior.RAISE))
+        self._validate_transaction(key, self._transaction_types.PRE_GETITEM, _tree=_tree)
+        if _tree is None: return default
+        if key[-1] in _tree:
+            val = _tree[key[-1]]
+            self._validate_transaction(key, self._transaction_types.POST_GETITEM, (val,), _tree=_tree)
+            return self._deserialize(val)
+        if set_default: self.setitem(key, default, _tree=_tree)
+        return default
+    __call__ = bettergetter
+    
+    # Med-level item manipulation
     ## Getting
-    @basic.locked
-    def get_item(self, key: str | tuple[str], *, unsafe_allow_get_subkey: bool = False) -> typing.Union[*serializable]:
+    @locked
+    def get(self, key: Key, default: typing.Literal[Behavior.RAISE] | Serializable = Behavior.RAISE, *, _tree: MutableMapping | None = None) -> Deserialized:
         '''
-            Gets an item
-                (raises TypeError upon trying to return a dict, use unsafe_allow_get_subkey=True to bypass)
-            If the top-level key cannot be found, but it exists in JSON form, then it is read in
-                (if a key is not found, KeyError is raised)
+            Gets the value of key
+                If the key is missing, then raises KeyError if default is Behavior.RAISE, otherwise returns default
         '''
-        key = self.key(key) # key key key
-        if key[0] not in self.data:
-            if not self.key_path(key).exists(): raise KeyError(f'{key}[0]')
-            self.readin_data(key[0])
-        d = self._get_(key[:-1])
-        if key[-1] not in d: raise KeyError(f'{key}[-1]')
-        if (not unsafe_allow_get_subkey) and isinstance(d[key[-1]], dict): raise TypeError(f'{key} refers to a subkey, pass unsafe_allow_get_subkey=True to bypass')
-        return d[key[-1]]
-    __getitem__ = get_item
-    def get_set_default(self, key: str | tuple[str], default, *, unsafe_allow_op_subkey: bool = False):
-        '''
-            Gets an item.
-            If the item doesn't exist, tries to set "default" as its value and returns default with set_default
-        '''
-        self.set_default(key, default, unsafe_allow_op_subkey=unsafe_allow_op_subkey)
-        return self.get_item(key, unsafe_allow_get_subkey=unsafe_allow_op_subkey)
+        key = self.key(key) if (_tree is None) else key
+        sect = _tree if (_tree is not None) else \
+               self._gettree(key, make_if_missing=False, fetch_if_missing=True, no_raise_keyerror=(default is not self.Behavior.RAISE))
+        self._validate_transaction(key, self._transaction_types.PRE_GETITEM, _tree=sect)
+        if sect is None: return default
+        if key[-1] not in sect:
+            raise KeyError(f'{key}[-1]')
+        val = sect[key[-1]]
+        self._validate_transaction(key, self._transaction_types.POST_GETITEM, (val,), _tree=_tree)
+        return self._deserialize(sect[key[-1]])
+    __getitem__ = getitem = get
     ## Setting
-    def set_item(self, key: str | tuple[str], val: typing.Any | dict, *, unsafe_allow_set_subkey: bool = False, unsafe_allow_assign_dict: bool = False):
-        '''	
-            Sets an item.
-                Throws TypeError upon trying to overwrite a subkey, pass unsafe_allow_set_subkey=True (also implied by unsafe_allow_set_top_lvl_key=True) to bypass
-                Throws TypeError upon trying to assign a dict (AKA subkey) as a value, pass unsafe_allow_assign_dict=True to bypass
-        '''
-        if isinstance(val, dict) and not unsafe_allow_assign_dict:
-            raise TypeError('Cannot assign dict as value, pass unsafe_allow_assign_dict=True (also implied by unsafe_allow_set_subkey=True) to bypass')
-        key = self.key(key) # key key key
-        d = self._get_(key[:-1], make_if_missing=True)
-        if (not unsafe_allow_set_subkey) and (key[-1] in d) and isinstance(d[key[-1]], dict):
-            raise TypeError('Cannot assign to a subkey, pass unsafe_allow_set_subkey=True to bypass')
-        d[key[-1]] = val
+    @locked
+    def setitem(self, key: Key, val: Serializable, *, _tree: MutableMapping | None = None):
+        '''Sets a key to a value'''
+        key = self.key(key) if (_tree is None) else key
+        sect = (self._gettree(key, make_if_missing=True, fetch_if_missing=True) if (_tree is None) else _tree)
+        self._validate_transaction(key, self._transaction_types.SETITEM, (val,), _tree=sect)
+        sect[key[-1]] = self._serialize(val)
         self.dirty.add(key[0])
-    __setitem__ = set_item
-    def set_default(self, key: str | tuple[str], default, unsafe_allow_op_subkey: bool = False, unsafe_allow_assign_dict: bool = False):
-        '''If the item corresponding to key doesn't exist, then sets it to default. Has no effect otherwise'''
-        if self.contains(key, unsafe_no_error_on_subkey=unsafe_allow_op_subkey): return
-        self.set_item(key, default, unsafe_allow_set_subkey=unsafe_allow_op_subkey, unsafe_allow_assign_dict=unsafe_allow_assign_dict)
+    __setitem__ = setitem
     ## Containing
-    @basic.locked
-    def contains(self, key: str | tuple[str], *, unsafe_no_error_on_subkey: bool = False) -> bool:
-        '''
-            Checks if the key exists
-                If the key resolves to a subkey, then TypeError is raised unless unsafe_no_error_on_subkey is truthy
-        '''
-        key = self.key(key) # key key key
-        if key[0] not in self.data:
-            if not self.key_path(key).exists(): return False
-            self.readin_data(key[0])
-        d = self._get_(key[:-1], no_raise=True)
-        if (d is None) or (key[-1] not in d): return False
-        if (not unsafe_no_error_on_subkey) and isinstance(d[key[-1]], dict):
-            raise TypeError(f'{key} resolved to a subkey, pass unsafe_no_error_on_subkey=True if this is intended')
+    @locked
+    def contains(self, key: Key, *, _tree: MutableMapping | None) -> bool:
+        '''Returns whether or not the key exists'''
+        key = self.key(key) if (_tree is None) else key
+        sect = self._gettree(key, make_if_missing=False, fetch_if_missing=True, no_raise_keyerror=True) if (_tree is None) else _tree
+        if (sect is None) or (key[-1] not in sect): return False
         return True
     __contains__ = contains
-    ## Deleting
-    @basic.locked
-    def delete(self, key: str | tuple[str], *, unsafe_allow_delete_subkey: bool = False):
-        '''
-            Deletes an item
-            Raises TypeError upon trying to delete a suspected subkey (dict), pass unsafe_allow_delete_subkey=True to bypass
-        '''
-        key = self.key(key) # key key key
-        d = self._get_(key[:-1])
-        if key[-1] not in d: raise KeyError(f'{key}[-1]')
-        if (not unsafe_allow_delete_subkey) and isinstance(d[key[-1]], dict):
-            raise TypeError(f'{key} refers to a subkey, pass unsafe_allow_delete_subkey=True to bypass')
-        del d[key[-1]]
-        self.prune(key[0])
-        self.dirty.add(key[0])
-    __delitem__ = delete
-    @basic.locked
-    def remove(self, key: str, *, unsafe_I_know_what_I_am_doing: bool = False):
-        '''Deletes a top level key AND it's corresponding JSON file. Don\'t call if you don\'t know what you are doing'''
-        if not unsafe_I_know_what_I_am_doing: raise RuntimeError('Pass unsafe_I_know_what_I_am_doing=True if you really want to do this')
-        del self.data[key]
-        self.key_path(key).unlink()
-        self.dirty.remove(key)
-        self.watchdog_times
-    ### Pruning
-    def __count_entries(self, d: dict) -> int:
-        '''
-            Recursively counts non-dictionary entries in d
-            Should never be called unless the lock is held, but is not locked by default for performance reasons
-        '''
-        return sum(self.__count_entries(e) if isinstance(e, dict) else 1 for e in d.values())
-    def __prune(self, data: dict):
-        '''
-            Recursively removes empty dictionaries in data
-            Should never be called unless the lock is held, but is not locked by default for performance reasons
-        '''
-        for k,v in tuple(data.items()):
-            if not isinstance(v, dict): continue
-            if self.__count_entries(v) == 0:
-                del data[k]
-                continue
-            self.__prune(v)
-    @basic.locked
-    def prune(self, start_key: str | None = None):
-        '''Recursively removes empty dictionaries, starting with start_key (or from root if start_key is None)'''
-        self.__prune(self.data if start_key is None else self._get_(self.key(start_key, allow_top_lvl_key=True)))
+    
+    # Low-level functions
+    @abstractmethod
+    def _init_topkey(self, topkey: str): NotImplemented
+    def _gettop(self, topkey: str, *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> MutableMapping | None:
+        '''Gets the mapping of the toppkey'''
+        if topkey not in self._data:
+            if fetch_if_missing and self.path_from_topkey(topkey).exists():
+                self.readin(topkey)
+            elif make_if_missing: self._init_topkey(topkey)
+            elif no_raise_keyerror: return None
+            else: raise KeyError(topkey)
+        return self._data[topkey]
+    @abstractmethod
+    def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> MutableMapping | None: NotImplemented
+    @abstractmethod
+    def _serialize(self, val: Serializable) -> Serialized: NotImplemented
+    @abstractmethod
+    def _deserialize(self, value: Serialized) -> Deserialized: NotImplemented
 
-    # Augmented get
-    on_missing = Enum('OnMissing', ('RETURN_DEFAULT', 'SET_RETURN_DEFAULT', 'SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE', 'ERROR'))
-    def __call__(self, key: str | tuple[str], default: None | typing.Any = None, on_missing: on_missing = on_missing.SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE):
-        '''
-            Behavior of on_missing when the key isn't found:
-                RETURN_DEFAULT: returns the default field
-                SET_RETURN_DEFAULT: same as the get_set_default method
-                SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE: (the default) same as SET_RETURN_DEFAULT unless default is None, in which case ExceptionGroup(KeyError, TypeError) is raised
-                ERROR: raises KeyError
-        '''
-        assert isinstance(on_missing, self.on_missing)
-        if key in self: return self[key]
-        match on_missing:
-            case self.on_missing.RETURN_DEFAULT: return default
-            case self.on_missing.SET_RETURN_DEFAULT:
-                self[key] = default
-                return default
-            case self.on_missing.SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE:
-                if default is None: raise ExceptionGroup('Key was not found, on_missing is SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE, and default=None', (KeyError(key), TypeError('Default is None')))
-                self[key] = default
-                return default
-            case self.on_missing.ERROR: raise KeyError(key)
+# ConfigParser (INI) implementation
+_INI_Serializable = typing.Union[type(...), type(None),                   # simple types
+                                 bool, int, float, complex,               # numeric types
+                                 str, bytes, tuple, list, set, frozenset] # collection types
+_INI_Serialized = str
+_INI_Deserialized = typing.Union[type(...), type(None),                   # simple types
+                                 bool, int, float, complex,               # numeric types
+                                 str, bytes, tuple, frozenset]            # collection types
+class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Deserialized]):
+    '''A FileBackedDict implementation that uses ConfigParser as a backend'''
+    __slots__ = ()
 
-    # Data sync functions
-    ## Reading in
-    @basic.locked
-    def readin_data(self, key: str):
-        '''Reads in data from the JSON value corresponding to key (found via self.key_path)'''
-        p = self.key_path(key)
-        self.logger.info(f'Reading in {key} from {p}...')
-        pc = PerfCounter()
-        with p.open() as f:
-            self.data[key] = json.load(f)
-        self.logger.infop(f'Readin {key} took {pc}')
-        self.watchdog_times[key] = p.stat().st_mtime
-    @basic.locked
-    def readin_watchdog(self):
+    file_suffix = '.ini'
+
+    def _init_topkey(self, topkey: str):
+        self._data[topkey] = ConfigParser()
+        self._data[topkey].optionxoption = lambda o: o
+    def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> SectionProxy | None:
+        '''Gets the section that contains key[-1]'''
+        self._gettop(key[0], make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)
+        ck = '.'.join(key[1:-1])
+        if not ck: raise ValueError(f'{key} is too short')
+        if ck not in self._data[key[0]]:
+            if not make_if_missing:
+                if no_raise_keyerror: return None
+                raise KeyError(f'{key} ({ck})')
+            self._data[key[0]][ck] = {}
+        return self._data[key[0]][ck]
+
+    def _to_string(self, topkey: str) -> str:
+        sio = StringIO()
+        self._data[topkey].write(sio)
+        return sio.getvalue().strip()
+    def _from_string(self, topkey: str, value: str):
+        self._init_topkey(topkey)
+        self._data[topkey].read_string(value)
+
+    def _serialize(self, val: _INI_Serializable) -> _INI_Serialized:
+        serv = repr(val)
+        assert val == self._deserialize(serv), 'Mismatch: <original>{val!r} != <de-serialized>{self._deserialize(val)!r}'
+        return serv
+    def _deserialize(self, val: _INI_Serialized) -> _INI_Deserialized:
+        desv = literal_eval(val)
+        if isinstance(desv, list): return tuple(desv)
+        elif isinstance(desv, set): return frozenset(desv)
+        return desv
+
+# JSON implementation
+_JSON_Serializable = typing.Union[type(None),       # simple type
+                                  bool, int, float, # numeric types
+                                  str, tuple, list] # collection types
+_JSON_Serialized = typing.Union[type(None),         # simple type
+                                bool, int, float,   # numeric types
+                                str, list]          # collection types
+_JSON_Deserialized = typing.Union[type(None),       # simple type
+                                  bool, int, float, # numeric types
+                                  str, tuple]       # collection types
+class JSONBackedDict(FileBackedDict[_JSON_Serializable, _JSON_Serialized, _JSON_Deserialized]):
+    '''A FileBackedDict implementation that uses JSON as a backend'''
+    __slots__ = ()
+
+    file_suffix = '.json'
+
+    def _validate_transaction(self, key: tuple[str], ttype: FileBackedDict._transaction_types, args: tuple[typing.Any] = (), *, _tree: MutableMapping | None = None) -> None:
         '''
-            Reads in data from files that have been modified since the last read
-            If a file is missing, it is removed from the watchdog list
+            Place restrictions on:
+                POST_GETITEM:
+                 -  prevents getting anything that is a dict
+                SETITEM:
+                 -  prevents setting a dict as a value
+                 -  prevents overwriting a dict
         '''
-        if not self.watchdog_times: return
-        self.logger.debug(f'Readin watchdog ticked: checking {len(self.watchdog_times)} key(s)')
-        readind = 0
-        pc = PerfCounter()
-        for k,t in tuple(self.watchdog_times.items()):
-            p = self.key_path(k)
-            if not p.exists():
-                self.logger.warning(f'File {p} no longer exists, removing {k} from watchdogs')
-                del self.watchdog_times[k]
-                continue
-            nt = p.stat().st_mtime
-            if nt <= t: continue
-            readind += 1
-            self.watchdog_times[k] = nt
-            self.readin_data(k)
-        if not readind: return
-        self.logger.infop(f'Readin {readind} key(s) took {pc}')
-    ## Writing back
-    @basic.locked
-    def writeback(self, key: str, *, clean: bool = True, force: bool = False) -> bool:
-        '''
-            Writes back a top-level key to its JSON file
-                If "force" is not truthy, and the key is not dirty, then nothing is written back and False is returned
-                Otherwise:
-                - the data is written back
-                - watchdog times are updated
-                - the key is "cleaned" (removed from dirty) if clean is Truthy
-                - True is returned
-        '''
-        if (not force) and (key not in self.dirty): return False
-        self.prune(key)
-        p = self.key_path(key)
-        self.logger.warning(f'Writing back {key} to {p}...')
-        pc = PerfCounter()
-        with p.open('w') as f:
-            json.dump(self.data[key], f, indent=4)
-        self.logger.infop(f'Writeback {key} took {pc}')
-        self.watchdog_times[key] = p.stat().st_mtime
-        if clean: self.dirty.remove(key)
-        return True
-    @basic.locked
-    def writeback_dirty(self):
-        '''Writes back all dirty keys'''
-        self.logger.debug(f'Writing back dirty keys: {len(self.dirty)} key(s) to clean')
-        nw = len(self.dirty); pc = PerfCounter()
-        while len(self.dirty):
-            self.writeback(self.dirty.pop(), clean=False, force=True)
-        self.logger.infop(f'Writeback {nw} key(s) took {pc}')
-    ## Dual-ways sync
-    @basic.locked
-    def sync_all(self):
-        '''Basically notifies the user and runs self.writeback_dirty() and then self.readin_watchdog()'''
-        self.logger.info('Syncing all...')
-        self.writeback_dirty()
-        self.readin_watchdog()
-    ## Sync timer
-    @basic.locked
-    def start_autosync(self):
-        '''Starts the internal watchdog timer'''
-        self.watchdog.start()
-    @basic.locked
-    def stop_autosync(self):
-        '''Stops the internal watchdog timer'''
-        self.watchdog.stop()
-    @basic.locked
-    def is_autosyncing(self) -> bool:
-        '''Returns whether or not the internal watchdog timer is ticking'''
-        return self.watchdog.is_alive()
+        match ttype:
+            case FileBackedDict._transaction_types.PRE_GETITEM: return
+            case FileBackedDict._transaction_types.POST_GETITEM:
+                if isinstance(args[0], dict):
+                    raise TypeError(f'{key} tried to directly return a subkey (dict)')
+            case FileBackedDict._transaction_types.SETITEM:
+                if isinstance(args[0], dict):
+                    raise TypeError(f'{key} tried to set a subkey (dict) as a value')
+                if isinstance(_tree.get(key[-1], None), dict):
+                    raise TypeError(f'{key} tried to overwrite a subkey (dict)')
+    
+    def _init_topkey(self, topkey: str, *, _val: dict = {}):
+        self._data[topkey] = _val
+    def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = True) -> dict | None:
+        '''Gets the section that contains key[-1]'''
+        cwd = self._gettop(key[0], make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)
+        if cwd is None: return cwd
+        for i,k in enumerate(key[:-1]):
+            if not i: continue # skip top-level key
+            if k not in cwd:
+                if not make_if_missing:
+                    if no_raise_keyerror: return None
+                    raise KeyError(f'{key}[{i}]')
+                cwd[k] = {}
+            cwd = cwd[k]
+            if not isinstance(cwd, dict):
+                raise TypeError(f'{key}[{i}] referenced as subkey, but it is a value')
+        return cwd
+
+    def _to_string(self, topkey: str) -> str:
+        return json.dumps(self._data[topkey])
+    def _from_string(self, topkey: str, value: str):
+        self._init_topkey(topkey, _val=json.loads(value))
+
+    def _serialize(self, val: _JSON_Serializable) -> _JSON_Serialized:
+        return val
+    def _deserialize(self, val: _JSON_Serialized) -> _JSON_Deserialized:
+        if isinstance(val, list): return tuple(val)
+        return val
+
+    def __repr__(self): return f'<JSONBackedDict {self._data!r}>'
+## !BROKEN! co-dict variation
+class _CoJSONBackedDict(JSONBackedDict):
+    '''
+        A varient of JSONBackedDict that "duplicates" the last part of keys in order to allow setting values to subkeys, similar to INI
+            This is completely broken and should not be used; it is kept here for potential future reworking
+    '''
+    def __init__(self, *args, I_want_to_try_it_please: bool = False, **kwargs):
+        if not i_want_to_try_it_please:
+            raise Exception('CoJSONBackedDict is very broken and should not be used for anything serious. Pass i_want_to_try_it_please=True if you want to just mess around!')
+        super().__init__(*args, **kwargs)
+    def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = True) -> dict | None:
+        '''Gets the section that contains key[-1], but in a funky way'''
+        return super()._gettree(key+(None,), make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)
