@@ -251,6 +251,26 @@ class JSONBackedDict(FileBackedDict[_JSON_Serializable, _JSON_Serialized, _JSON_
 
     file_suffix = '.json'
 
+    def _validate_transaction(self, key: tuple[str], ttype: FileBackedDict._transaction_types, args: tuple[typing.Any] = (), *, _tree: MutableMapping | None = None) -> None:
+        '''
+            Place restrictions on:
+                POST_GETITEM:
+                 -  prevents getting anything that is a dict
+                SETITEM:
+                 -  prevents setting a dict as a value
+                 -  prevents overwriting a dict
+        '''
+        match ttype:
+            case FileBackedDict._transaction_types.PRE_GETITEM: return
+            case FileBackedDict._transaction_types.POST_GETITEM:
+                if isinstance(args[0], dict):
+                    raise TypeError(f'{key} tried to directly return a subkey (dict)')
+            case FileBackedDict._transaction_types.SETITEM:
+                if isinstance(args[0], dict):
+                    raise TypeError(f'{key} tried to set a subkey (dict) as a value')
+                if isinstance(_tree.get(key[-1], None), dict):
+                    raise TypeError(f'{key} tried to overwrite a subkey (dict)')
+    
     def _init_topkey(self, topkey: str, *, _val: dict = {}):
         self._data[topkey] = _val
     def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = True) -> dict | None:
