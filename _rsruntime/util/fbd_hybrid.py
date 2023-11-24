@@ -253,7 +253,7 @@ class JSONBackedDict(FileBackedDict[_JSON_Serializable, _JSON_Serialized, _JSON_
         '''Gets the section that contains key[-1]'''
         cwd = self._gettop(key[0], make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)
         if cwd is None: return cwd
-        for i,k in enumerate(key):
+        for i,k in enumerate(key[:-1]):
             if not i: continue # skip top-level key
             if k not in cwd:
                 if not make_if_missing:
