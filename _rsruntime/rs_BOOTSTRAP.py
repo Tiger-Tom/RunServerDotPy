@@ -22,11 +22,12 @@ import types
 import os
 import re
 import time
-from ast import literal_eval
+from concurrent.futures import ThreadPoolExecutor
 from collections import UserDict
 from io import StringIO
 ## Parser/writers
 from configparser import ConfigParser
+from ast import literal_eval
 import json
 ## Cryptography
 import hashlib
@@ -328,14 +329,38 @@ class Manifest(UserDict):
         if not fetch:
             self.logger.warning(f'Nothing to do')
             return
-        self.logger.warning('Fetching {len(fetch)} file(s)')
-        for url, path in (('/'.join((self['metadata']['content_upstream'].rstrip('/'), fn)), self.base_path / fn) for fn in fetch):
+        self.logger.warning(f'Fetching {len(fetch)} file(s); dispatching {ThreadPoolExecutor.__qualname__}')
+        with ThreadPoolExecutor(thread_name_prefix='ManifestFileDownloader') as tpe:
+            tuple(tpe.map(self._install_file, fetch))
+    ## Downloading
+    def _install_file(self, filename: str):
+        url = '/'.join((self['metadata']['content_upstream'].rstrip('/'), filename))
+        path = self.base_path / filename
+        bkppath = path.with_suffix('.'.join((path.suffix, 'old')))
+        if path.exists():
+            d = path.read_bytes()
+            self.logger.infop(f'Copying {path} ({len(d)} byte(s)) to {bkppath}')
+            bkppath.write_bytes(d)
+        self.logger.info(f'Fetching {url} to {path}')
+        try:
+            with request.urlopen(url) as r:
+                d = r.read(); path.write_bytes(d)
+            self.logger.infop(f'Downloaded {url} ({len(d)} byte(s)) to {path}')
+        except Exception as e:
+            self.logger.error(f'An error occured whilst fetching {url} to {path}:\n{"".join(traceback.format_exception(e))}')
             if path.exists():
-                op = path.with_suffix('.'.join((path.suffix, 'old')))
-                self.logger.infop(f'Moving {path} to {op}')
-                op.write_bytes(path.read_bytes())
-            self.logger.info(f'Fetching {url} to {path}')
-            with urllib.request.urlopen(url) as r: path.write_bytes(r.read())
+                if (ld := len(path.read_bytes())):
+                    self.logger.warning(f'{path} appears to still exist (holding {ld} byte(s)), leaving it in the hopes that it is functional')
+                    return
+                self.logger.error(f'{path} appears to still exist, but holds no data')
+            if bkppath.exists():
+                d = bkppath.read_bytes()
+                if len(d):
+                    self.logger.warning(f'A backup exists at {bkppath}, copying {len(d)} byte(s) to {path} in the hopes that it is functional')
+                    path.write_bytes(d)
+                    return
+                self.logger.error(f'A backup exists at {bkppath}, but holds no data')
+            self.logger.fatal(f'No usable local versions ({path}) or backups ({bkppath}) found, the program may not function as intended')
     # Helper / compat function
     @staticmethod
     def _logger() -> logging.Logger:
