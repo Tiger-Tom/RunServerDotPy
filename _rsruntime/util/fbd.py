@@ -250,7 +250,7 @@ class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Dese
 
     def _init_topkey(self, topkey: str):
         self._data[topkey] = ConfigParser()
-        self._data[topkey].optionxoption = lambda o: o
+        self._data[topkey].optionxform = lambda o: o
     def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> SectionProxy | None:
         '''Gets the section that contains key[-1]'''
         self._gettop(key[0], make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)
