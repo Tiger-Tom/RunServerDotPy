@@ -17,8 +17,8 @@ from enum import Enum, IntEnum
 # Abstract
 from abc import ABC, abstractmethod, abstractproperty
 # Local types
-from locked_resource import LockedResource, locked
-from timer import Timer
+from .locked_resource import LockedResource, locked
+from .timer import Timer
 #</Imports
 
 #> Header >/
