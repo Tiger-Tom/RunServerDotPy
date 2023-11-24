@@ -327,7 +327,7 @@ class Manifest(UserDict):
             self.logger.warning(f'The following local files will be replaced:{sep}{sep.join(str(self.base_path / p) for p in to_replace)}')
             if (not ask) or input('Replace files? (y/N) >').lower().startswith('y'): fetch.update(to_replace)
         if not fetch:
-            self.logger.warning(f'Nothing to do')
+            self.logger.warning('Nothing to do')
             return
         self.logger.warning(f'Fetching {len(fetch)} file(s); dispatching {ThreadPoolExecutor.__qualname__}')
         with ThreadPoolExecutor(thread_name_prefix='ManifestFileDownloader') as tpe:
