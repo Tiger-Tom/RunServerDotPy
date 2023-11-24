@@ -130,7 +130,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     # Med-level item manipulation
     ## Getting
     @locked
-    def get(self, key: Key, default: typing.Literal[Behavior.RAISE] | Serializable = Behavior.RAISE, converter: typing.Callable[str, Deserialized] = literal_eval, *, _tree: MutableMapping | None = None) -> Deserialized:
+    def get(self, key: Key, default: typing.Literal[Behavior.RAISE] | Serializable = Behavior.RAISE, *, _tree: MutableMapping | None = None) -> Deserialized:
         '''
             Gets the value of key
                 If the key is missing, then raises KeyError if default is Behavior.RAISE, otherwise returns default
@@ -143,7 +143,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
         if key[-1] not in sect:
             raise KeyError(f'{key}[-1]')
         val = sect[key[-1]]
-        return converter(sect[key[-1]])
+        return self._deserialize(sect[key[-1]])
     __getitem__ = getitem = get
     ## Setting
     @locked
@@ -235,21 +235,49 @@ class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Dese
         return desv
 
     file_suffix = '.ini'
+
 # JSON implementation
-class JSONBackedDict(FileBackedDict[
-    # Serializable #
-    typing.Union[type(None),         # simple types
-                 bool, int, float,   # numeric types
-                 str, tuple, list],  # collection types
-    # Serialized #
-    typing.Union[type(None),         # simple types
-                 bool, int, float,   # numeric types
-                 str, tuple, list],  # collection types
-    # Deserialized #
-    typing.Union[type(None),         # simple types
-                 bool, int, float,   # numeric types
-                 str, tuple]]):      # collection types
+_JSON_Serializable = typing.Union[type(None),       # simple type
+                                  bool, int, float, # numeric types
+                                  str, tuple, list] # collection types
+_JSON_Serialized = typing.Union[type(None),         # simple type
+                                bool, int, float,   # numeric types
+                                str, list]          # collection types
+_JSON_Deserialized = typing.Union[type(None),       # simple type
+                                  bool, int, float, # numeric types
+                                  str, tuple]       # collection types
+class JSONBackedDict(FileBackedDict[_JSON_Serializable, _JSON_Serialized, _JSON_Deserialized]):
     '''A FileBackedDict implementation that uses JSON as a backend'''
     __slots__ = ()
 
     file_suffix = '.json'
+
+    def _init_topkey(self, topkey: str, *, _val: dict = {}):
+        self._data[topkey] = _val
+    def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = True) -> dict | None:
+        cwd = self._gettop(key[0], make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)
+        if cwd is None: return cwd
+        for i,k in enumerate(key):
+            if not i: continue # skip top-level key
+            if k not in cwd:
+                if not make_if_missing:
+                    if no_raise_keyerror: return None
+                    raise KeyError(f'{key}[{i}]')
+                cwd[k] = {}
+            cwd = cwd[k]
+            if not isinstance(cwd, dict):
+                raise TypeError(f'{key}[{i}] referenced as subkey, but it is a value')
+        return cwd
+
+    def _to_string(self, topkey: str) -> str:
+        return json.dumps(self._data[topkey])
+    def _from_string(self, topkey: str, value: str):
+        self._init_topkey(topkey, _val=json.loads(value))
+
+    def _serialize(self, val: _JSON_Serializable) -> _JSON_Serialized:
+        return val
+    def _deserialize(self, val: _JSON_Serialized) -> _JSON_Deserialized:
+        if isinstance(val, list): return tuple(val)
+        return val
+
+    def __repr__(self): return f'<JSONBackedDict {self._data!r}>'
