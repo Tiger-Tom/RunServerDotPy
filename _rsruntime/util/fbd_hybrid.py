@@ -277,3 +277,16 @@ class JSONBackedDict(FileBackedDict[_JSON_Serializable, _JSON_Serialized, _JSON_
         return val
 
     def __repr__(self): return f'<JSONBackedDict {self._data!r}>'
+## !BROKEN! co-dict variation
+class _CoJSONBackedDict(JSONBackedDict):
+    '''
+        A varient of JSONBackedDict that "duplicates" the last part of keys in order to allow setting values to subkeys, similar to INI
+            This is completely broken and should not be used; it is kept here for potential future reworking
+    '''
+    def __init__(self, *args, I_want_to_try_it_please: bool = False, **kwargs):
+        if not i_want_to_try_it_please:
+            raise Exception('CoJSONBackedDict is very broken and should not be used for anything serious. Pass i_want_to_try_it_please=True if you want to just mess around!')
+        super().__init__(*args, **kwargs)
+    def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = True) -> dict | None:
+        '''Gets the section that contains key[-1], but in a funky way'''
+        return super()._gettree(key+(None,), make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)
