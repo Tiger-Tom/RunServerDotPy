@@ -221,8 +221,7 @@ class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Dese
     def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> SectionProxy | None:
         '''Gets the section that contains key[-1]'''
         self._gettop(key[0], make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)
-        ck = '.'.join(key[1:-1])
-        if not ck: raise ValueError(f'{key} is too short')
+        ck = '.'.join(key[1:-1]) if (len(key) > 2) else '_'
         if ck not in self._data[key[0]]:
             if not make_if_missing:
                 if no_raise_keyerror: return None
