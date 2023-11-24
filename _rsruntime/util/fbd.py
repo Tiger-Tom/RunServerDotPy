@@ -84,6 +84,19 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
         '''Convenience method for writeback_dirty and readin_changed'''
         self.writeback_dirty()
         self.readin_changed()
+    ## Enabling/disabling
+    @locked
+    def start_autosync(self):
+        '''Starts the internal watchdog timer'''
+        self.watchdog.start()
+    @locked
+    def stop_autosync(self):
+        '''Stops the internal watchdog timer'''
+        self.watchdog.stop()
+    @locked
+    def is_autosyncing(self) -> bool:
+        '''Returns whether or not the internal watchdog timer is ticking'''
+        return self.watchdog.is_alive()
     ## Write-back
     @locked
     def writeback_dirty(self):
