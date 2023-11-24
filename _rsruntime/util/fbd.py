@@ -270,12 +270,26 @@ class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Dese
         self._init_topkey(topkey)
         self._data[topkey].read_string(value)
 
+    _serialize_translations = {
+        Ellipsis: '...',
+        True: 'yes', False: 'no',
+        'none': None,
+    }
     def _serialize(self, val: _INI_Serializable) -> _INI_Serialized:
-        serv = repr(val)
+        if val in self._serialize_translations:
+            serv = self._serialize_translations[val]
+        else: serv = repr(val)
         assert val == self._deserialize(serv), 'Mismatch: <original>{val!r} != <de-serialized>{self._deserialize(val)!r}'
         return serv
+    _deserialize_translations = {
+        'yes': True, 'true': True, 'indeed': True,
+        'no': False, 'false': False, 'unthinkable': False,
+        'none': None, 'n/a': None,
+    }
     def _deserialize(self, val: _INI_Serialized) -> _INI_Deserialized:
-        desv = literal_eval(val)
+        if val.lower() in self._deserialize_translations:
+            desv = self._deserialize_translations[val.lower()]
+        else: desv = literal_eval(val)
         if isinstance(desv, list): return tuple(desv)
         elif isinstance(desv, set): return frozenset(desv)
         return desv
