@@ -8,6 +8,8 @@ _*.dump
 _rsconfig/
 _rslog/
 _rsusers/
+# Backed up files
+*.old
 
 ####################
 
