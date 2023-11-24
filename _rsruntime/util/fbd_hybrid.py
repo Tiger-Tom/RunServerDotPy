@@ -2,9 +2,14 @@
 
 #> Imports
 from pathlib import Path
+from io import StringIO
 # Parsing
 import re
+## For ConfigParser
 from ast import literal_eval
+from configparser import ConfigParser, SectionProxy
+## For JSON
+import json
 # Types
 import typing
 from typing import MutableMapping
@@ -50,6 +55,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     def __init__(self, path: Path, intvl: float = 120.0):
         LockedResource.__init__(self)
         self.path = path
+        self._data = {}
         self.watchdog = Timer.set_interval(self.sync, intvl, False)
         self.mtimes = {}; self.dirty = set()
 
@@ -179,19 +185,54 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     def _deserialize(self, value: Serialized) -> Deserialized: NotImplemented
 
 # ConfigParser (INI) implementation
-class INIBackedDict(FileBackedDict[
-    # Serializable #
-    typing.Union[type(...), type(None),                    # simple types
-                 bool, int, float, complex,                # numeric types
-                 str, bytes, tuple, list, set, frozenset], # collection types
-                 
-    # Serialized #
-    str,
-    # Deserialized #
-    typing.Union[type(...), type(None),                    # simple types
-                 bool, int, float, complex,                # numeric types
-                 str, bytes, tuple, frozenset]]):          # collection types
+_INI_Serializable = typing.Union[type(...), type(None),                   # simple types
+                                 bool, int, float, complex,               # numeric types
+                                 str, bytes, tuple, list, set, frozenset] # collection types
+_INI_Serialized = str
+_INI_Deserialized = typing.Union[type(...), type(None),                   # simple types
+                                 bool, int, float, complex,               # numeric types
+                                 str, bytes, tuple, frozenset]            # collection types
+class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Deserialized]):
     '''A FileBackedDict implementation that uses ConfigParser as a backend'''
+    __slots__ = ()
+
+    def _init_topkey(self, topkey: str):
+        self._data[topkey] = ConfigParser()
+        self._data[topkey].optionxoption = lambda o: o
+    def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> SectionProxy | None:
+        '''Gets the section that contains key[-1]'''
+        if key[0] not in self._data:
+            if fetch_if_missing and self.path_from_topkey(key[0]).exists():
+                self.readin(key[0])
+            elif make_if_missing: self._init_topkey(key[0])
+            elif no_raise_keyerror: return None
+            else: raise KeyError(f'{key}[0]')
+        ck = '.'.join(key[1:-1])
+        if not ck: raise ValueError(f'{key} is too short')
+        if ck not in self._data[key[0]]:
+            if not make_if_missing:
+                if no_raise_keyerror: return None
+                raise KeyError(f'{key} ({ck})')
+            self._data[key[0]][ck] = {}
+        return self._data[key[0]][ck]
+
+    def _to_string(self, topkey: str) -> str:
+        sio = StringIO()
+        self._data[topkey].write(sio)
+        return sio.getvalue().strip()
+    def _from_string(self, topkey: str, value: str):
+        self._init_topkey(topkey)
+        self._data[topkey].read_string(value)
+
+    def _serialize(self, val: _INI_Serializable) -> _INI_Serialized:
+        serv = repr(val)
+        assert val == self._deserialize(serv), 'Mismatch: <original>{val!r} != <de-serialized>{self._deserialize(val)!r}'
+        return serv
+    def _deserialize(self, val: _INI_Serialized) -> _INI_Deserialized:
+        desv = literal_eval(val)
+        if isinstance(desv, list): return tuple(desv)
+        elif isinstance(desv, set): return frozenset(desv)
+        return desv
 
     file_suffix = '.ini'
 # JSON implementation
