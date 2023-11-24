@@ -62,7 +62,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     # Key functions
     Key = str | tuple[str]
     @classmethod
-    def key(cls, key: Key, top_level: bool = False, /) -> tuple[str]: # key key key
+    def key(cls, key: Key, *, top_level: bool = False) -> tuple[str]: # key key key
         '''Transform a string / tuple of strings into a key'''
         if isinstance(key, str): key = key.split(cls.key_sep)
         if not key: raise ValueError('Empty key')
@@ -81,9 +81,9 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     # Syncing functions
     @locked
     def sync(self):
-        '''Convenience method for writeback_dirty and readin_changed'''
+        '''Convenience method for writeback_dirty and readin_modified'''
         self.writeback_dirty()
-        self.readin_changed()
+        self.readin_modified()
     ## Enabling/disabling
     @locked
     def start_autosync(self):
@@ -115,11 +115,18 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     @locked
     def readin_modified(self):
         '''Reads in top-level keys that have been changed'''
-        raise NotImplementedError
+        for tk,tm in self.mtimes.items():
+            p = self.path_from_topkey(tk)
+            nt = p.stat().st_mtime
+            if nt == tm: continue
+            self.mtimes[tk] = tm
+            self._from_string(tk, p.read_text())
     @locked
     def readin(self, topkey: str):
         '''Reads in a top-level key'''
-        self._from_string(topkey, self.path_from_topkey(topkey).read_text())
+        path = self.path_from_topkey(topkey)
+        self._from_string(topkey, path.read_text())
+        self.mtimes[topkey] = path.stat().st_mtime
     @abstractmethod
     def _from_string(self, topkey: str, value: str): NotImplemented
 
@@ -181,6 +188,30 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
         if (sect is None) or (key[-1] not in sect): return False
         return True
     __contains__ = contains
+    ## Iterating
+    @locked
+    def items_full(self, start_key: Key, key_join: bool = True) -> typing.Generator[tuple[str | tuple[str], Deserialized], None, None]:
+        '''Iterates over every (key, value) pair, yielding the entire key'''
+        yield from ((k, self[k]) for k in self.keys(start_key, key_join))
+    @locked
+    def items_short(self, start_key: Key):
+        '''Iterates over every (key, value) pair, yielding the last part of the key'''
+        yield from ((k[-1], self[k]) for k in self.keys(start_key, False))
+    @locked
+    def keys(self, start_key: Key | None = None, key_join: bool = True) -> typing.Generator[str | tuple[str], None, None]:
+        '''Iterates over every key'''
+        if start_key is None:
+            skey = ()
+            target = self._data
+        else:
+            skey = self.key(start_key, top_level=True)
+            target = self._gettree(skey+(None,), make_if_missing=False)
+        yield from map((lambda k: self.key_sep.join(skey+(k,))) if key_join else (lambda k: skey+(k,)), target.keys())
+    __iter__ = keys
+    @locked
+    def values(self, start_key: Key) -> typing.Generator[[Deserialized], None, None]:
+        '''Iterates over every value'''
+        yield from map(self.getitem, self.keys(start_key))
     
     # Low-level functions
     @abstractmethod
