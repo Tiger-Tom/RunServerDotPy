@@ -62,7 +62,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     # Key functions
     Key = str | tuple[str]
     @classmethod
-    def key(cls, key: Key, top_level: bool = False, /): # key key key
+    def key(cls, key: Key, top_level: bool = False, /) -> tuple[str]: # key key key
         '''Transform a string / tuple of strings into a key'''
         if isinstance(key, str): key = key.split(cls.key_sep)
         if not key: raise ValueError('Empty key')
@@ -74,7 +74,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
             raise ValueError(f'Top-level part of key {key} does not match pattern {cls.key_topp_patt.pattern}')
         elif not all(map(cls.key_part_patt.fullmatch, key[1:])):
             raise ValueError(f'Part of sub-key {key[1:]} (full: {key}) not match pattern {cls.key_part_patt.pattern}')
-        return key
+        return tuple(key)
     def path_from_topkey(self, topkey: str):
         '''Returns the Path corresponding to the top-key's file'''
         return (self.path / topkey).with_suffix(self.file_suffix)
