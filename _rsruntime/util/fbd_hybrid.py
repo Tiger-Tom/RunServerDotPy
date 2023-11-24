@@ -20,7 +20,7 @@ from timer import Timer
 __all__ = ('JSONBackedDict', 'INIBackedDict')
 
 # ABC
-class FileBackedDict[Serializable, Serialized, Deserializable](ABC, LockedResource):
+class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource):
     '''
         A dictionary-like class that is backed by an on-disk file
         Asynchronously synchronizes entries with a file on disk
@@ -105,7 +105,7 @@ class FileBackedDict[Serializable, Serialized, Deserializable](ABC, LockedResour
     def _from_string(self, topkey: str, value: str): NotImplemented
 
     # High-level item manipulation
-    def bettergetter(self, key: Key, default: typing.Literal[Behavior.RAISE] | typing.Any = Behavior.RAISE, set_default: bool = True) -> Deserializable | typing.Any:
+    def bettergetter(self, key: Key, default: typing.Literal[Behavior.RAISE] | typing.Any = Behavior.RAISE, set_default: bool = True) -> Deserialized | typing.Any:
         '''
             Gets the value of key
                 If the key is missing, then:
@@ -124,7 +124,7 @@ class FileBackedDict[Serializable, Serialized, Deserializable](ABC, LockedResour
     # Med-level item manipulation
     ## Getting
     @locked
-    def get(self, key: Key, default: typing.Literal[Behavior.RAISE] | Serializable = Behavior.RAISE, converter: typing.Callable[str, Deserializable] = literal_eval, *, _tree: MutableMapping | None = None) -> Deserializable:
+    def get(self, key: Key, default: typing.Literal[Behavior.RAISE] | Serializable = Behavior.RAISE, converter: typing.Callable[str, Deserialized] = literal_eval, *, _tree: MutableMapping | None = None) -> Deserialized:
         '''
             Gets the value of key
                 If the key is missing, then raises KeyError if default is Behavior.RAISE, otherwise returns default
@@ -175,4 +175,40 @@ class FileBackedDict[Serializable, Serialized, Deserializable](ABC, LockedResour
     def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> MutableMapping | None: NotImplemented
     @abstractmethod
     def _serialize(self, val: Serializable) -> Serialized: NotImplemented
-    def _deserialize(self, value: Serialized) -> Deserializable: NotImplemented
+    @abstractmethod
+    def _deserialize(self, value: Serialized) -> Deserialized: NotImplemented
+
+# ConfigParser (INI) implementation
+class INIBackedDict(FileBackedDict[
+    # Serializable #
+    typing.Union[type(...), type(None),                    # simple types
+                 bool, int, float, complex,                # numeric types
+                 str, bytes, tuple, list, set, frozenset], # collection types
+                 
+    # Serialized #
+    str,
+    # Deserialized #
+    typing.Union[type(...), type(None),                    # simple types
+                 bool, int, float, complex,                # numeric types
+                 str, bytes, tuple, frozenset]]):          # collection types
+    '''A FileBackedDict implementation that uses ConfigParser as a backend'''
+
+    file_suffix = '.ini'
+# JSON implementation
+class JSONBackedDict(FileBackedDict[
+    # Serializable #
+    typing.Union[type(None),         # simple types
+                 bool, int, float,   # numeric types
+                 str, tuple, list],  # collection types
+    # Serialized #
+    typing.Union[type(None),         # simple types
+                 bool, int, float,   # numeric types
+                 str, tuple, list],  # collection types
+    # Deserialized #
+    typing.Union[type(None),         # simple types
+                 bool, int, float,   # numeric types
+                 str, tuple]]):      # collection types
+    '''A FileBackedDict implementation that uses JSON as a backend'''
+    __slots__ = ()
+
+    file_suffix = '.json'
