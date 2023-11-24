@@ -76,7 +76,7 @@ class MCLang:
         self.logger.debug('Extracting lang')
         pc = PerfCounter()
         jzp = zipfile.Path(Path(Config('minecraft/path/base', './minecraft'), Config('minecraft/path/server_jar', 'server.jar')))
-        vers = Config('minecraft/lang_parser/version', None, on_missing=Config.on_missing.SET_RETURN_DEFAULT)
+        vers = Config('minecraft/lang_parser/version', None)
         self.version_info = None
         with (jzp / 'version.json').open('r') as vf:
             self.version_info = json.load(vf)

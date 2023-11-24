@@ -16,7 +16,7 @@ from enum import Flag, IntEnum
 # RunServer Module
 import RS
 from RS import Bootstrapper, Config, MCLang, LineParser
-from RS.Util import FileBackedDict
+from RS.Util import JSONBackedDict
 
 #> Header >/
 class UserManager:
@@ -24,14 +24,13 @@ class UserManager:
 
     # Permissions
     ## Insert comments
-    Config['permissions/levels/__comments'] = ( # S+ tier JSON commenting
-        ('Lower permession numbers are more \'powerful\'.',
-         'In the config `users/[uuid]/permissions`, permissions can be given as strings (corresponding to keys in the config `permissions/levels/`), or as integers.'),
-        ('Permission level names are always given as, or converted to, uppercase',
-         'Permission level values are always positive integers, being silently set to 255 if they are not and cannot be converted'),
-        ('The excessive number of permissions are more for example/documentational use than for real use, but are put in anyway.',
-         'The large gaps in the default are to allow modification if, somehow, finer control is needed.'),
-    )
+    Config['permissions/levels/__comment_0'] = 'Lower permission numbers are more \'powerful\'.'
+    Config['permissions/levels/__comment_0'] = 'In the config `users/[uuid]/permissions`, permissions can be given as strings (corresponding to keys in the config `permissions/levels/`), or as integers.'
+    Config['permissions/levels/__comment_0'] = ' Permission level names are always given as, or converted to, uppercase'
+    Config['permissions/levels/__comment_0'] = ' Permission level values are always positive integers, being silently set to 255 if they are not and cannot be converted'
+    Config['permissions/levels/__comment_0'] = 'The excessive number of default permissions are more for example/documentational use than for real use, but are put in anyway.'
+    Config['permissions/levels/__comment_0'] = 'The large gaps in the default permissions are to allow modification if, somehow, finer control is needed.',
+    
     ## Insert defaults
     Config.mass_set_default('permissions/levels',
         LIMITED = 100, USER    = 80,
@@ -42,8 +41,7 @@ class UserManager:
     ## Enum
     Permission = Perm = IntEnum('Perm', {
         n.upper(): (v if v >= 0 else 255) if isinstance(v, int) else (int(v) if v.isdigit() else 255) if isinstance(v, str) else 255
-        for n,v in Config.get_item('permissions/levels', unsafe_allow_get_subkey=True).items()
-        if not n.startswith('_')
+        for n,v in Config.items_short('permissions/levels') if not n.startswith('_')
     })
 
     @dataclasses.dataclass(slots=True)
@@ -135,7 +133,7 @@ class UserManager:
         # FileBackedDict
         path = Path(Config('users/fbd/path', './_rsusers/'))
         path.mkdir(parents=True, exist_ok=True)
-        self.fbd = FileBackedDict(path, Config('users/fbd/sync_time', 60.0))
+        self.fbd = JSONBackedDict(path, Config('users/fbd/sync_time', 60.0))
         Bootstrapper.register_onclose(self.close)
         # Register hooks
         LineParser.register_callback( # player joins
@@ -160,7 +158,7 @@ class UserManager:
 
     def close(self):
         self.fbd.stop_autosync()
-        self.fbd.sync_all()
+        self.fbd.sync()
 
 class TellRaw(list):
     '''

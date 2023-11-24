@@ -127,7 +127,7 @@ class PluginManager:
             
     def load_plugins(self):
         bp = Path(Config['plugins/plugins_path'])
-        self._traverse_plugins(sorted(set(bp.glob(Config('plugins/glob/basic', '**/__plugin__.py')) | set(bp.glob(Config('plugins/glob/standalone', '**/*.rs.py'))))), PerfCounter(sec='', secs=''))
+        self._traverse_plugins(sorted(set(bp.glob(Config('plugins/glob/basic', '**/__plugin__.py'))) | set(bp.glob(Config('plugins/glob/standalone', '**/*.rs.py')))), PerfCounter(sec='', secs=''))
     def _traverse_plugins(self, paths: set, pc: PerfCounter):
         captured = set()
         for p in paths: # note: add follow_symlinks=True upon release of 3.13

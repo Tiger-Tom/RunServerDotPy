@@ -96,7 +96,7 @@ class RunServer(types.ModuleType):
         self.logger.debug(f'finish:load_5@T+{pc}')
         # Load: 6
         self.logger.debug(f'start:load_6@T+{pc}')
-        self.Config.sync_all()
+        self.Config.sync()
         self.PM.load_plugins()
         self.logger.debug(f'finish:load_6@T+{pc}')
         # Final log

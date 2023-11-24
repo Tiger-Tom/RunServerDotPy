@@ -117,6 +117,8 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
         '''Reads in top-level keys that have been changed'''
         for tk,tm in self.mtimes.items():
             p = self.path_from_topkey(tk)
+            if not p.exists():
+                del self.mtimes[tk]
             nt = p.stat().st_mtime
             if nt == tm: continue
             self.mtimes[tk] = tm

@@ -60,7 +60,7 @@ class BaseServerManager(ABC):
                (100.0 if Config(f'server_manager/prefer/{cls.name}', False) else 0.0)
     @classmethod
     def _bias_override(cls) -> float | None:
-        return Config(f'override/server_manager/bias_mod/{cls.name}', None, Config.on_missing.SET_RETURN_DEFAULT)
+        return Config(f'override/server_manager/bias_mod/{cls.name}', None)
     @classmethod
     @property
     def real_bias(cls) -> float:
@@ -72,7 +72,7 @@ class BaseServerManager(ABC):
     @classmethod
     @property
     def name(cls) -> str:
-        return f'{"_builtin" if cls.__module__ == BaseServerManager.__module__ else cls.__module__}.{cls.__qualname__}'.replace('/', '.')
+        return f'{"_builtin" if cls.__module__ == BaseServerManager.__module__ else cls.__module__}.{cls.__qualname__}'.replace('/', '_').replace('.', '_')
     @classmethod
     @property
     def type(cls) -> str:
@@ -252,7 +252,7 @@ class RConManager(BaseServerManager):
         if not Config('minecraft/rcon/enabled', False): raise RuntimeError('RCon is not enabled! (set it up in config: minecraft/rcon/enabled)')
         self.remote = f'{Config("minecraft/rcon/host", "127.0.0.1")}:{Config("minecraft/rcon/port", 25575)}'
         self.logger.infop(f'RCon remote: {self.remote} (can be set in config minecraft/rcon/)')
-        self.rconpwd = Config('minecraft/rcon/password', None, Config.on_missing.SET_RETURN_DEFAULT)
+        self.rconpwd = Config('minecraft/rcon/password', None)
         if self.rconpwd is None:
             self.rconpwd = getpass('Enter RCon password >')
             self.logger.warning('RCon password can be permanently set in config minecraft/rcon/password')
@@ -263,7 +263,7 @@ class RConManager(BaseServerManager):
     # Set config defaults
     Config('minecraft/rcon/host', '127.0.0.1')
     Config('minecraft/rcon/port', 25575)
-    Config('minecraft/rcon/password', None, Config.on_missing.SET_RETURN_DEFAULT)
+    Config('minecraft/rcon/password', None)
 
     cap_arbitrary_read = False
     cap_arbitrary_write = True
