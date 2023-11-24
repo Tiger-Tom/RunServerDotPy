@@ -1,320 +1,206 @@
 #!/bin/python3
 
 #> Imports
+from configparser import ConfigParser, SectionProxy
 from pathlib import Path
-import functools
-import logging
-# Parsing
-import json
-from configparser import ConfigParser
 import re
-# Types
+import functools
 import typing
-from collections import UserDict
+from ast import literal_eval
 from enum import Enum
 from .timer import Timer
 from .locked_resource import basic
-from .perfcounter import PerfCounter
 #</Imports
 
 #> Header >/
-__all__ = ('serializable', 'FileBackedDict')
+__all__ = ('FileBackedDict',)
 
-serializable = (dict, list, str, int, float, bool, type(None))
-
-class FileBackedDict(UserDict, basic.LockedResource):
+class FileBackedDict(basic.LockedResource):
     '''
-        A dictionary backed by an on-disk INI/JSON file
+        A dictionary backed by an on-disk INI file
         Asynchronously synchronizes entries with a file on disk when enabled
-        Detects file changes by checking its modification time
-        Detects dict changes by adding keys to a "dirty" flag
-        Sub-dictionaries can be accessed with "/" notation
+            Detects file changes by checking modification times
+            Detects local changes by adding mutated keys to a "dirty" set
+        Sub-fields are accessed with `key_sep` (default: "/")
     '''
-    __slots__ = ('path', 'use_json', 'logger', 'dirty', 'watchdog', 'watchdog_times')
-    key_patt_shrt = re.compile(r'^[\w\d][\w\d\t .\-;()[\]]*$')
-    key_patt_long = re.compile(fr'^{key_patt_shrt.pattern[1:-1]}/.*?[^/]$')
-    # Ironic that the word "short" is longer than the word "long"...
+    __slots__ = ('path', 'c', 'watchdog', 'mtimes', 'dirty')
 
-    def __init__(self, path: Path, interval: float = 120.0, use_json: bool = False):
-        basic.LockedResource.__init__(self)
-        UserDict.__init__(self)
-        self.path = Path(path) # path path path
-        self.use_json = use_json
-        self.logger = logging.getLogger(f'FBD[{self.path.name.replace(".", "_")}]')
-        self.dirty = set()
-        self.watchdog = Timer.set_interval(self.sync_all, interval, False); self.watchdog_times = {}
-    def __hash__(self):
-        '''Exclusively for functools.cache'''
-        return hash((self.path, self.key_patt_long.pattern, self.key_patt_shrt.pattern))
+    key_sep = '/'
+    key_topp_patt = re.compile(r'^[a-zA-Z\d][\w\d\-]*')
+    key_part_patt = re.compile(r'^[a-zA-Z][\w\d\- ;]*$')
+    file_suffix = '.ini'
+
+    serializable = (type(...), type(None), # simple literals
+        bool, int, float, complex,         # numeric literals
+        str, bytes, list, frozenset)       # collection literals
+    serializable_convert = { # types that need conversion to be immutable
+        list: tuple,
+        set: frozenset,
+    }
+    Serializable = typing.Union[*serializable, *serializable_convert]
+    Deserializable = typing.Union[*serializable]
+    
+    def __init__(self, path: Path, intvl: float = 120.0):
+        super().__init__()
+        self.path = Path(path)
+        self.c = {}
+        self.watchdog = Timer.set_interval(self.sync, intvl, False)
+        self.mtimes = {}; self.dirty = set()
+    optionxform = staticmethod(lambda o: str(o))
+    @basic.locked
+    def _init_topkey(self, topkey: str) -> ConfigParser:
+        self.c[topkey] = ConfigParser()
+        self.c[topkey].optionxform = self.optionxform
+        return self.c[topkey]
+
+    Behavior = Enum('Behavior', ('DEFAULT', 'IGNORE', 'RAISE', 'FORCE'))
+    Behavior.__doc__ = \
+        '''
+            Various behaviors for error/"warning" handlers.
+                Most functions only specify a subset of accepted Behaviors, see annotations for typing.Literal[]s containing Behaviors
+        '''
 
     # Key functions
-    @functools.cache
-    def key(self, key: str | tuple[str], *, allow_top_lvl_key: bool = False) -> tuple[str]:
-        '''
-            Converts a str a key, ensures that it matches against key_patt_long
-                (or key_patt_shrt if allow_top_lvl_key is truthy)
-            When passed a tuple of str, simply checks if it meets length requirements
-        '''
-        if isinstance(key, str):
-            if self.key_patt_long.fullmatch(key) is not None:
-                key = tuple(key.split('/'))
-            elif allow_top_lvl_key:
-                if self.key_patt_shrt.fullmatch(key) is None:
-                    raise ValueError(f'Key must match pattern {self.key_patt_shrt.pattern} or {self.key_patt_long.pattern}')
-                return (key,)
-            else:
-                raise ValueError(f'Key must match pattern: {self.key_patt_long.pattern}')
-        if len(key) == 0: raise ValueError('Key cannot have a length of 0')
-        elif len(key) == 1 and not allow_top_lvl_key:
-            raise ValueError(f'Key cannot be a top-level key')
+    Key = str | tuple[str]
+    @classmethod
+    def key(cls, key: Key, top_level: bool = False, /): # key key key
+        '''Transform a string / tuple of strings into a key'''
+        if isinstance(key, str): key = key.split(cls.key_sep)
+        if not key: raise ValueError('Empty key')
+        if any(cls.key_sep in part for part in key):
+            raise ValueError(f'Part of {key} contains a "{cls.key_sep}"')
+        elif (not top_level) and (len(key) == 1):
+            raise ValueError('Top-level key disallowed')
+        elif not cls.key_topp_patt.fullmatch(key[0]):
+            raise ValueError(f'Top-level part of key {key} does not match pattern {cls.key_topp_patt.pattern}')
+        elif not all(map(cls.key_part_patt.fullmatch, key[1:])):
+            raise ValueError(f'Part of sub-key {key[1:]} (full: {key}) not match pattern {cls.key_part_patt.pattern}')
         return key
-    @functools.cache
-    def key_path(self, key: str | tuple[str]) -> Path:
-        '''Converts the key with self.key(), returns the Path corresponding to its INI/JSON file'''
-        return self.path / f'{self.key(key, allow_top_lvl_key=True)[0]}.{"json" if self.use_json else "ini"}'
+    def tkey_path(self, topkey: str):
+        '''Returns the Path corresponding to the topkey's INI file'''
+        return (self.path / topkey).with_suffix(self.file_suffix)
 
-    # Dict functions
+    # Syncing methods
     @basic.locked
-    def _get_(self, key: tuple[str], *, make_if_missing: bool = False, no_raise: bool = False) -> dict | None:
-        '''Gets the dictionary referenced by the key, useful for mutating'''
-        d = self.data
-        for i,k in enumerate(key):
-            if k not in d:
-                if not make_if_missing:
-                    if no_raise: return None
-                    raise KeyError(f'{key}[{i}]')
-                d[k] = {}
-            d = d[k]
-            if not isinstance(d, dict):
-                if no_raise: return None
-                raise TypeError(f'{key}[{i}] referenced as subkey, but it is a value')
-        return d
+    def sync(self):
+        '''Convenience method for readin_changed and writeback_dirty'''
+        writeback_dirty()
+        readin_modified()
+    ## Read-in
+    @basic.locked
+    def readin_modified(self):
+        '''Reads in top-level keys that have been changed'''
+        raise NotImplementedError
+    @basic.locked
+    def readin(self, topkey: str):
+        '''Reads in a top-level key'''
+        self._init_topkey(topkey).read_string(self.tkey_path(topkey).read_text())
+    ## Write-back
+    @basic.locked
+    def writeback_dirty(self):
+        '''Writes back all top-level keys marked as dirty'''
+        while self.dirty:
+            self.writeback(self.dirty.pop(), False, False)
+    @basic.locked
+    def writeback(self, topkey: str, only_if_dirty: bool = True, clean: bool = True):
+        '''Writes back a top-level key'''
+        if topkey in self.dirty:
+            if clean: self.dirty.remove(topkey)
+        elif only_if_dirty: return
+        with self.tkey_path(topkey).open('w') as f:
+            self.c[topkey].write(f)
+
+    # High-level item manipulation
+    def bettergetter(self, key: Key, default: typing.Literal[Behavior.RAISE] | typing.Any = Behavior.RAISE, set_default: bool = True) -> Deserializable | typing.Any:
+        '''
+            Gets the value of key
+                If the key is missing, then:
+                    if default is Behavior.RAISE: raises KeyError
+                    otherwise: returns default, and if set_default is truthy then sets the key to default
+        '''
+        key = self.key(key)
+        _tree = self._gettree(key, make_if_missing=(default is not self.Behavior.RAISE) and set_default, fetch_if_missing=True, no_raise_keyerror=(default is not self.Behavior.RAISE))
+        if _tree is None: return default
+        if key[-1] in _tree: return literal_eval(_tree[key[-1]])
+        if set_default: self.setitem(key, default, _tree=_tree)
+        return default
+    __call__ = bettergetter
+    
+    # Med-level item manipulation
     ## Getting
     @basic.locked
-    def get_item(self, key: str | tuple[str], *, unsafe_allow_get_subkey: bool = False) -> typing.Union[*serializable]:
+    def get(self, key: Key, default: typing.Literal[Behavior.RAISE] | Serializable = Behavior.RAISE, converter: typing.Callable[str, Deserializable] = literal_eval, *, _tree: SectionProxy | None = None) -> Deserializable:
         '''
-            Gets an item
-                (raises TypeError upon trying to return a dict, use unsafe_allow_get_subkey=True to bypass)
-            If the top-level key cannot be found, but it exists in INI/JSON form, then it is read in
-                (if a key is not found, KeyError is raised)
+            Gets the value of key
+                If the key is missing, then raises KeyError if default is Behavior.RAISE, otherwise returns default
         '''
-        key = self.key(key) # key key key
-        if key[0] not in self.data:
-            if not self.key_path(key).exists(): raise KeyError(f'{key}[0]')
-            self.readin_data(key[0])
-        d = self._get_(key[:-1])
-        if key[-1] not in d: raise KeyError(f'{key}[-1]')
-        if (not unsafe_allow_get_subkey) and isinstance(d[key[-1]], dict): raise TypeError(f'{key} refers to a subkey, pass unsafe_allow_get_subkey=True to bypass')
-        return d[key[-1]]
-    __getitem__ = get_item
-    def get_set_default(self, key: str | tuple[str], default, *, unsafe_allow_op_subkey: bool = False):
-        '''
-            Gets an item.
-            If the item doesn't exist, tries to set "default" as its value and returns default with set_default
-        '''
-        self.set_default(key, default, unsafe_allow_op_subkey=unsafe_allow_op_subkey)
-        return self.get_item(key, unsafe_allow_get_subkey=unsafe_allow_op_subkey)
+        key = self.key(key) if (_tree is None) else key
+        sect = _tree if (_tree is not None) else \
+               self._gettree(key, make_if_missing=False, fetch_if_missing=True, no_raise_keyerror=(default is not self.Behavior.RAISE))
+        if sect is None: return default
+        if key[-1] not in sect:
+            raise KeyError(f'{key}[-1]')
+        val = sect[key[-1]]
+        return converter(sect[key[-1]])
+    __getitem__ = getitem = get
     ## Setting
-    def set_item(self, key: str | tuple[str], val: typing.Any | dict, *, unsafe_allow_set_subkey: bool = False, unsafe_allow_assign_dict: bool = False):
-        '''	
-            Sets an item.
-                Throws TypeError upon trying to overwrite a subkey, pass unsafe_allow_set_subkey=True (also implied by unsafe_allow_set_top_lvl_key=True) to bypass
-                Throws TypeError upon trying to assign a dict (AKA subkey) as a value, pass unsafe_allow_assign_dict=True to bypass
+    @basic.locked
+    def setitem(self, key: Key, val: Serializable,
+                type_convert: typing.Literal[Behavior.DEFAULT, Behavior.IGNORE] = Behavior.DEFAULT, converter: typing.Callable[[Serializable], str] = repr,
+                *, _tree: SectionProxy | None = None):
         '''
-        if isinstance(val, dict) and not unsafe_allow_assign_dict:
-            raise TypeError('Cannot assign dict as value, pass unsafe_allow_assign_dict=True (also implied by unsafe_allow_set_subkey=True) to bypass')
-        key = self.key(key) # key key key
-        d = self._get_(key[:-1], make_if_missing=True)
-        if (not unsafe_allow_set_subkey) and (key[-1] in d) and isinstance(d[key[-1]], dict):
-            raise TypeError('Cannot assign to a subkey, pass unsafe_allow_set_subkey=True to bypass')
-        d[key[-1]] = val
+            Sets a key
+            As values in INI are untyped strings, the following rulesets are used to retain typing, depending on if type_convert is:
+                Behavior.DEFAULT:
+                    If the type of val is in serializable_convert, then the value (callable) associated with that type is called to convert it
+                    Then, val is checked for being an instance of any of serializable (isinstance(val, serializable)), throwing TypeError if it isn't
+                    Then, val is passed to converter and saved
+                Behavior.IGNORE:
+                    Val is passed to converter without checking it against serializable or serializable_convert before being saved
+        '''
+        assert type_convert in {self.Behavior.DEFAULT, self.Behavior.IGNORE}
+        key = self.key(key) if (_tree is None) else key
+        if type_convert is self.Behavior.DEFAULT:
+            if type(val) in self.serializable_convert:
+                val = self.serializable_convert[type(val)](val)
+        if not isinstance(val, self.serializable):
+            raise TypeError(f'Cannot serialize type {type(val)} of {val!r}, must be one of {self.serializable} or {tuple(self.serializable_convert)}')
+        (self._gettree(key, make_if_missing=True, fetch_if_missing=True) if (_tree is None) else _tree)[key[-1]] = converter(val)
         self.dirty.add(key[0])
-    __setitem__ = set_item
-    def set_default(self, key: str | tuple[str], default, unsafe_allow_op_subkey: bool = False, unsafe_allow_assign_dict: bool = False):
-        '''If the item corresponding to key doesn't exist, then sets it to default. Has no effect otherwise'''
-        if self.contains(key, unsafe_no_error_on_subkey=unsafe_allow_op_subkey): return
-        self.set_item(key, default, unsafe_allow_set_subkey=unsafe_allow_op_subkey, unsafe_allow_assign_dict=unsafe_allow_assign_dict)
+    __setitem__ = setitem
     ## Containing
     @basic.locked
-    def contains(self, key: str | tuple[str], *, unsafe_no_error_on_subkey: bool = False) -> bool:
-        '''
-            Checks if the key exists
-                If the key resolves to a subkey, then TypeError is raised unless unsafe_no_error_on_subkey is truthy
-        '''
-        key = self.key(key) # key key key
-        if key[0] not in self.data:
-            if not self.key_path(key).exists(): return False
-            self.readin_data(key[0])
-        d = self._get_(key[:-1], no_raise=True)
-        if (d is None) or (key[-1] not in d): return False
-        if (not unsafe_no_error_on_subkey) and isinstance(d[key[-1]], dict):
-            raise TypeError(f'{key} resolved to a subkey, pass unsafe_no_error_on_subkey=True if this is intended')
+    def contains(self, key: Key, *, _tree: SectionProxy | None) -> bool:
+        '''Returns whether or not the key exists'''
+        key = self.key(key) if (_tree is None) else key
+        sect = self._gettree(key, make_if_missing=False, fetch_if_missing=True, no_raise_keyerror=True) if (_tree is None) else _tree
+        if (sect is None) or (key[-1] not in sect): return False
         return True
     __contains__ = contains
     ## Deleting
     @basic.locked
-    def delete(self, key: str | tuple[str], *, unsafe_allow_delete_subkey: bool = False):
-        '''
-            Deletes an item
-            Raises TypeError upon trying to delete a suspected subkey (dict), pass unsafe_allow_delete_subkey=True to bypass
-        '''
-        key = self.key(key) # key key key
-        d = self._get_(key[:-1])
-        if key[-1] not in d: raise KeyError(f'{key}[-1]')
-        if (not unsafe_allow_delete_subkey) and isinstance(d[key[-1]], dict):
-            raise TypeError(f'{key} refers to a subkey, pass unsafe_allow_delete_subkey=True to bypass')
-        del d[key[-1]]
-        self.prune(key[0])
-        self.dirty.add(key[0])
-    __delitem__ = delete
+    def delitem(self, key: str | tuple[str]):
+        '''Deletes an item'''
+        key = self.key(key)
+        ck = '.'.join(key[1:-1])
+        if ck not in self.c[key[0]]:
+            raise KeyError(f'{key} ({ck})')
+        del self.c[key[0]][ck]
+    __delitem__ = delitem
+    # Low-level item manipulation
     @basic.locked
-    def remove(self, key: str, *, unsafe_I_know_what_I_am_doing: bool = False):
-        '''Deletes a top level key AND it's corresponding INI/JSON file. Don\'t call if you don\'t know what you are doing'''
-        if not unsafe_I_know_what_I_am_doing: raise RuntimeError('Pass unsafe_I_know_what_I_am_doing=True if you really want to do this')
-        del self.data[key]
-        self.key_path(key).unlink()
-        self.dirty.remove(key)
-        self.watchdog_times
-    ### Pruning
-    def __count_entries(self, d: dict) -> int:
-        '''
-            Recursively counts non-dictionary entries in d
-            Should never be called unless the lock is held, but is not locked by default for performance reasons
-        '''
-        return sum(self.__count_entries(e) if isinstance(e, dict) else 1 for e in d.values())
-    def __prune(self, data: dict):
-        '''
-            Recursively removes empty dictionaries in data
-            Should never be called unless the lock is held, but is not locked by default for performance reasons
-        '''
-        for k,v in tuple(data.items()):
-            if not isinstance(v, dict): continue
-            if self.__count_entries(v) == 0:
-                del data[k]
-                continue
-            self.__prune(v)
-    @basic.locked
-    def prune(self, start_key: str | None = None):
-        '''Recursively removes empty dictionaries, starting with start_key (or from root if start_key is None)'''
-        self.__prune(self.data if start_key is None else self._get_(self.key(start_key, allow_top_lvl_key=True)))
-
-    # Augmented get
-    on_missing = Enum('OnMissing', ('RETURN_DEFAULT', 'SET_RETURN_DEFAULT', 'SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE', 'ERROR'))
-    def __call__(self, key: str | tuple[str], default: None | typing.Any = None, on_missing: on_missing = on_missing.SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE):
-        '''
-            Behavior of on_missing when the key isn't found:
-                RETURN_DEFAULT: returns the default field
-                SET_RETURN_DEFAULT: same as the get_set_default method
-                SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE: (the default) same as SET_RETURN_DEFAULT unless default is None, in which case ExceptionGroup(KeyError, TypeError) is raised
-                ERROR: raises KeyError
-        '''
-        assert isinstance(on_missing, self.on_missing)
-        if key in self: return self[key]
-        match on_missing:
-            case self.on_missing.RETURN_DEFAULT: return default
-            case self.on_missing.SET_RETURN_DEFAULT:
-                self[key] = default
-                return default
-            case self.on_missing.SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE:
-                if default is None: raise ExceptionGroup('Key was not found, on_missing is SET_RETURN_DEFAULT_BUT_ERROR_ON_NONE, and default=None', (KeyError(key), TypeError('Default is None')))
-                self[key] = default
-                return default
-            case self.on_missing.ERROR: raise KeyError(key)
-
-    # Data sync functions
-    ## Reading in
-    @basic.locked
-    def readin_data(self, key: str):
-        '''Reads in data from the INI/JSON value corresponding to key (found via self.key_path)'''
-        p = self.key_path(key)
-        self.logger.info(f'Reading in {key} from {p}...')
-        pc = PerfCounter()
-        if self.use_json:
-            with p.open() as f:
-                self.data[key] = json.load(f)
-        else:
-            par = ConfigParser(); par.optionxform = lambda o: o
-            with p.open() as f: par.read_file(f)
-            print('fixme::configparser_readin')
-        self.logger.infop(f'Readin {key} took {pc}')
-        self.watchdog_times[key] = p.stat().st_mtime
-    @basic.locked
-    def readin_watchdog(self):
-        '''
-            Reads in data from files that have been modified since the last read
-            If a file is missing, it is removed from the watchdog list
-        '''
-        if not self.watchdog_times: return
-        self.logger.debug(f'Readin watchdog ticked: checking {len(self.watchdog_times)} key(s)')
-        readind = 0
-        pc = PerfCounter()
-        for k,t in tuple(self.watchdog_times.items()):
-            p = self.key_path(k)
-            if not p.exists():
-                self.logger.warning(f'File {p} no longer exists, removing {k} from watchdogs')
-                del self.watchdog_times[k]
-                continue
-            nt = p.stat().st_mtime
-            if nt <= t: continue
-            readind += 1
-            self.watchdog_times[k] = nt
-            self.readin_data(k)
-        if not readind: return
-        self.logger.infop(f'Readin {readind} key(s) took {pc}')
-    ## Writing back
-    @basic.locked
-    def writeback(self, key: str, *, clean: bool = True, force: bool = False) -> bool:
-        '''
-            Writes back a top-level key to its INI/JSON file
-                If "force" is not truthy, and the key is not dirty, then nothing is written back and False is returned
-                Otherwise:
-                - the data is written back
-                - watchdog times are updated
-                - the key is "cleaned" (removed from dirty) if clean is Truthy
-                - True is returned
-        '''
-        if (not force) and (key not in self.dirty): return False
-        self.prune(key)
-        p = self.key_path(key)
-        self.logger.warning(f'Writing back {key} to {p}...')
-        pc = PerfCounter()
-        if self.use_json:
-            with p.open('w') as f:
-                json.dump(self.data[key], f, indent=4)
-        else:
-            par = ConfigParser(); par.optionxform = lambda o: o
-            for ok,ov in self.data[key].items():
-                par[ok] = {ik: repr(iv) for ik,iv in ov.items()} if isinstance(ov, dict) else {'_': repr(ov)}
-            with p.open('w') as f: par.write(f)
-        self.logger.infop(f'Writeback {key} took {pc}')
-        self.watchdog_times[key] = p.stat().st_mtime
-        if clean: self.dirty.remove(key)
-        return True
-    @basic.locked
-    def writeback_dirty(self):
-        '''Writes back all dirty keys'''
-        self.logger.debug(f'Writing back dirty keys: {len(self.dirty)} key(s) to clean')
-        nw = len(self.dirty); pc = PerfCounter()
-        while len(self.dirty):
-            self.writeback(self.dirty.pop(), clean=False, force=True)
-        self.logger.infop(f'Writeback {nw} key(s) took {pc}')
-    ## Dual-ways sync
-    @basic.locked
-    def sync_all(self):
-        '''Basically notifies the user and runs self.writeback_dirty() and then self.readin_watchdog()'''
-        self.logger.info('Syncing all...')
-        self.writeback_dirty()
-        self.readin_watchdog()
-    ## Sync timer
-    @basic.locked
-    def start_autosync(self):
-        '''Starts the internal watchdog timer'''
-        self.watchdog.start()
-    @basic.locked
-    def stop_autosync(self):
-        '''Stops the internal watchdog timer'''
-        self.watchdog.stop()
-    @basic.locked
-    def is_autosyncing(self) -> bool:
-        '''Returns whether or not the internal watchdog timer is ticking'''
-        return self.watchdog.is_alive()
+    def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> SectionProxy | None:
+        '''Gets the section that contains key[-1]'''
+        if key[0] not in self.c:
+            if fetch_if_missing and self.tkey_path(key[0]).exists():
+                self.readin(key[0])
+            elif make_if_missing: self._init_topkey(key[0])
+            elif no_raise_keyerror: return None
+            else: raise KeyError(f'{key}[0]')
+        ck = '.'.join(key[1:-1])
+        if ck not in self.c[key[0]]:
+            if not make_if_missing:
+                if no_raise_keyerror: return None
+                raise KeyError(f'{key} ({ck})')
+            self.c[key[0]][ck] = {}
+        return self.c[key[0]][ck]
