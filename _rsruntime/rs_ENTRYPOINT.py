@@ -6,6 +6,8 @@
 import types
 import sys
 import importlib
+import time
+from types import SimpleNamespace
 # RSModules
 from . import util
 #</Imports
@@ -18,6 +20,7 @@ class RunServer(types.ModuleType):
         'Bootstrapper', 'BS',
         # Load: 0
         'Util', 'U',
+        'Flags', 'F',
         # Load: 1
         'Config', 'C',
         'ExceptionHandlers', 'EH',
@@ -52,6 +55,9 @@ class RunServer(types.ModuleType):
         # Load: 0
         self.logger.debug(f'start:load_0@T+{pc}')
         sys.modules['RS.Util'] = self.Util = self.U = util
+        self.Flags = self.F = SimpleNamespace()
+        self.F.force_restart = False
+        self.F.force_no_restart = False
         self.logger.debug(f'finish:load_0@T+{pc}')
         # Load: 1
         self.logger.debug(f'start:load_1@T+{pc}')
@@ -117,4 +123,16 @@ class RunServer(types.ModuleType):
         # Start plugins
         self.PM.start()
         # Start server
-        self.SM.start()
+        while True:
+            self.SM.start()
+            if self.F.force_no_restart or ((not self.F.force_restart) and (not self.C('server_manager/autorestart/restart', True))): break
+            if not self.SM.cap_restartable:
+                self.logger.fatal(f'A restart was requested, but the ServerManager (type {self.SM.type}) does not support restarting')
+                break
+            try:
+                for s in range(self.C('server_manager/autorestart/delay', 5), 0, -1):
+                    print(f'Restarting in {s} second{"" if s == 1 else "s"}, issue KeyboardInterrupt (usually CTRL+C) to cancel')
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                print('Restart aborted')
+                break
