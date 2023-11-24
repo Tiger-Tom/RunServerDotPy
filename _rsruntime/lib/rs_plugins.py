@@ -122,12 +122,12 @@ class PluginManager:
         all(map(self.ML.update_execute, self.ML.discover_manifests(Path(Config['plugins/plugins_path']))))
         self.logger.infop(f'Manifests loaded after {pc}')
         pc = PerfCounter(sec='', secs='')
-        for p in Path(Config['plugins/plugins_path']).glob('**/__early_load__.py'):
+        for p in Path(Config['plugins/plugins_path']).glob(Config('plugins/globs/early_load', '**/__early_load__.py')):
             self.logger.infop(f'Executing early load on {p} (T+{pc})')
             
     def load_plugins(self):
         bp = Path(Config['plugins/plugins_path'])
-        self._traverse_plugins(sorted(set(bp.glob('**/__plugin__.py')) | set(bp.glob('**/*.rs.py'))), PerfCounter(sec='', secs=''))
+        self._traverse_plugins(sorted(set(bp.glob(Config('plugins/glob/basic', '**/__plugin__.py')) | set(bp.glob(Config('plugins/glob/standalone', '**/*.rs.py'))))), PerfCounter(sec='', secs=''))
     def _traverse_plugins(self, paths: set, pc: PerfCounter):
         captured = set()
         for p in paths: # note: add follow_symlinks=True upon release of 3.13
