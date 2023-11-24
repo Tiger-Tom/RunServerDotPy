@@ -47,7 +47,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     @abstractproperty
     def file_suffix() -> str: NotImplemented
     
-    _transaction_types = IntEnum('TransactionTypes', ('GETITEM', 'SETITEM'))
+    _transaction_types = IntEnum('TransactionTypes', ('PRE_GETITEM', 'POST_GETITEM', 'SETITEM'))
     def _validate_transaction(self, key: tuple[str], ttype: _transaction_types, args: tuple[typing.Any] = (), *, _tree: MutableMapping | None = None) -> None:
         '''Allows subclasses to place extra restrictions on types of transactions by throwing exceptions to cancel them. Is a no-op by default'''
 
@@ -120,9 +120,12 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
         '''
         key = self.key(key)
         _tree = self._gettree(key, make_if_missing=(default is not self.Behavior.RAISE) and set_default, fetch_if_missing=True, no_raise_keyerror=(default is not self.Behavior.RAISE))
-        self._validate_transaction(key, self._transaction_types.GETITEM, _tree=_tree)
+        self._validate_transaction(key, self._transaction_types.PRE_GETITEM, _tree=_tree)
         if _tree is None: return default
-        if key[-1] in _tree: return self._deserialize(_tree[key[-1]])
+        if key[-1] in _tree:
+            val = _tree[key[-1]]
+            self._validate_transaction(key, self._transaction_types.POST_GETITEM, (val,), _tree=_tree)
+            return self._deserialize(val)
         if set_default: self.setitem(key, default, _tree=_tree)
         return default
     __call__ = bettergetter
@@ -138,11 +141,12 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
         key = self.key(key) if (_tree is None) else key
         sect = _tree if (_tree is not None) else \
                self._gettree(key, make_if_missing=False, fetch_if_missing=True, no_raise_keyerror=(default is not self.Behavior.RAISE))
-        self._validate_transaction(key, self._transaction_types.GETITEM, _tree=sect)
+        self._validate_transaction(key, self._transaction_types.PRE_GETITEM, _tree=sect)
         if sect is None: return default
         if key[-1] not in sect:
             raise KeyError(f'{key}[-1]')
         val = sect[key[-1]]
+        self._validate_transaction(key, self._transaction_types.POST_GETITEM, (val,), _tree=_tree)
         return self._deserialize(sect[key[-1]])
     __getitem__ = getitem = get
     ## Setting
@@ -151,7 +155,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
         '''Sets a key to a value'''
         key = self.key(key) if (_tree is None) else key
         sect = (self._gettree(key, make_if_missing=True, fetch_if_missing=True) if (_tree is None) else _tree)
-        self._validate_transaction(key, self._transaction_types.GETITEM, (val,), _tree=sect)
+        self._validate_transaction(key, self._transaction_types.SETITEM, (val,), _tree=sect)
         sect[key[-1]] = self._serialize(val)
         self.dirty.add(key[0])
     __setitem__ = setitem
