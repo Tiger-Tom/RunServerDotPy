@@ -174,5 +174,5 @@ class FileBackedDict[Serializable, Serialized, Deserializable](ABC, LockedResour
     @abstractmethod
     def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> MutableMapping | None: NotImplemented
     @abstractmethod
-    def _serialize(self, val: Serializable) -> 'Serialized': NotImplemented
-    def _deserialize(self, value: 'Serialized') -> 'Deserializable': NotImplemented
+    def _serialize(self, val: Serializable) -> Serialized: NotImplemented
+    def _deserialize(self, value: Serialized) -> Deserializable: NotImplemented
