@@ -35,7 +35,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
 
     key_sep = '/'
     key_topp_patt = re.compile(r'^[a-zA-Z\d][\w\d\-]*')
-    key_part_patt = re.compile(r'^[a-zA-Z][\w\d\- ;]*$')
+    key_part_patt = re.compile(r'^_?_?[a-zA-Z][\w\d\- ;]*$')
 
     Behavior = Enum('Behavior', ('DEFAULT', 'IGNORE', 'RAISE', 'FORCE'))
     Behavior.__doc__ = \
