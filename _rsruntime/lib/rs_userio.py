@@ -10,7 +10,7 @@ import time # struct_time
 import dataclasses
 import typing
 from pathlib import Path
-from enum import Flag, IntEnum
+from enum import Enum, Flag, IntEnum
 #</Imports
 
 # RunServer Module
@@ -182,34 +182,34 @@ class TellRaw(list):
     def render(self):
         return json.dumps(self)
 
-    click_events = {'open_url', 'run_command', 'suggest_command', 'copy'}
-    hover_events = {'show_text', 'show_item', 'show_entity'}
-    text_types = {'text', 'selector', 'score', 'keybind'}
+    TextType = Enum('TextType', {'TEXT': 'text', 'SELECTOR': 'selector', 'SCORE': 'score', 'KEYBIND': 'keybind'})
+    ClickEvent = Enum('ClickEvent', {'OPEN_URL': 'open_url', 'RUN_COMMAND': 'run_command', 'SUGGEST_COMMAND': 'suggest_command', 'COPY': 'copy'})
+    HoverEvent = Enum('HoverEvent', {'TEXT': 'show_text', 'ITEM': 'show_item', 'ENTITY': 'show_entity'})
     def text(self, text: str, fmt: TextFormat | dict = TextFormat(), *,
              insertion: str | None = None,
-             type: typing.Literal[*text_types] = 'text', objective: None | str = None,
-             click_event: typing.Literal[None, *click_events] = None, click_contents: None | str = None,
-             hover_event: typing.Literal[None, *hover_events] = None, hover_contents: None | typing.Union['TellRaw', tuple] | typing.Union[dict, tuple] | typing.Union[dict, tuple] = None):
+             type: TextType = TextType.TEXT, objective: None | str = None,
+             click_event: ClickEvent | None = None, click_contents: None | str = None,
+             hover_event: HoverEvent | None = None, hover_contents: None | typing.Union['TellRaw', tuple] | typing.Union[dict, tuple] | typing.Union[dict, tuple] = None):
         '''
             Appends a tellraw text to self
                 text is the text to show unless type is:
-                    selector, in which case text is the selector type
-                    score, in which case text is the name of the player
-                    keybind, in which case text is the ID of the keybind
+                    SELECTOR, in which case text is the selector type
+                    SCORE, in which case text is the name of the player
+                    KEYBIND, in which case text is the ID of the keybind
                 fmt is the format to formatting to apply to the text
                 insertion is text that is entered into the user's chat-box when the text is shift-clicked
-                type is one of text_types, which should be self-explanitory
-                objective is None unless type is "score", in which case objective is the scoreboard objective
-                click_event is one of click_events (or None for nothing), they should be self-explanatory
+                type should be self-explanatory
+                objective is None unless type is SCORE, in which case objective is the scoreboard objective
+                click_event is either a ClickEvent or None for nothing
                     click_contents is the text to use for the click_event (the URL to open, text to copy, etc.)
-                hover_event is one of hover_events (or None for nothing), they should be self-explanatory
+                hover_event is either a HoverEvent or None for nothing
                     hover_contents is the data to use for the hover_event (the entity to display, the TellRaw to show [as text])
         '''
         # type, text, objective
-        assert type in {'text', 'selector', 'score'}
+        assert isinstance(type, self.TextType)
         assert isinstance(text, str)
-        assert not ((type == 'score') ^ isinstance(objective, str))
-        obj = {'score': {'name': text, 'objective': objective}} if (type == 'score') else {type: text}
+        assert not ((type is self.TextType.SCORE) ^ isinstance(objective, str)) # ensure that objective is a string if type is TextType.SCORE
+        obj = {'score': {'name': text, 'objective': objective}} if (type is self.TextType.SCORE) else {type.value: text}
         # fmt
         if fmt is not None:
             assert isinstance(fmt, (self.TextFormat, dict))
@@ -221,14 +221,14 @@ class TellRaw(list):
             obj['insertion'] = insertion
         # click_event, click_contents
         if click_event is not None:
-            assert click_event in self.click_events
+            assert isinstance(click_event, self.ClickEvent)
             assert isinstance(click_contents, str)
-            obj['clickEvent'] = {'action': click_event, 'value': click_contents}
+            obj['clickEvent'] = {'action': click_event.value, 'value': click_contents}
         # hover_event, hover_contents
         if hover_event is not None:
-            assert hover_event in self.hover_events
-            obj['hoverEvent'] = {'action': hover_event}
-            if hover_event == 'show_text':
+            assert isinstance(hover_event, self.HoverEvent)
+            obj['hoverEvent'] = {'action': hover_event.value}
+            if hover_event is self.HoverEvent.TEXT:
                 if isinstance(hover_value, self.__class__): obj['hoverEvent']['contents'] = hover_value.render()
                 else:
                     assert isinstance(hover_value, tuple, list)
