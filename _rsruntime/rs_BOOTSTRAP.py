@@ -80,6 +80,7 @@ class Bootstrapper:
         log_l_grp.add_argument('--debug', help='Show even more information in stderr logging (loglvl=DEBUG)', action='store_true')
         log_l_grp.add_argument('--quiet', help='Show less information in stderr logging (loglvl=WARNING)', action='store_true')
         log_grp.add_argument('--verbose-headers', help='Show longer headers in stderr logs', action='store_true')
+        log_grp.add_argument('--no-color', help='Don\'t color output to stderr', action='store_true')
         p.add_argument('--update-only', help='Only download/update and execute the bootstrapper manifest, don\'t start the server', action='store_true')
         unat_grp_ = p.add_argument_group()
         unat_grp = unat_grp_.add_mutually_exclusive_group()
@@ -91,15 +92,37 @@ class Bootstrapper:
     def setup_logger(self) -> logging.Logger:
         log_path = (Path.cwd() / '_rslog')
         log_path.mkdir(exist_ok=True)
+        # Create new logging level
+        logging.INFOPLUS = logging.INFO + ((logging.WARNING - logging.INFO) // 2)
+        logging.getLoggerClass().infop = functools.partialmethod(logging.getLoggerClass().log, logging.INFOPLUS)
         # Setup formatters
-        stream_fmt = logging.Formatter(
+        class ColoredFormatter(logging.Formatter):
+            FG_GRAY        = '\x1b[37m'
+            FG_DGREEN      = '\x1b[32m'
+            FG_LGREEN      = '\x1b[92m'
+            FG_YELLOW      = '\x1b[93m'
+            FG_LRED        = '\x1b[91m'
+            FG_DRED        = '\x1b[31m'
+            FG_GRAY_BG_RED = '\x1b[37;41m'
+            RESET          = '\x1b[0m'
+
+            _level_to_color = {
+                logging.DEBUG:    FG_GRAY,
+                logging.INFO:     FG_DGREEN,
+                logging.INFOPLUS: FG_LGREEN,
+                logging.WARNING:  FG_YELLOW,
+                logging.ERROR:    FG_LRED,
+                logging.FATAL:    FG_DRED,
+            }
+            
+            def format(self, record: logging.LogRecord) -> str:
+                record.msg = f'{self._level_to_color[record.levelno]}{record.msg}{self.RESET}'
+                return super().format(record)
+        stream_fmt = (logging.Formatter if self.args.no_color else ColoredFormatter)(
             self.log_fmt_long if self.args.verbose_headers else self.log_fmt_short,
             self.date_fmt_long if self.args.verbose_headers else self.date_fmt_short,
             style='$')
         file_fmt = logging.Formatter(self.log_fmt_long, self.date_fmt_long, style='$')
-        # Create new logging level
-        logging.INFOPLUS = logging.INFO + ((logging.WARNING - logging.INFO) // 2)
-        logging.getLoggerClass().infop = functools.partialmethod(logging.getLoggerClass().log, logging.INFOPLUS)
         # Configure logger
         logger = logging.getLogger('RS')
         logger.setLevel(logging.DEBUG)
