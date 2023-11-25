@@ -5,6 +5,7 @@
 import re
 import json
 import inspect
+from functools import wraps
 # Types
 import time # struct_time
 import dataclasses
@@ -245,7 +246,7 @@ class TellRaw(list):
         return self
     
 class ChatCommands:
-    __slots__ = ('logger', 'commands', 'aliases')
+    __slots__ = ('logger', 'commands', 'aliases', 'help_sections')
 
     class Params:
         __slots__ = ('params', 'args_line')
@@ -309,14 +310,16 @@ class ChatCommands:
                     A default value of "None" indicates the argument as optional without hinting the default, as in: `arg=None`, which results in `[arg]`
                 Keyword-only args and varargs are ignored
             When arguments are provided by users, they are split via shlex.split
+            help_section is the help section, with sub-sections delimited by '/'
         '''
-        __slots__ = ('target', 'permission', 'help_section', 'params')        
+        __slots__ = ('target', 'permission', 'help_section', 'params', 'aliases')
 
-        def __init__(self, target: typing.Callable[['User', ...], None], permission: UserManager.Perm, help_section: str | None = None):
+        def __init__(self, target: typing.Callable[['User', ...], None], *, permission: UserManager.Perm = UserManager.Perm.USER, help_section: str | tuple[str] = ()):
             self.target = target
             self.permission = permission
-            self.help_section = help_section
+            self.help_section = help_section.split(self.HELP_SUBSECTION) if isinstance(help_section, str) else help_section
             self.params = RS.CC.Params(target)
+            self.aliases = set()
         def __call__(self, user: UserManager.User, *args):
             # Validate permissions
             if user.permission > self.permission:
@@ -324,17 +327,72 @@ class ChatCommands:
             # Validate arguments and call command
             self.target(user, *self.params.parse_args(*args))
 
-    def __call__(self, func: typing.Callable):
-        ...
+        @property
+        def name(self): return self.target.__name__
 
+    HELP_SUBSECTION = 0
     def __init__(self):
         self.logger = RS.logger.getChild('CC')
         self.commands = {}
         self.aliases = {}
-    def register(self, cmd: 'ChatCommand') -> bool:
-        ...
+        self.help_sections = {self.HELP_SUBSECTION: {}}
+        
+    def __call__(self, func: typing.Callable[['User', ...], None] | None = None, **kwargs):
+        '''
+            Decorator to use register_func
+            Can be used as a decorator in two ways:
+              - No-arguments mode
+                @ChatCommands
+                def command(user: UserManager.User, ...): ...
+              - With arguments:
+                @ChatCommands(aliases={'cmd', 'c'}, permission=UserManager.Perm.ADMIN, help_section='help section')
+                def command(user: UserManager.User, ...): ...
+        '''
+        def wrapper(func: typing.Callable[['User', ...], None]):
+            self.register_func(**kwargs)
+            return func
+        if (func is not None):
+            if not callable(func):
+                raise TypeError(f'{func!r} must be a callable')
+            return wrapper(func)
+        return wrapper
+    
+    def register_func(self, func: typing.Callable[['User', ...], None], aliases: set = set(), *, permission: UserManager.Perm = UserManager.Perm.USER, help_section: str | None = None) -> ChatCommand:
+        cc = ChatCommand(func, permission=permission, help_section=help_section)
+        self.register(cc)
+        return cc
+    def register(self, cmd: ChatCommand, aliases: set = set()) -> bool:
+        if cmd.name in self.commands:
+            raise ValueError(f'Command name {cmd.name} is already taken')
+        if cmd.name in self.aliases:
+            raise ValueError(f'Command name {cmd.name} is already taken as an alias')
+        self.commands[cmd.name] = cmd
+        self.logger.infop(f'Registered {cmd.name}')
+        for a in aliases:
+            if a in self.aliases:
+                self.logger.error(f'Cannot register alias {a} -> {cmd.name} as it is already taken by {self.aliases[a].name}')
+                continue
+            self.logger.info(f'Registered alias: {a} -> {cmd.name}')
+            self.aliases[a] = cmd
+            cmd.aliases.add(a)
+        if cmd.help_section not in self.help_sections: self.help_sections[cmd.help_section] = {}
+        self.help_sections[cmd.help_section][cmd.name] = cmd
 
-    @staticmethod
-    def do_test():
-        def test(user: 'User', arg0: int, arg1: typing.Literal['arg1_1', 'arg1_2'], arg2: str = 'abc', arg3=None, arg4: int = None, *varargs): pass
-        return RS.CC.ChatCommand(test, RS.UM.Perm.USER, '')
+    def _register_helpsect(self, section: tuple[str], cmd: ChatCommand):
+        self._get_helpsubsect(self.help_sections, section)[cmd.name] = cmd
+    def _get_helpsubsect(self, container: dict, section: tuple[str]) -> dict:
+        if not len(section): return container[self.HELP_SUBSECTION]
+        if section[0] not in container[self.HELP_SUBSECTION]:
+            container[self.HELP_SUBSECTION][section[0]] = {self.HELP_SUBSECTION: {}}
+        return self._get_helpsubsect(container[self.HELP_SUBSECTION][section[0]], section[1:])
+
+    def help(self, subquery: str | None = None) -> typing.Generator[[str], None, None]:
+        '''
+            Returns either:
+              - all help sections if subquery is None
+              - all commands under a help section if subquery is a help section
+              - a command's help / arguments and aliases
+        '''
+        if subquery is None:
+            yield (self.help_sections)
+            return
