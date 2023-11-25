@@ -82,7 +82,7 @@ class Bootstrapper:
         log_grp.add_argument('--verbose-headers', help='Show longer headers in stderr logs', action='store_true')
         log_grp.add_argument('--no-color', help='Don\'t color output to stderr', action='store_true')
         p.add_argument('--update-only', help='Only download/update and execute the bootstrapper manifest, don\'t start the server', action='store_true')
-        unat_grp_ = p.add_argument_group()
+        unat_grp_ = p.add_argument_group('Unattended')
         unat_grp = unat_grp_.add_mutually_exclusive_group()
         unat_grp.add_argument('--unattended-install', help='When executing manifests, don\'t ask before installing new files', action='store_true')
         unat_grp.add_argument('--unattended-replace', help='When executing manifests, don\'t ask before replacing existing files', action='store_true')
