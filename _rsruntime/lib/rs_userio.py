@@ -25,11 +25,11 @@ class UserManager:
     # Permissions
     ## Insert comments
     Config['permissions/levels/__comment_0'] = 'Lower permission numbers are more \'powerful\'.'
-    Config['permissions/levels/__comment_0'] = 'In the config `users/[uuid]/permissions`, permissions can be given as strings (corresponding to keys in the config `permissions/levels/`), or as integers.'
-    Config['permissions/levels/__comment_0'] = ' Permission level names are always given as, or converted to, uppercase'
-    Config['permissions/levels/__comment_0'] = ' Permission level values are always positive integers, being silently set to 255 if they are not and cannot be converted'
-    Config['permissions/levels/__comment_0'] = 'The excessive number of default permissions are more for example/documentational use than for real use, but are put in anyway.'
-    Config['permissions/levels/__comment_0'] = 'The large gaps in the default permissions are to allow modification if, somehow, finer control is needed.',
+    Config['permissions/levels/__comment_1'] = 'In the config `users/[uuid]/permissions`, permissions can be given as strings (corresponding to keys in the config `permissions/levels/`), or as integers.'
+    Config['permissions/levels/__comment_2'] = ' Permission level names are always given as, or converted to, uppercase'
+    Config['permissions/levels/__comment_3'] = ' Permission level values are always positive integers, being silently set to 255 if they are not and cannot be converted'
+    Config['permissions/levels/__comment_4'] = 'The excessive number of default permissions are more for example/documentational use than for real use, but are put in anyway.'
+    Config['permissions/levels/__comment_5'] = 'The large gaps in the default permissions are to allow modification if, somehow, finer control is needed.',
     
     ## Insert defaults
     Config.mass_set_default('permissions/levels',
