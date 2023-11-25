@@ -92,9 +92,13 @@ class Bootstrapper:
     def setup_logger(self) -> logging.Logger:
         log_path = (Path.cwd() / '_rslog')
         log_path.mkdir(exist_ok=True)
-        # Create new logging level
+        # Create new logging levels
+        ## INFO+ level
         logging.INFOPLUS = logging.INFO + ((logging.WARNING - logging.INFO) // 2)
         logging.getLoggerClass().infop = functools.partialmethod(logging.getLoggerClass().log, logging.INFOPLUS)
+        ## Irrecoverable level
+        logging.IRRECOVERABLE = logging.FATAL * 2
+        logging.getLoggerClass().irrec = functools.partialmethod(logging.getLoggerClass().log, logging.IRRECOVERABLE)
         # Setup formatters
         class ColoredFormatter(logging.Formatter):
             FG_GRAY        = '\x1b[37m'
@@ -107,12 +111,13 @@ class Bootstrapper:
             RESET          = '\x1b[0m'
 
             _level_to_color = {
-                logging.DEBUG:    FG_GRAY,
-                logging.INFO:     FG_DGREEN,
-                logging.INFOPLUS: FG_LGREEN,
-                logging.WARNING:  FG_YELLOW,
-                logging.ERROR:    FG_LRED,
-                logging.FATAL:    FG_DRED,
+                logging.DEBUG:         FG_GRAY,
+                logging.INFO:          FG_DGREEN,
+                logging.INFOPLUS:      FG_LGREEN,
+                logging.WARNING:       FG_YELLOW,
+                logging.ERROR:         FG_LRED,
+                logging.FATAL:         FG_DRED,
+                logging.IRRECOVERABLE: FG_GRAY_BG_RED,
             }
             
             def format(self, record: logging.LogRecord) -> str:
@@ -157,12 +162,13 @@ class Bootstrapper:
         dfile_h.rotator = lambda src,dst: Path(src).unlink()
         logger.addHandler(dfile_h)
         # Set loglevel names
-        logging.addLevelName(logging.DEBUG, 'DEBG')
-        logging.addLevelName(logging.INFO, 'INFO')
-        logging.addLevelName(logging.INFOPLUS, 'INF+')
-        logging.addLevelName(logging.WARNING, 'WARN')
-        logging.addLevelName(logging.ERROR, 'ERRO')
-        logging.addLevelName(logging.CRITICAL, 'CRIT')
+        logging.addLevelName(logging.DEBUG,         'DEBG')
+        logging.addLevelName(logging.INFO,          'INFO')
+        logging.addLevelName(logging.INFOPLUS,      'INF+')
+        logging.addLevelName(logging.WARNING,       'WARN')
+        logging.addLevelName(logging.ERROR,         'ERRO')
+        logging.addLevelName(logging.CRITICAL,      'CRIT')
+        logging.addLevelName(logging.IRRECOVERABLE, 'IREC')
         # Finish up
         self.root_logger = logger
         return logger
@@ -212,9 +218,9 @@ class Bootstrapper:
     ## Shutdown functions
     def close(self, do_exit: bool | int = False):
         if self.is_closed: return
-        self.logger.fatal('Instructed to perform orderly shutdown, executing shutdown callbacks...')
+        self.logger.irrec('Instructed to perform orderly shutdown, executing shutdown callbacks...')
         for h in self.shutdown_callbacks: h()
-        self.logger.error(f'Closing logger{f" and exiting with code {do_exit}" if do_exit is not False else ""}, goodbye!')
+        self.logger.irrec(f'Closing logger{f" and exiting with code {do_exit}" if do_exit is not False else ""}, goodbye!')
         logging.shutdown()
         if do_exit is False: self.is_closed = True
         else: exit(do_exit)
