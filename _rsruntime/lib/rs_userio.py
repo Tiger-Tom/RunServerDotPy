@@ -344,9 +344,10 @@ class ChatCommands:
                                    char=Config['chat_commands/patterns/char'],
                                    argsep=Config['chat_commands/arguments/argsep'],
                                    command=Config['chat_commands/arguments/argsep'].join((
-                                       Config['chat_commands/help/command'],
-                                       Config['chat_commands/help/section/subcommand'],
-                                       sect)), args=''),
+                                               Config['chat_commands/help/command'],
+                                               Config['chat_commands/help/section/subcommand'],
+                                               sect)),
+                                   args=''),
                                hover_event=TellRaw.HoverEvent.TEXT,
                                hover_contents=(Config['chat_commands/help/section/hover'],))
                 for sect, text in secttexts)
