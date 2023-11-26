@@ -21,6 +21,10 @@ class Config(INIBackedDict):
         super().__init__(self.conf_path, 60.0)
         self.start_autosync()
         RS.BS.register_onclose(self.close)
+    def set_default(self, option: str | tuple[str], value: typing.Any):
+        '''Sets an option if it does not exist'''
+        if option not in self:
+            self[option] = value
     def mass_set_default(self, pfx: str | None = None, dict_vals: dict[str, ...] | None = None, **values: dict[str, ...]):
         '''
             Sets a large amount of default values
@@ -48,7 +52,7 @@ class Config(INIBackedDict):
         if len(values) == 0:
             self.logger.error(f'Instructed to set mass default of 0 values?')
             return
-        self.logger.infop(f'Setting mass default on {len(values)} value(s)')
+        self.logger.info(f'Setting mass default on {len(values)} value(s)')
         with self.lock:
             # Store bg loop
             resume = self.is_autosyncing()
@@ -58,7 +62,7 @@ class Config(INIBackedDict):
             if pfx is None: pfx = ''
             elif not pfx.endswith('/'): pfx = f'{pfx}/'
             for k,v in values.items():
-                self(f'{pfx}{k}', v)
+                self.set_default(f'{pfx}{k}', v)
             # Resume bg loop if needed
             if resume: self.start_autosync()
     def close(self):
