@@ -45,7 +45,7 @@ class Config(INIBackedDict):
                 if dict_vals[k] == values[k]: continue
                 raise ValueError(f'''Cannot resolve *A* (there could be more!) mismatched duplicate key from dict_vals and **values:
                     dict_vals[{k!r}] = {dict_vals[k]!r}
-                    values    = {values[k]!r}''')
+                    values   [{k!r}] = {values[k]!r}''')
             values |= dict_vals
         if len(values) == 0:
             self.logger.error(f'Instructed to set mass default of 0 values?')
