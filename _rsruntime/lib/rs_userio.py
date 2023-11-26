@@ -315,18 +315,18 @@ class ChatCommands:
         if cmd.name in self.aliases:
             raise ValueError(f'Command name {cmd.name} is already taken as an alias')
         self.commands[cmd.name] = cmd
-        self.logger.infop(f'Registered {cmd.name}')
         for a in aliases:
             if a in self.commands:
                 self.logger.error(f'Cannot register alias {a} -> {cmd.name} as it is already taken by {self.commands[a].name}')
                 continue
             if a in self.aliases:
-                self.logger.error(f'Cannot register alias {a} -> {cmd.name} as it is already taken by {self.aliases[a].name}')
+                self.logger.error(f'Cannot register alias {a} -> {cmd.name} as it is already taken by {self.aliases[a].name} (alias)')
                 continue
             self.logger.info(f'Registered alias: {a} -> {cmd.name}')
             self.aliases[a] = cmd
             cmd.aliases.add(a)
         self._register_helpsect(cmd.help_section, cmd)
+        self.logger.infop(f'Registered command {cmd.name}{" <- " if cmd.aliases else ""}{" | ".join(cmd.aliases)}')
 
     def _register_helpsect(self, section: tuple[str], cmd: ChatCommand):
         self._get_helpsubsect(self.help_sections, section, True)[cmd.name] = cmd
