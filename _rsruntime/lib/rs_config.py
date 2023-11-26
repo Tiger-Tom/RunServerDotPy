@@ -65,4 +65,5 @@ class Config(INIBackedDict):
             if resume: self.start_autosync()
     def close(self):
         self.stop_autosync()
+        self.sort()
         self.sync()
