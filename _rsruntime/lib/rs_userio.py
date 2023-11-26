@@ -172,22 +172,11 @@ class TellRaw(list):
     '''
     __slots__ = ()
 
-    class TextFormat(IntFlag):
-        _NONE         =     0b00000
-        BOLD          = B = 0b00001 
-        ITALIC        = I = 0b00010
-        UNDERLINED    = U = 0b00100
-        STRIKETHROUGH = S = 0b01000
-        OBFUSCATED    = U = 0b10000
-
-        def render(self): ...
-            
-    TextFormat = IntFlag('TextFormat', ('BOLD', 'ITALIC', 'UNDERLINE', 'STRIKETHROUGH', 'OBFUSCATE'))
-    TextFormat.render = lambda self: ...
-    #class TextFormat(Enum):
-        #color: str | typing.Literal[False] = False
-    #    def __call__(self):
-    #        return {k: v for k,v in dataclasses.asdict(self).items() if v is not False}
+    TextFormat = TF = IntFlag('TextFormat', ('BOLD', 'ITALIC', 'UNDERLINED', 'STRIKETHROUGH', 'OBFUSCATED'))
+    TF.B = TF.BOLD; TF.I = TF.ITALIC; TF.U = TF.UNDERLINED; TF.S = TF.STRIKETHROUGH; TF.O = TF.OBFUSCATED
+    TextFormat.NONE = TextFormat.BOLD ^ TextFormat.BOLD
+    TextFormat.ALL = TextFormat.BOLD | ~TextFormat.BOLD
+    TextFormat.render = lambda self: {fmt.name: True for fmt in self}
 
     def render(self):
         return json.dumps(self)
@@ -195,7 +184,7 @@ class TellRaw(list):
     TextType = Enum('TextType', {'TEXT': 'text', 'SELECTOR': 'selector', 'SCORE': 'score', 'KEYBIND': 'keybind'})
     ClickEvent = Enum('ClickEvent', {'OPEN_URL': 'open_url', 'RUN_COMMAND': 'run_command', 'SUGGEST_COMMAND': 'suggest_command', 'COPY': 'copy'})
     HoverEvent = Enum('HoverEvent', {'TEXT': 'show_text', 'ITEM': 'show_item', 'ENTITY': 'show_entity'})
-    def text(self, text: str, fmt: TextFormat | dict = TextFormat, *,
+    def text(self, text: str, color: str | None = None, fmt: TextFormat | dict = TextFormat.NONE*,
              insertion: str | None = None,
              type: TextType = TextType.TEXT, objective: None | str = None,
              click_event: ClickEvent | None = None, click_contents: None | str = None,
@@ -206,7 +195,7 @@ class TellRaw(list):
                     SELECTOR, in which case text is the selector type
                     SCORE, in which case text is the name of the player
                     KEYBIND, in which case text is the ID of the keybind
-                fmt is the format to formatting to apply to the text
+                fmt is the formatting to apply to the text
                 insertion is text that is entered into the user's chat-box when the text is shift-clicked
                 type should be self-explanatory
                 objective is None unless type is SCORE, in which case objective is the scoreboard objective
@@ -218,13 +207,16 @@ class TellRaw(list):
         # type, text, objective
         assert isinstance(type, self.TextType)
         assert isinstance(text, str)
-        assert not ((type is self.TextType.SCORE) ^ isinstance(objective, str)) # ensure that objective is a string if type is TextType.SCORE
+        assert not ((type is self.TextType.SCORE) ^ isinstance(objective, str)) # ensure that objective is a string if, and only if, type is TextType.SCORE
         obj = {'score': {'name': text, 'objective': objective}} if (type is self.TextType.SCORE) else {type.value: text}
+        # color
+        if color is not None:
+            assert isinstance(color, str)
+            obj['color'] = color
         # fmt
         if fmt is not None:
             assert isinstance(fmt, (self.TextFormat, dict))
-            if isinstance(fmt, self.TextFormat): obj |= fmt()
-            else: obj |= fmt
+            obj |= (fmt.render() if isinstance(fmt, self.TextFormat) else fmt)
         # insertion
         if insertion is not None:
             assert isinstance(insertion, str)
