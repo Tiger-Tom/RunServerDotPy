@@ -118,6 +118,8 @@ class RunServer(types.ModuleType):
             self.logger.debug(f'{l} = {s} = {module}.{n} [T+{pc}]')
     def __call__(self):
         self.logger.infop('Entrypoint starting')
+        # Registering help command
+        self.CC.register_func(self.CC.help, {'?',})
         # Instantiate ServerManager
         self.ServerManager = self.SM = self.ServerManager()
         # Start plugins
