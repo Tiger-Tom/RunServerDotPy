@@ -183,7 +183,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     __setitem__ = setitem
     ## Containing
     @locked
-    def contains(self, key: Key, *, _tree: MutableMapping | None) -> bool:
+    def contains(self, key: Key, *, _tree: MutableMapping | None = None) -> bool:
         '''Returns whether or not the key exists'''
         key = self.key(key) if (_tree is None) else key
         sect = self._gettree(key, make_if_missing=False, fetch_if_missing=True, no_raise_keyerror=True) if (_tree is None) else _tree
