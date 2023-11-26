@@ -151,6 +151,8 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
         if set_default: self.setitem(key, default, _tree=_tree)
         return default
     __call__ = bettergetter
+    @abstractmethod
+    def sort(self, by: typing.Callable[[str | tuple[str]], typing.Any] = lambda k: k): NotImplemented
     
     # Med-level item manipulation
     ## Getting
@@ -271,6 +273,14 @@ class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Dese
         self._init_topkey(topkey)
         self._data[topkey].read_string(value)
 
+    def sort(self, by: typing.Callable[[str | tuple[str]], typing.Any] = lambda k: k):
+        '''Sorts the data of this INIBackedDict in-place, marking all touched sections as dirty'''
+        for top,cfg in self._data.items():
+            self.dirty.add(top)
+            cfg._sections = dict(sorted(cfg._sections.items(), key=lambda it: by((it[0],))))
+            for sname,ssect in cfg._sections.items():
+                cfg._sections[sname] = dict(sorted(ssect.items(), key=lambda it: by(tuple(it[0].split('.')))))
+
     _serialize_translations = {
         Ellipsis: '...',
         True: 'yes', False: 'no',
@@ -353,6 +363,19 @@ class JSONBackedDict(FileBackedDict[_JSON_Serializable, _JSON_Serialized, _JSON_
         return json.dumps(self._data[topkey])
     def _from_string(self, topkey: str, value: str):
         self._init_topkey(topkey, _val=json.loads(value))
+
+    @classmethod
+    def _sorteddict(cls, data: dict[str, dict | typing.Any], keys: tuple[str], by: typing.Callable[[tuple[str]], typing.Any]) -> dict[str, dict | typing.Any]:
+        sdata = {}
+        for k,v in sorted(data.items(), key=lambda it: by(keys+(it[0],))):
+            sdata[k] = self._sorteddict(v, keys+(k,), by) if isinstance(v, dict) else v
+        return sdata
+    def sort(self, by: typing.Callable[[tuple[str]], typing.Any] = lambda k: k):
+        '''Sorts the data of this JSONBackedDict (semi-)in-place, marking all touched sections as dirty'''
+        for top,dat in self._data.items():
+            self.dirty.add(top)
+            self._data[top] = self._sorteddict(dat, (top,), by)
+        
 
     def _serialize(self, val: _JSON_Serializable) -> _JSON_Serialized:
         return val
