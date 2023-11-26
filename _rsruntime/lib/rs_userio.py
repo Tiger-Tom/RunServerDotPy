@@ -171,17 +171,13 @@ class TellRaw(list):
         Who doesn't want object-oriented TellRaws???
     '''
     __slots__ = ()
-    
-    @dataclasses.dataclass(slots=True)
-    class TextFormat:
-        color: str | typing.Literal[False] = False
-        bold: bool = False
-        italic: bool = False
-        underlined: bool = False
-        strikethrough: bool = False
-        obfuscated: bool = False
-        def __call__(self):
-            return {k: v for k,v in dataclasses.asdict(self).items() if v is not False}
+
+    TextFormat = Flag('TextFormat', ('BOLD', 'ITALIC', 'UNDERLINE', 'STRIKETHROUGH', 'OBFUSCATE'))
+    TextFormat.render = lambda self: ...
+    #class TextFormat(FlagEnum):
+        #color: str | typing.Literal[False] = False
+    #    def __call__(self):
+    #        return {k: v for k,v in dataclasses.asdict(self).items() if v is not False}
 
     def render(self):
         return json.dumps(self)
@@ -189,7 +185,7 @@ class TellRaw(list):
     TextType = Enum('TextType', {'TEXT': 'text', 'SELECTOR': 'selector', 'SCORE': 'score', 'KEYBIND': 'keybind'})
     ClickEvent = Enum('ClickEvent', {'OPEN_URL': 'open_url', 'RUN_COMMAND': 'run_command', 'SUGGEST_COMMAND': 'suggest_command', 'COPY': 'copy'})
     HoverEvent = Enum('HoverEvent', {'TEXT': 'show_text', 'ITEM': 'show_item', 'ENTITY': 'show_entity'})
-    def text(self, text: str, fmt: TextFormat | dict = TextFormat(), *,
+    def text(self, text: str, fmt: TextFormat | dict = TextFormat, *,
              insertion: str | None = None,
              type: TextType = TextType.TEXT, objective: None | str = None,
              click_event: ClickEvent | None = None, click_contents: None | str = None,
