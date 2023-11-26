@@ -20,8 +20,11 @@ from RS.Util import Hooks, PerfCounter
 #> Header >/
 class MCLang:
     __slots__ = ('logger', 'lang', 'version_info')
-
     prefix = re.compile(r'^\[(?P<time>[0-9:]{8})\] \[(?P<thread>[^/]+)/(?P<level>[A-Z]+)\]: (?P<line>.*?)$')
+
+    # Setup config
+    Config.mass_set_default('minecraft/path', base='./minecraft/', server_jar='server.jar')
+    Config.mass_set_default('minecraft/lang_parser', version=None, lang='en_us')
     
     def __init__(self):
         self.logger = RS.logger.getChild('L')
@@ -75,14 +78,14 @@ class MCLang:
         '''Extracts the language file from a server JAR file, sets and returns self.lang'''
         self.logger.debug('Extracting lang')
         pc = PerfCounter()
-        jzp = zipfile.Path(Path(Config('minecraft/path/base', './minecraft'), Config('minecraft/path/server_jar', 'server.jar')))
-        vers = Config('minecraft/lang_parser/version', None)
+        jzp = zipfile.Path(Path(Config['minecraft/path/base'], Config['minecraft/path/server_jar']))
+        vers = Config['minecraft/lang_parser/version']
         self.version_info = None
         with (jzp / 'version.json').open('r') as vf:
             self.version_info = json.load(vf)
         if vers is None: vers = self.version_info['id']
         with ((jzp / f'META-INF/versions/{vers}/server-{vers}.jar').open('rb') as vzf,
-              zipfile.Path(vzf, f'assets/minecraft/lang/{Config("minecraft/lang_parser/lang", "en_us")}.json').open('r') as lf):
+              zipfile.Path(vzf, f'assets/minecraft/lang/{Config["minecraft/lang_parser/lang"]}.json').open('r') as lf):
             self.lang = json.load(lf)
             self.logger.infop(f'Loaded lang in {pc}')
             return self.lang

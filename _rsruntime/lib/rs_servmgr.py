@@ -34,6 +34,13 @@ from RS.Util import Hooks, PerfCounter
 class BaseServerManager(ABC):
     __slots__ = ('logger', 'hooks', 'managers')
     basemanagers = SimpleNamespace()
+
+    # Setup config
+    Config.set_default('server_manager/command_line', '{java_binary} {java_args} {server_jar_path} {server_args}')
+    Config.mass_set_default('java/', java_binary='java', java_args='-Xmx{allocated_ram} -Xms{allocated_ram} -jar')
+    Config.mass_set_default('minecraft/', allocated_ram='1024M', server_args='--nogui')
+    Config.mass_set_default('path/', base='./minecraft', server_jar='server.jar')
+    
     def __init__(self):
         self.logger = RS.logger.getChild(f'SM<{self.name}>')
         self.hooks = Hooks.SingleHook()
@@ -79,11 +86,11 @@ class BaseServerManager(ABC):
         return '/'.join(t for c in cls.__mro__[cls.__mro__.index(BaseServerManager)-1::-1] for t in c._type)
     @staticmethod
     def cli_line() -> list:
-        return shlex.split(Config('server_manager/command_line', '{java_binary} {java_args} {server_jar_path} {server_args}').format(
-            java_binary = Config('java/java_binary', 'java'),
-            java_args = Config('java/java_args', '-Xmx{allocated_ram} -Xms{allocated_ram} -jar').format(allocated_ram=Config('minecraft/allocated_ram', '1024M')),
-            server_jar_path = (Path(Config('minecraft/path/base', './minecraft')) / Config('minecraft/path/server_jar', 'server.jar')).absolute(),
-            server_args = Config('minecraft/server_args', '--nogui'),
+        return shlex.split(Config['server_manager/command_line'].format(
+            java_binary = Config['java/java_binary'],
+            java_args = Config['java/java_args'].format(allocated_ram=Config['minecraft/allocated_ram']),
+            server_jar_path = (Path(Config['minecraft/path/base']) / Config['minecraft/path/server_jar']).absolute(),
+            server_args = Config['minecraft/server_args'],
         ))
 
     # Set config defaults
@@ -137,10 +144,8 @@ class BasePopenManager(BaseServerManager):
     cap_restartable = True
     
     def start(self):
-        self.popen = subprocess.Popen(self.cli_line(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, text=True, cwd=Config('minecraft/path/base', './minecraft'))
+        self.popen = subprocess.Popen(self.cli_line(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, text=True, cwd=Config['minecraft/path/base'])
 
-    # Set config defaults
-    Config('minecraft/path/base', './minecraft')
 # Manager
 class ServerManager:
     managers = SimpleNamespace()
@@ -191,21 +196,32 @@ class ServerManager:
 class ScreenManager(BaseServerManager):
     __slots__ = ('screen',)
     _type = ('screen',)
+
+    # Setup config
+    Config.mass_set_default('server_manager/screen/',
+        binary         = 'screen',
+        name           = 'RS_ScreenManager_mcserverprocess',
+        encoding       = sys.getdefaultencoding(),
+        reset_log      = True,
+        log_fifo       = './_rslog/screen.%(name)s.fifo',
+        log_flush_secs = 1,
+    )
+    
     def __init__(self):
         super().__init__()
-        if shutil.which(Config('server_manager/screen/binary', 'screen')) is None:
+        if shutil.which(Config['server_manager/screen/binary']) is None:
             raise FileNotFoundError('ScreenManager requires the `screen` binary!')
-        self.screen = self.Screen(Config('server_manager/screen/name', 'RS_ScreenManager_mcserverprocess'), self.cli_line())
+        self.screen = self.Screen(Config['server_manager/screen/name'], self.cli_line())
     class Screen:
         __slots__ = ('name', 'cmdline')
         def __init__(self, name: str, cmdline: tuple[str]):
             self.name = shlex.quote(name)
             self.cmdline = ' '.join(cmdline)
         @property
-        def _cmd_pfx(self) -> tuple[str]: return (Config('server_manager/screen/binary', 'screen'), '-x', self.name)
+        def _cmd_pfx(self) -> tuple[str]: return (Config['server_manager/screen/binary'], '-x', self.name)
         # Commands
         def run_screen_cmd(self, *cmd: tuple[str]) -> str:
-            return subprocess.check_output(self._cmd_pfx+cmd).decode(Config('server_manager/screen/encoding', sys.getdefaultencoding()))
+            return subprocess.check_output(self._cmd_pfx+cmd).decode(Config['server_manager/screen/encoding'])
         def run_screen_noout(self, *cmd: tuple[str]) -> int:
             return subprocess.call(self._cmd_pfx+cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         # Status
@@ -214,24 +230,19 @@ class ScreenManager(BaseServerManager):
             return not self.run_screen_noout('-X', 'info')
         # Logging
         def setup_logfifo(self) -> Path:
-            if Config('server_manager/screen/reset_log', True): self.run_screen_cmd('-X', 'log', 'off')
-            path = Path(Config('server_manager/screen/log_fifo', f'./_rslog/screen.{self.name}.fifo'))
+            if Config['server_manager/screen/reset_log']: self.run_screen_cmd('-X', 'log', 'off')
+            path = Path(Config['server_manager/screen/log_fifo'])
             if not path.exists(): os.mkfifo(path)
             self.run_screen_cmd('-X', 'log', 'on')
             self.run_screen_cmd('-X', 'logfile', str(path))
-            self.run_screen_cmd('-X', 'logfile', 'flush', str(Config('server_manager/screen/log_flush_secs', 1)))
+            self.run_screen_cmd('-X', 'logfile', 'flush', str(Config['server_manager/screen/log_flush_secs']))
         # Start/stop
         def start(self):
-            subprocess.call((shutil.which(Config('server_manager/screen/binary', 'screen')), '-dmS', self.name))
+            subprocess.call((shutil.which(Config['server_manager/screen/binary']), '-dmS', self.name))
         def stop(self):
             self.run_screen_noout('-X', 'kill')
     def start(self): raise NotImplementedError
     def write(self): raise NotImplementedError
-
-    # Set config defaults
-    Config('server_manager/screen/binary', 'screen')
-    Config('server_manager/screen/name', 'RS_ScreenManager_mcserverprocess')
-    Config('server_manager/screen/encoding', sys.getdefaultencoding())
     
     cap_arbitrary_read = True
     cap_arbitrary_write = True
@@ -244,13 +255,20 @@ class ScreenManager(BaseServerManager):
 class RConManager(BaseServerManager):
     __slots__ = ()
     _type = ('remote', 'passwd')
-    
+
+    # Setup config
+    Config.mass_set_default('minecraft/rcon/',
+        host     = '127.0.0.1',
+        port     = 25575,
+        password = None,
+    )
+
     def __init__(self):
         super().__init__()
         if RCONClient is None:
             raise ModuleNotFoundError('RCon module is required for RConManager!')
-        if not Config('minecraft/rcon/enabled', False): raise RuntimeError('RCon is not enabled! (set it up in config: minecraft/rcon/enabled)')
-        self.remote = f'{Config("minecraft/rcon/host", "127.0.0.1")}:{Config("minecraft/rcon/port", 25575)}'
+        if not Config['minecraft/rcon/enabled']: raise RuntimeError('RCon is not enabled! (set it up in config: minecraft/rcon/enabled)')
+        self.remote = f'{Config["minecraft/rcon/host"]}:{Config["minecraft/rcon/port"]}'
         self.logger.infop(f'RCon remote: {self.remote} (can be set in config minecraft/rcon/)')
         self.rconpwd = Config('minecraft/rcon/password', None)
         if self.rconpwd is None:
@@ -259,11 +277,6 @@ class RConManager(BaseServerManager):
         raise NotImplementedError
     def start(self): raise NotImplementedError
     def write(self): raise NotImplementedError
-
-    # Set config defaults
-    Config('minecraft/rcon/host', '127.0.0.1')
-    Config('minecraft/rcon/port', 25575)
-    Config('minecraft/rcon/password', None)
 
     cap_arbitrary_read = False
     cap_arbitrary_write = True
@@ -276,7 +289,7 @@ class RConManager(BaseServerManager):
     @property
     def bias(cls) -> float:
         if RCONClient is None: return -float('inf')
-        if Config('minecraft/rcon/enabled', False):
+        if Config['minecraft/rcon/enabled']:
             return 10.0
         return -255.0 #RConManager should be manually selected
 class SelectManager(BasePopenManager):

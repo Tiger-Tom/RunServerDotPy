@@ -117,6 +117,23 @@ class ChatCommands:
 
     class Params:
         __slots__ = ('params', 'args_line')
+
+        # Setup config
+        Config.set_default('chat_commands/arguments/argsep', ' ')
+        Config.mass_set_default('chat_commands/help/formatter/argument/brackets/',
+            required         = '<{argstr}>',
+            required_literal = '({argstr})',
+            optional         = '[{argstr}]',
+            variadic         = '[{argstr}...]',
+        )
+        Config.mass_set_default('chat_commands/help/formatter/argument/joiners/',
+            type = ':',
+            default = '=',
+            literals = '|',
+            union = '|',
+            tokens = '',
+        )
+        
         def __init__(self, func: typing.Callable):
             self.params = tuple(inspect.signature(func).parameters.values())[1:]
             self.args_line = self.render_args(self.params)
@@ -143,31 +160,31 @@ class ChatCommands:
 
         @classmethod
         def render_args(cls, args: tuple[inspect.Parameter]) -> str:
-            return Config('chat_commands/arguments/argsep', ' ').join(map(cls.render_arg, args))
+            return Config['chat_commands/arguments/argsep'].join(map(cls.render_arg, args))
 
         @classmethod
         def render_arg(cls, arg: inspect.Parameter) -> str:
             if (arg.kind == inspect.Parameter.KEYWORD_ONLY) or (arg.kind == arg.VAR_KEYWORD):
                 raise TypeError(f'Cannot handle param kind {arg.kind} (parameter {arg})')
-            braks = Config('chat_commands/help/formatter/argument/brackets/variadic', '[{argstr}...]')           if (arg.kind == arg.VAR_POSITIONAL) \
-                    else Config('chat_commands/help/formatter/argument/brackets/optional', '[{argstr}]')         if (arg.default is not arg.empty) \
-                    else Config('chat_commands/help/formatter/argument/brackets/required_literal', '({argstr})') if (getattr(arg.annotation, '__origin__', None) is typing.Literal) \
-                    else Config('chat_commands/help/formatter/argument/brackets/required', '<{argstr}>')
+            braks = Config['chat_commands/help/formatter/argument/brackets/variadic']              if (arg.kind == arg.VAR_POSITIONAL) \
+                    else Config['chat_commands/help/formatter/argument/brackets/optional']         if (arg.default is not arg.empty) \
+                    else Config['chat_commands/help/formatter/argument/brackets/required_literal'] if (getattr(arg.annotation, '__origin__', None) is typing.Literal) \
+                    else Config['chat_commands/help/formatter/argument/brackets/required']
             build = [arg.name]
             if (a := arg.annotation) is not arg.empty:
-                build.append(Config('chat_commands/help/formatter/argument/joiners/type', ':'))
+                build.append(Config['chat_commands/help/formatter/argument/joiners/type'])
                 build.append(cls.render_annotation(a))
             if (arg.default is not arg.empty) and (arg.default is not None):
-                build.append(Config('chat_commands/help/formatter/argument/joiners/default', '='))
+                build.append(Config['chat_commands/help/formatter/argument/joiners/default'])
                 build.append(str(arg.default))
-            return braks.format(argstr=Config('chat_commands/help/formatter/argument/joiners/tokens', '').join(build))
+            return braks.format(argstr=Config['chat_commands/help/formatter/argument/joiners/tokens'].join(build))
         @classmethod
         def render_annotation(cls, ann: typing.Any) -> str:
             if ann in {None, type(None)}: return 'None'
             elif getattr(ann, '__origin__', None) is typing.Literal:
-                return Config('chat_commands/help/formatter/argument/joiners/literals', '|').join(cls.render_annotation(aa) for aa in ann.__args__ if aa not in {None, type(None)})
+                return Config['chat_commands/help/formatter/argument/joiners/literals'].join(cls.render_annotation(aa) for aa in ann.__args__ if aa not in {None, type(None)})
             elif (getattr(ann, '__origin__', None) is typing.Union) or isinstance(ann, UnionType):
-                return Config('chat_commands/help/formatter/argument/joiners/union', '|').join(cls.render_annotation(aa) for aa in ann.__args__ if aa not in {None, type(None)})
+                return Config['chat_commands/help/formatter/argument/joiners/union'].join(cls.render_annotation(aa) for aa in ann.__args__ if aa not in {None, type(None)})
             elif isinstance(ann, str): return ann
             else: return ann.__qualname__
             
@@ -187,9 +204,16 @@ class ChatCommands:
         '''
         __slots__ = ('target', 'permission', 'help_section', 'params', 'aliases', '_help')
 
+        # Setup config
+        Config.mass_set_default('chat_commands/', {
+            'patterns/command': r'[\w\d]+',
+            'help/no_help': '<no help supplied>'
+        })
+        
+
         def __init__(self, target: typing.Callable[['User', ...], None], *, permission: UserManager.Perm = UserManager.Perm.USER, help_section: str | tuple[str] = ()):
             self.target = target
-            assert re.fullmatch(Config('chat_commands/patterns/command', r'[\w\d]+'), self.name) is not None, f'Illegal command name {self.name}'
+            assert re.fullmatch(Config['chat_commands/patterns/command'], self.name) is not None, f'Illegal command name {self.name}'
             self.permission = permission
             self.help_section = help_section.split(self.HELP_SUBSECTIONS) if isinstance(help_section, str) else help_section
             self.params = RS.CC.Params(target)
@@ -210,8 +234,30 @@ class ChatCommands:
             lspace = len(min(re.finditer(r'^([ \t]+)[^ \t\n].*$', doc, re.MULTILINE), key=lambda m: len(m.group(1))).group(1))
             self._help = ('\n'.join(
                 line[lspace:]
-                for line in doc.split('\n'))) or Config('chat_commands/help/no_help', '<no help supplied>')
+                for line in doc.split('\n'))) or Config['chat_commands/help/no_help']
             return self._help
+
+    # Setup config
+    Config.mass_set_default('chat_commands/patterns/',
+        char='>',
+        line='{char}{command}{argsep}{args}',
+    )
+    Config.mass_set_default('chat_commands/help/', {
+        'command': 'help',
+        'formatter/aliassep': '|',
+        'command/hover': 'Shift-click to insert command',
+    })
+    Config.mass_set_default('chat_commands/help/section/',
+        subcommand = 'section',
+        list_item  = '- Section "{sect}"',
+        hover      = 'Shift-click for more information on this section',
+        top        = 'Top-level sections (shift-click a section for more help)',
+        skip_list  = (),
+    )
+        
+        
+        
+        
 
     HELP_SUBSECTIONS = 0
     def __init__(self):
@@ -291,26 +337,26 @@ class ChatCommands:
             container[self.HELP_SUBSECTIONS][section[0]] = {self.HELP_SUBSECTIONS: {}}
         return self._get_helpsubsect(container[self.HELP_SUBSECTIONS][section[0]], section[1:], create)
     def _help_section(self, sections: tuple[str], to_console: bool = False) -> typing.Iterator[TellRaw | str]:
-        secttexts = ((sect, Config('chat_commands/help/section/list_item', '- Section "{sect}"').format(sect=sect)) for sect in sections if sect is not self.HELP_SUBSECTIONS)
-        if to_console: return (secttext[1] for secttext in secttexts if secttext not in Config('chat_commands/help/section/skip_list', ()))
+        secttexts = ((sect, Config['chat_commands/help/section/list_item'].format(sect=sect)) for sect in sections if sect is not self.HELP_SUBSECTIONS)
+        if to_console: return (secttext[1] for secttext in secttexts if secttext not in Config['chat_commands/help/section/skip_list'])
         return (TellRaw().text(text,
-                               insertion=Config('chat_commands/patterns/line', '{char}{command}{argsep}{args}').format(
-                                   char=Config('chat_commands/patterns/char', '>'),
-                                   argsep=Config('chat_commands/arguments/argsep', ' '),
+                               insertion=Config['chat_commands/patterns/line'].format(
+                                   char=Config['chat_commands/patterns/char'],
+                                   argsep=Config['chat_commands/arguments/argsep'],
                                    command=Config['chat_commands/arguments/argsep'].join((
-                                       Config('chat_commands/help/command', 'help'),
+                                       Config['chat_commands/help/command'],
                                        Config['chat_commands/help/section/subcommand'],
                                        sect)), args=''),
                                hover_event=TellRaw.HoverEvent.TEXT,
-                               hover_contents=(Config('chat_commands/help/section/hover', 'Shift-click for more information on this section'),))
+                               hover_contents=(Config['chat_commands/help/section/hover'],))
                 for sect, text in secttexts)
-    def help(self, user: UserManager.User, on: str | typing.Literal[Config('chat_commands/help/section/subcommand', 'section')] | None = None, section: None | str = None):
+    def help(self, user: UserManager.User, on: str | typing.Literal[Config['chat_commands/help/section/subcommand']] | None = None, section: None | str = None):
         '''Docstring supplied later'''
         is_console = user == UserManager.CONSOLE
         if on is None:
-            Config('chat_commands/help/section/top', 'Top-level sections (shift-click a section for more help)')
+            Config['chat_commands/help/section/top']
             help_vals = self._help_section(sorted(self.help_sections.keys()), is_console)
-        elif on == Config('chat_commands/help/section/subcommand', 'section'):
+        elif on == Config['chat_commands/help/section/subcommand']:
             if section is None:
                 raise TypeError('Command missing an argument <section>')
             elif (sectc := self._get_helpsubsect(self.help_sections, section.split('/'), False)) is not None:
@@ -320,22 +366,22 @@ class ChatCommands:
             try: cmd = self[on]
             except KeyError: raise KeyError(f'Help for command/alias {on} not found')
             help_vals = (
-                    Config('chat_commands/patterns/line', '{char}{command}{args}').format(
+                    Config['chat_commands/patterns/line'].format(
                         char=Config['chat_commands/patterns/char'],
-                        command=Config('chat_commands/help/formatter/aliassep', '|').join((cmd.name, *cmd.aliases)),
+                        command=Config['chat_commands/help/formatter/aliassep'].join((cmd.name, *cmd.aliases)),
                         args=f' {cmd.params.args_line}'),
                     cmd.help,
                 ) if is_console else (
                     TellRaw() \
-                        .text(Config('chat_commands/patterns/line', '{char}{command}{args}').format(
+                        .text(Config['chat_commands/patterns/line'].format(
                                   char=Config['chat_commands/patterns/char'],
-                                  command=Config('chat_commands/help/formatter/aliassep', '|').join((cmd.name, *cmd.aliases)),
+                                  command=Config['chat_commands/help/formatter/aliassep'].join((cmd.name, *cmd.aliases)),
                                   args=f' {cmd.params.render_args()}'),
                               insertion=Config['chat_commands/patterns/line'].format(
                                   char=Config['chat_commands/patterns/char'],
                                   command=cmd.name, args=''),
                               hover_event=TellRaw.HoverEvent.TEXT,
-                              hover_contents=(Config('chat_commands/help/command/hover', 'Shift-click to insert command'),)),
+                              hover_contents=(Config['chat_commands/help/command/hover'],)),
                     TellRaw.text(cmd.help))
         if is_console: print('\n'.join(help_vals))
         else: user.tell(TellRaw.NEWLINE@help_vals)

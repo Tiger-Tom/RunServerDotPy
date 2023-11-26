@@ -40,18 +40,21 @@ class PluginManager:
         unnamed_plugin = Config('plugins/orphans/unnamed_plugin_name', '_UNNAMED_PLUGIN_')
         unnamed_plugin_by = Config('plugins/orphans/unnamed_plugin_by', '_UNNAMED_PLUGIN_BY_{}')
 
+        # Setup config
+        Config.mass_set_default('plugins/orphans', ignore_orphans=False, skip=())
+
         def __init__(self, pm: 'PluginManager'):
             self.pm = pm
             self.logger = self.pm.logger.getChild('ML')
         # Orphaned manifest handling
         def scrape_orphaned_manifests(self, base: Path):
             '''Under "base", finds all possible manifests and places them into their own folders'''
-            if Config('plugins/orphans/ignore_orphans', False):
+            if Config['plugins/orphans/ignore_orphans']:
                 self.logger.warning('Set to ignore orphans (config plugins/orphans/ignore_orphans)')
                 return
             for mf in set(base.glob('*.json', case_sensitive=False)) | set(base.glob('*manifest*', case_sensitive=False)):
                 if (not mf.is_file()) or (mf.suffix in {'.py', '.pyc'}): continue
-                if mf.name in Config('plugins/orphans/skip', ()):
+                if mf.name in Config['plugins/orphans/skip']:
                     self.logger.warning(f'Set to skip orphan {mf.name} (config plugins/orphans/skip)')
                     continue
                 try: man = BS.Manifest(mf)
@@ -110,24 +113,28 @@ class PluginManager:
             except Exception as e:
                 self.logger.fatal(f'Could not update or execute manifest {man.m_name} because:\n{"".join(traceback.format_exception(e))}\n skipping...')
             return True
+
+    # Setup config
+    Config.set_default('plugins/plugins_path', './_rsplugins/')
+    Config.mass_set_default('plugins/glob/', early_load='**/__early_load__.py', basic='**/__plugin__.py', standalone='**/*.rs.py')
     
     def __init__(self):
         self.logger = RS.logger.getChild('PM')
         self.ManifestLoader = self.ML = self._ManifestLoader(self)
         self.plugins = {}
     def early_load_plugins(self):
-        self.ML.scrape_orphaned_manifests(Path(Config('plugins/plugins_path', '_rsplugins/')))
+        self.ML.scrape_orphaned_manifests(Path(Config['plugins/plugins_path']))
         self.logger.infop('Loading manifests...')
         pc = PerfCounter()
         all(map(self.ML.update_execute, self.ML.discover_manifests(Path(Config['plugins/plugins_path']))))
         self.logger.infop(f'Manifests loaded after {pc}')
         pc = PerfCounter(sec='', secs='')
-        for p in Path(Config['plugins/plugins_path']).glob(Config('plugins/globs/early_load', '**/__early_load__.py')):
+        for p in Path(Config['plugins/plugins_path']).glob(Config['plugins/glob/early_load']):
             self.logger.infop(f'Executing early load on {p} (T+{pc})')
             
     def load_plugins(self):
         bp = Path(Config['plugins/plugins_path'])
-        self._traverse_plugins(sorted(set(bp.glob(Config('plugins/glob/basic', '**/__plugin__.py'))) | set(bp.glob(Config('plugins/glob/standalone', '**/*.rs.py')))), PerfCounter(sec='', secs=''))
+        self._traverse_plugins(sorted(set(bp.glob(Config['plugins/glob/basic'])) | set(bp.glob(Config['plugins/glob/standalone']))), PerfCounter(sec='', secs=''))
     def _traverse_plugins(self, paths: set, pc: PerfCounter):
         captured = set()
         for p in paths: # note: add follow_symlinks=True upon release of 3.13
