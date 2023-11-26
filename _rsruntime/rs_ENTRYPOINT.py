@@ -84,7 +84,7 @@ class RunServer(types.ModuleType):
         self.__setup_frommod('rs_servmgr', {
             ('ServerManager', 'SM'): 'ServerManager',
         }, call=False)
-        self.__setup_frommod('rs_userio', {
+        self.__setup_frommod('rs_usermgr', {
             ('UserManager', 'UM'): 'UserManager',
         })
         self.logger.debug(f'finish:load_3@T+{pc}')
