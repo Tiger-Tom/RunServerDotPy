@@ -13,7 +13,7 @@ import dataclasses
 import typing
 from types import UnionType
 from pathlib import Path
-from enum import Enum, Flag, IntEnum
+from enum import Enum, IntFlag, IntEnum
 #</Imports
 
 # RunServer Module
@@ -172,9 +172,19 @@ class TellRaw(list):
     '''
     __slots__ = ()
 
-    TextFormat = Flag('TextFormat', ('BOLD', 'ITALIC', 'UNDERLINE', 'STRIKETHROUGH', 'OBFUSCATE'))
+    class TextFormat(IntFlag):
+        _NONE         =     0b00000
+        BOLD          = B = 0b00001 
+        ITALIC        = I = 0b00010
+        UNDERLINED    = U = 0b00100
+        STRIKETHROUGH = S = 0b01000
+        OBFUSCATED    = U = 0b10000
+
+        def render(self): ...
+            
+    TextFormat = IntFlag('TextFormat', ('BOLD', 'ITALIC', 'UNDERLINE', 'STRIKETHROUGH', 'OBFUSCATE'))
     TextFormat.render = lambda self: ...
-    #class TextFormat(FlagEnum):
+    #class TextFormat(Enum):
         #color: str | typing.Literal[False] = False
     #    def __call__(self):
     #        return {k: v for k,v in dataclasses.asdict(self).items() if v is not False}
@@ -388,7 +398,7 @@ class ChatCommands:
         elif (c := self.aliases.get(cmd_or_alias, None)) is not None: return c
         raise KeyError(cmd_or_alias)
 
-    def run_command(self, user: User, line: str, not_secure: bool):
+    def run_command(self, user: UserManager.User, line: str, not_secure: bool):
         try:
             ...
         except Exception as e:
