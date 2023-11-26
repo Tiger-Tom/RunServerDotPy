@@ -1,8 +1,9 @@
 #!/bin/python3
 
 #> Imports
-from pathlib import Path
+import typing
 import warnings
+from pathlib import Path
 #</Imports
 
 # RunServer Module
@@ -32,13 +33,10 @@ class Config(INIBackedDict):
             Values are either given through dict_vals or **values (keyword args)
                 Using both is probably bad but not prohibited
                     A SyntaxWarning shall be issued upon you to remind you of your choices. 
-                If a value is in both:
-                    if it is the same in both, a UserWarning is issued
-                    if it is not the same in both, ValueError is raised
+                If a value is in both and is not the same, a ValueError is raised
                     Once this has been checked, they are merged together
             If a total of 0 values are given, an error is logged
-            If a total of 1 value is given, a warning is logged
-            Otherwise, an infop is logged decribing how many keys will be set
+            Otherwise, an info is logged decribing how many keys will be set
         '''
         if dict_vals is not None:
             if dict_vals.keys() and values.keys():
