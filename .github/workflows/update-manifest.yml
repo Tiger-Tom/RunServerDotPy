@@ -19,7 +19,9 @@ jobs:
           - name: "Explicitly install requirements"
             run: "python3 -m pip install -r requirements.txt"
           - name: "Extract key"
-            run: "echo ${{ secrets.MAN_KEY }} | base64 -d > ./key.pyk"
+            run: "echo $MAN_KEY | base64 -d > ./key.pyk"
+            env:
+                MAN_KEY: "${{ secrets.MAN_KEY }}"
           - name: "Use ./devel/rsruntime-updatemanifest.sh"
             run: "./devel/rsruntime-updatemanifest.sh 2>&1 /dev/null"
           - name: "Remove key"
