@@ -1,0 +1,31 @@
+name: Update Manifests
+on: workflow_dispatch
+#    push:
+#        branches: [ main ]
+#    workflow_dispatch:
+
+jobs:
+    name: Update _rsruntime/MANIFEST.ini
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+            python-version: '3.12'
+            cache: pip
+      - name: "Install cryptography"
+        run: pip install cryptography
+      - name: "Extract key"
+        run: "echo ${{ secrets.MAN_KEY }} | base64 -d > ./key.pyk"
+      - name: "Use ./devel/rsruntime-updatemanifest.sh"
+        run: "./devel/rsruntime-updatemanifest.sh > 2>&1 /dev/null"
+      - name: "Remove key"
+        run: "rm ./key.pyk"
+      - name: "Commit changes"
+        uses: Andro999b/push@v1.3
+        with:
+            github_token: ${{ secrets.GITHUB_TOKEN }}
+            branch: main
+            force: true
+            message: "${{ github.action }}[${{ github.id }}] triggered by ${{ github.actor }} ${{ github.sha }}"
+        
