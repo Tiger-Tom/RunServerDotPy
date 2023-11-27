@@ -22,7 +22,7 @@ jobs:
             env:
                 MAN_KEY: ${{ secrets.MAN_KEY }}
             run: |
-              echo "$MAN_KEY" | base64 -d > ./key.pyk
+              echo "$MAN_KEY" | python3 ./devel/pysign.py readinto ./key.pyk
           - name: "Use ./devel/rsruntime-updatemanifest.sh"
             run: "./devel/rsruntime-updatemanifest.sh 2>&1 /dev/null"
           - name: "Remove key"

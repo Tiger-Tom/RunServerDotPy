@@ -65,6 +65,9 @@ if (__name__ == '__main__') and ('idlelib.run' not in sys.modules):
     ep.add_argument('--no-headers', help='Don\'t print headers (key names and output mode names)', action='store_true')
     ep.add_argument('--col-names', help='The column names to print as headers (default: "private" "public")', nargs=2, default=('private', 'public'))
     ep.add_argument('path', help='The path to read the key from, defaults to reading from stdin', type=Path, default=None, nargs='?')
+    rp = sp.add_parser('readinto', help='Convert a key from Base85 to bytes')
+    rp.add_argument('dst', help='The path to write the key to, defaults to writing to stdout', type=Path, default=None, nargs='?')
+    rp.add_argument('src', help='The path to read the key from, defaults to reading from stdin', type=Path, default=None, nargs='?')
     args = p.parse_args()
     if args.mode == 'generate':
         key = create_key()
@@ -75,6 +78,11 @@ if (__name__ == '__main__') and ('idlelib.run' not in sys.modules):
             exit()
         with args.path.open('wb') as f:
             f.write(key.private_bytes_raw())
+        exit()
+    elif args.mode == 'readinto':
+        key = EdPrivK.from_private_bytes(base64.b85decode((input() if (args.src is None) else args.src.read_text()).strip()))
+        if args.dst is None: sys.stdout.buffer.write(key.private_bytes_raw())
+        else: args.dst.write_bytes(key.private_bytes_raw())
         exit()
     assert args.extract_pub or args.extract_priv, 'No keys selected for extraction'
     assert args.output or args.in_all, 'No output modes selected'
