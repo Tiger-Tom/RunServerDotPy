@@ -264,6 +264,15 @@ ManifestDict_ignore = typing.TypedDict("ManifestDict['ignore']", {
     'skip_all_files': bool,
     'skip_files': tuple[str],
 }, total=False)
+ManifestDict_format = typing.TypedDict("ManifestDict['format']", {
+    'terse': str,
+    'normal': str,
+    'verbose': str,
+    'verbose+': str,
+    'datefmt': str,
+    'aliasfmt': tuple[str, str],
+    'sysfmt': tuple[str, str, str],
+})
 ManifestDict = typing.TypedDict('ManifestDict', {
     '_': ManifestDict__,
     'creation': ManifestDict_creation,
@@ -271,6 +280,7 @@ ManifestDict = typing.TypedDict('ManifestDict', {
     'system': ManifestDict_system,
     'files': ManifestDict_files,
     'ignore': typing.NotRequired[ManifestDict_ignore],
+    'format': typing.NotRequired[ManifestDict_format],
 })
 ## Manifest class
 class Manifest(UserDict):
@@ -285,11 +295,13 @@ class Manifest(UserDict):
                  skip_verify_local: bool = False, skip_update: bool = False, skip_execute: bool = False,
                  ask_download: bool = True, ask_execute: bool = True):
         '''Verifies, upgrades, and executes this manifest'''
+        self.logger.infop(f'Local manifest:'); self._log_info()
         if not skip_verify_local:
             try: self.verify()
             except InvalidSignature:
                 self.logger.fatal(f'Local manifest has an invalid signature! Will continue anyway, but keep in mind that upstream manifests may fail as well')
         self.upgrade(ask_download)
+        self.logger.infop(f'(New) Local manifest:'); self._log_info()
         self.execute(ask_execute)
     # Self-updating
     def upgrade(self, ask: bool = True, override: bool = False):
@@ -544,6 +556,54 @@ class Manifest(UserDict):
     def verify(self, other: typing.Self | None = None):
         '''Verifies either this manifest or another with this manifest's public key'''
         self.d_pubkey.verify((self if other is None else other).d_sig, (self if other is None else other).compile())
+    # Information formatting
+    DEFAULT_FORMAT = {
+        'terse':   '\'{metadata.name}\' by {creation.by}',
+        'normal':  '\'{metadata.name}\' by {creation.by}{f_alias} (updated {fd_updated} to rev.{creation.nupdates}): "{metadata.description}"',
+        'verbose': '\'{metadata.name}\' by {creation.by}{f_alias}\n'
+                   '{metadata.description}\n'
+                   ' Created on {fd_created}, updated on {fd_updated} to rev.{creation.nupdates}\n'
+                   ' Contains {n_files} file(s) hashed with {_.hash_algorithm} ({_.encoding})\n'
+                   '  Signed with {_.pubkey!r} -> {_.signature!r}',
+        'verbose+': ...,
+        'datefmt': '%Y-%m-%d %H:%M:%S %Z',
+        'aliasfmt': ('', ' (AKA "{creation.aka}")'),
+        'sysfmt': ('<system info redacted>',
+                   '\n  OS: {system.os_name} ({system.architecture})\n  {system.python_implementation} {f_pyver}',
+                   '"{system.hostname}"\n  {system.platform} [{system.os_name}] {system.os_release} ({system.architecture})\n  {system.python_implementation} {f_pyver}'),
+    }
+    DEFAULT_FORMAT['verbose+'] = DEFAULT_FORMAT['verbose'] + '\n' \
+                                 ' Updates from:\n' \
+                                 '  Self: {metadata.manifest_upstream}\n' \
+                                 '  Contents: {metadata.content_upstream}\n' \
+                                 ' Generated on: (info level {system._info_level}): {f_system}'
+    def info(self, level: typing.Literal['terse', 'normal', 'verbose', 'verbose+'] = 'verbose+', force_default: bool = False) -> str:
+        fmt = (self.DEFAULT_FORMAT if (force_default or (self.get('format', None) is None)) else self['format'])
+        fmtdict = {k: types.SimpleNamespace() for k in self.keys()}
+        for ok,ns in fmtdict.items():
+            for ik,iv in self[ok].items(): setattr(ns, ik, iv)
+        fmtdict['f_alias'] = fmt['aliasfmt'][self['creation']['aka'] is not None].format_map(fmtdict)
+        for t in ('created', 'updated'):
+            fmtdict[f'fd_{t}'] = time.strftime(fmt['datefmt'], time.localtime(self['creation'][f'{t}_at'])).format_map(fmtdict)
+        if self['system']['_info_level'] == 0:
+            fmtdict['f_pyver'] = '<version info redacted>'
+            fmtdict['f_system'] = fmt['sysfmt'][0].format_map(fmtdict)
+        elif (s := self['system'])['_info_level'] == 1:
+            fmtdict['f_pyver'] = '.'.join(s['python_version'][:3])
+            fmtdict['f_system'] = fmt['sysfmt'][1].format_map(fmtdict)
+        elif (s := self['system'])['_info_level'] == 2:
+            fmtdict['f_pyver'] = f'{".".join(str(v) for v in s["python_version"][:3])} {s["python_version"][3]} {s["python_version"][4]}'
+            fmtdict['f_system'] = fmt['sysfmt'][2].format_map(fmtdict)
+        fmtdict['n_files'] = len(self['files'])
+        return fmt[level].format_map(fmtdict)
+    def _loglvl_to_infolvl(self) -> str:
+        lvl = self.logger.getEffectiveLevel()
+        if lvl < logging.INFO: return 'verbose+'
+        elif lvl < getattr(logging, 'INFOPLUS', logging.INFO): return 'verbose'
+        elif lvl < logging.WARNING: return 'normal'
+        return 'terse'
+    def _log_info(self, force_default: bool = False):
+        self.logger.infop(self.info(self._loglvl_to_infolvl(), force_default))
     # Generation
     class _ManifestFactory:
         __slots__ = ('Manifest',)
