@@ -43,7 +43,7 @@ RS = NotImplemented
 
 #> Header >/
 class Bootstrapper:
-    __slots__ = ('args', 'args_unknown', 'root_logger', 'logger', 'Manifest', 'shutdown_callbacks', 'is_closed', '__contained_RS_module', '__contained_RS')
+    __slots__ = ('args', 'args_unknown', 'root_logger', 'logger', 'Manifest', 'base_manifest', 'shutdown_callbacks', 'is_closed', '__contained_RS_module', '__contained_RS')
     # Remotes
     #dl_man = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e/manifest.json'
     dl_man = 'http://0.0.0.0:8000/manifest.json'
@@ -174,7 +174,7 @@ class Bootstrapper:
     # Bootstrapping
     ## Base function
     def bootstrap(self, close_after: bool = True):
-        self.base_manifest()
+        self.run_base_manifest()
         if self.args.update_only:
             self.logger.fatal('--update-only argument supplied, exiting')
             return
@@ -187,7 +187,7 @@ class Bootstrapper:
         self.chainload_entrypoint(RS)
         if close_after: self.close()
     ## Install and execute base manifest
-    def base_manifest(self):
+    def run_base_manifest(self):
         mp = Path('_rsruntime/MANIFEST.ini')
         if not mp.exists():
             self.logger.error(f'Manifest at {mp} does not exist, attempting to download')
@@ -196,9 +196,7 @@ class Bootstrapper:
                 self.logger.fatal(f'Could not fetch manifest from {self.dl_man}:\n{"".join(traceback.format_exception(e))}')
                 return
         self.logger.info(f'Loading in {mp}')
-        man = Manifest.from_file(mp)
-        man.upgrade()
-        man.execute()
+        self.base_manifest = Manifest.from_file(mp)()
     ## Load entrypoint
     def access_entrypoint(self, ep: str) -> types.ModuleType:
         fl = SourceFileLoader(f'{__package__}.RS', ep)
@@ -293,7 +291,7 @@ class Manifest(UserDict):
 
     def __call__(self, *,
                  skip_verify_local: bool = False, skip_update: bool = False, skip_execute: bool = False,
-                 ask_download: bool = True, ask_execute: bool = True):
+                 ask_download: bool = True, ask_execute: bool = True) -> typing.Self:
         '''Verifies, upgrades, and executes this manifest'''
         self.logger.infop(f'Local manifest:'); self._log_info()
         if not skip_verify_local:
@@ -303,6 +301,7 @@ class Manifest(UserDict):
         self.upgrade(ask_download)
         self.logger.infop(f'(New) Local manifest:'); self._log_info()
         self.execute(ask_execute)
+        return self
     # Self-updating
     def upgrade(self, ask: bool = True, override: bool = False):
         '''Updates the local manifest, verifying it and notifying the user of modified and stale files'''
