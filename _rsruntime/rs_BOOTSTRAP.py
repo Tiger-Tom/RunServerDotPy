@@ -45,8 +45,7 @@ RS = NotImplemented
 class Bootstrapper:
     __slots__ = ('args', 'args_unknown', 'root_logger', 'logger', 'Manifest', 'base_manifest', 'shutdown_callbacks', 'is_closed', '__contained_RS_module', '__contained_RS')
     # Remotes
-    #dl_man = 'https://gist.githubusercontent.com/Tiger-Tom/85a2e52d7f8550a70a65b749f65bc303/raw/8a922bb83e9cb724e1913082113168f4e3ccc99e/manifest.json'
-    dl_man = 'http://0.0.0.0:8000/manifest.json'
+    dl_man = 'https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy/v3.x.x/_rsruntime/MANIFEST.ini'
     # Logger formats
     log_fmt_short = '[$asctime] [$name/$threadName/$levelname]: $message'
     log_fmt_long = '[$asctime] [$name/$processName:$threadName<$module.$funcName[$lineno]>/$levelname]: $message'
