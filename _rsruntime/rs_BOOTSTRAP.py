@@ -293,13 +293,13 @@ class Manifest(UserDict):
                  skip_verify_local: bool = False, skip_update: bool = False, skip_execute: bool = False,
                  ask_download: bool = True, ask_execute: bool = True) -> typing.Self:
         '''Verifies, upgrades, and executes this manifest'''
-        self.logger.infop(f'Local manifest:'); self._log_info()
+        self.logger.infop(f'Local manifest: {self._log_info()}')
         if not skip_verify_local:
             try: self.verify()
             except InvalidSignature:
                 self.logger.fatal(f'Local manifest has an invalid signature! Will continue anyway, but keep in mind that upstream manifests may fail as well')
         self.upgrade(ask_download)
-        self.logger.infop(f'(New) Local manifest:'); self._log_info()
+        self.logger.infop(f'(New) Local manifest: {self._log_info()}')
         self.execute(ask_execute)
         return self
     # Self-updating
@@ -601,8 +601,8 @@ class Manifest(UserDict):
         elif lvl < getattr(logging, 'INFOPLUS', logging.INFO): return 'verbose'
         elif lvl < logging.WARNING: return 'normal'
         return 'terse'
-    def _log_info(self, force_default: bool = False):
-        self.logger.infop(self.info(self._loglvl_to_infolvl(), force_default))
+    def _log_info(self, force_default: bool = False) -> str:
+        return self.info(self._loglvl_to_infolvl(), force_default)
     # Generation
     class _ManifestFactory:
         __slots__ = ('Manifest',)
