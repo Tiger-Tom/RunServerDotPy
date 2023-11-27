@@ -5,7 +5,7 @@ on: workflow_dispatch
 #    workflow_dispatch:
 
 jobs:
-    name: Update _rsruntime/MANIFEST.ini
+    name: "Update _rsruntime/MANIFEST.ini"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
