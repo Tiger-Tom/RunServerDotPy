@@ -17,7 +17,7 @@ jobs:
           - name: "Extract key"
             run: "echo ${{ secrets.MAN_KEY }} | base64 -d > ./key.pyk"
           - name: "Use ./devel/rsruntime-updatemanifest.sh"
-            run: "./devel/rsruntime-updatemanifest.sh > 2>&1 /dev/null"
+            run: "./devel/rsruntime-updatemanifest.sh 2>&1 /dev/null"
           - name: "Remove key"
             run: "rm ./key.pyk"
           - name: "Commit changes"
