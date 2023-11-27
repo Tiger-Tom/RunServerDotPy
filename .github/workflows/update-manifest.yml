@@ -14,8 +14,6 @@ jobs:
             with:
                 python-version: '3.12'
                 cache: pip
-          - name: "Install cryptography"
-            run: pip install cryptography
           - name: "Extract key"
             run: "echo ${{ secrets.MAN_KEY }} | base64 -d > ./key.pyk"
           - name: "Use ./devel/rsruntime-updatemanifest.sh"
