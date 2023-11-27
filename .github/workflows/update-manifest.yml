@@ -14,6 +14,8 @@ jobs:
             with:
                 python-version: '3.12'
                 cache: pip
+          - name: "Print /bin/python3 version"
+            run: "/bin/python3 --version"
           - name: "Extract key"
             run: "echo ${{ secrets.MAN_KEY }} | base64 -d > ./key.pyk"
           - name: "Use ./devel/rsruntime-updatemanifest.sh"
