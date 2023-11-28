@@ -113,7 +113,7 @@ class TellRaw(list):
     @classmethod
     def itell(cls, user: UserManager.User, *args, **kwargs):
         '''Convenience method for `user.tell(RS.TR().text(*args, **kwargs))`'''
-        user.tell(cls().text(*args, **kwargs)
+        user.tell(cls().text(*args, **kwargs))
 
 TellRaw.NEWLINE = TellRaw().line_break()
 
