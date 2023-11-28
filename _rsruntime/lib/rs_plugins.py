@@ -21,11 +21,12 @@ class PluginManager:
     __slots__ = ('logger', 'ManifestLoader', 'ML', 'plugins')
 
     class Plugin:
-        __slots__ = ('source', 'name', 'spec', 'module')
+        __slots__ = ('logger', 'source', 'name', 'spec', 'module')
 
         def __init__(self, src: Path, name: str | None = None):
             self.source = src
             self.name = '<anonymous plugin>' if name is None else name
+            self.logger = RS.logger.getChild('PM').getChild(self.name)
             self.spec = iutil.spec_from_file_location(src.with_suffix('').as_posix().replace('/', '.'), self.source)
             self.module = iutil.module_from_spec(self.spec)
             self.spec.loader.exec_module(self.module)
