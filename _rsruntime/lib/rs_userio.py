@@ -118,7 +118,7 @@ class TellRaw(list):
 TellRaw.NEWLINE = TellRaw().line_break()
 
 class ChatCommands:
-    __slots__ = ('logger', 'commands', 'aliases', 'help_sections')
+    __slots__ = ('logger', 'commands', 'command_patt', 'aliases', 'help_sections')
 
     class Params:
         __slots__ = ('params', 'args_line')
@@ -246,6 +246,7 @@ class ChatCommands:
     Config.mass_set_default('chat_commands/patterns/',
         char='>',
         line='{char}{command}{argsep}{args}',
+        line_outer='^{line}$'
     )
     Config.mass_set_default('chat_commands/help/', {
         'command': 'help',
@@ -260,10 +261,6 @@ class ChatCommands:
         skip_list  = (),
     )
 
-
-
-
-
     HELP_SUBSECTIONS = 0
     def __init__(self):
         self.logger = RS.logger.getChild('CC')
@@ -272,6 +269,13 @@ class ChatCommands:
         self.help_sections = {self.HELP_SUBSECTIONS: {}}
         # Register hooks
         LineParser.register_chat_callback(self.run_command)
+        # Precompile command pattern
+        self.command_patt = re.compile(Config['chat_commands/line_outer'].format(
+            line=Config['chat_commands/line'].format(
+                char=re.escape(Config['chat_commands/char']),
+                command=f'(?P<cmd>{Config["patterns/command"]})',
+                argsep=f'(?:{Config["chat_commands/arguments/argsep"]})?',
+                args='(?P<args>.*)'))
     def __call__(self, func: typing.Callable[['User', ...], None] | None = None, **kwargs):
         '''
             Decorator to use register_func
@@ -295,10 +299,31 @@ class ChatCommands:
         if (c := self.commands.get(cmd_or_alias, None)) is not None: return c
         elif (c := self.aliases.get(cmd_or_alias, None)) is not None: return c
         raise KeyError(cmd_or_alias)
+    def __contains__(self, cmd_or_alias: str) -> bool:
+        return (cmd_or_alias in self.commands) or (cmd_or_alias in self.aliases)
 
+    def compose_command(self, cmd: str, args: str | None) -> str:
+        '''Compiles cmd and args together using various configuration to compose a command string'''
+        Command['chat_commands/patterns/line'].format(
+            char=Config['chat_commands/char'], command=cmd,
+            argsep=('' if args is None else Config['chat_commands/arguments/argsep']),
+            args=('' if args is None else args))
+    def parse_command(self, line: str) -> tuple[bool, ChatCommand | str, str]:
+        '''
+            Returns:
+              - a (True, ChatCommand, args) tuple if the line is a ChatCommand
+              - a (False, command, args) tuple if the line matches as a ChatCommand, but the command in question hasn't been registered
+              - None if the line doesn't match as a ChatCommand
+        '''
+        if m := self.command_patt.fullmatch(line):
+            return (is_cmd, self[m.group('cmd')] if is_cmd else m.group('cmd'), m.group('args'))
+        return None
     def run_command(self, user: UserManager.User, line: str, not_secure: bool):
+        mat = self.parse_command(line)
+        if mat is None: return # not a ChatCommand
         try:
-            ...
+            if not mat[0]:
+                raise KeyError(f'ChatCommand {mat[1]} was not found, perhaps try }?')
         except Exception as e:
             if user is user.CONSOLE:
                 print(f'Failure whilst running command {line!r}:\n{"".join(traceback.format_exception(e))}')
@@ -360,7 +385,6 @@ class ChatCommands:
         '''Docstring supplied later'''
         is_console = user == UserManager.CONSOLE
         if on is None:
-            Config['chat_commands/help/section/top']
             help_vals = self._help_section(sorted(self.help_sections.keys()), is_console)
         elif on == Config['chat_commands/help/section/subcommand']:
             if section is None:
