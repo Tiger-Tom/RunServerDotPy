@@ -29,6 +29,7 @@ class PluginManager:
             self.logger = RS.logger.getChild('PM').getChild(self.name)
             self.spec = iutil.spec_from_file_location(src.with_suffix('').as_posix().replace('/', '.'), self.source)
             self.module = iutil.module_from_spec(self.spec)
+            self.module._ = RS._
             self.spec.loader.exec_module(self.module)
         def __getattr__(self, attr: str):
             if hasattr(self.module, attr):
