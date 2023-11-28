@@ -29,11 +29,11 @@ def tellraw(self, user: RS.UM.User | str, *args, **kwargs):
             This function uses RS.TR.itell
     '''
     RS.TR.itell(_user_from_(user), *args, **kwargs)
-def tell(self, user: RS.UM.User | str, text: str):
+def tell(user: RS.UM.User | str, text: str):
     if '\n' in text:
         raise ValueError('Cannot tell with newlines, use tellraw instead')
     command(f'tell {user.name} {text}')
-def say(self, text: str):
+def say(text: str):
     if '\n' in text:
         raise ValueError('Cannot say with newlines, use tellraw with @a')
     command(f'say {text}')
