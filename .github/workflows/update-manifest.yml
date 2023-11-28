@@ -27,10 +27,8 @@ jobs:
             run: "./devel/rsruntime-updatemanifest.sh 2>&1 /dev/null"
           - name: "Remove key"
             run: "rm ./key.pyk"
-          - name: "Commit changes"
-            uses: Andro999b/push@v1.3
+          - name: "Commit and push changes"
+            uses: EndBug/add-and-commit@v9
             with:
-                github_token: ${{ secrets.GITHUB_TOKEN }}
-                branch: main
-                force: true
+                add: "./_rsruntime/MANIFEST.ini"
                 message: "${{ github.action }}[${{ github.id }}] triggered by ${{ github.actor }} ${{ github.sha }}"
