@@ -22,7 +22,7 @@ jobs:
             run: "python3 -m pip install -r requirements.txt"
           - name: "Extract key"
             env:
-                MAN_KEY: ${{ secrets.MAN_KEY }}
+                MAN_KEY: ${{ secrets.MAN_KEY__RSRUNTIME }}
             run: |
               echo "$MAN_KEY" | python3 ./devel/pysign.py readinto ./key.pyk
           - name: "Use ./devel/rsruntime-updatemanifest.sh"
