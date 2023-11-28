@@ -105,6 +105,7 @@ def args_update(p: argparse.ArgumentParser):
     args_common_manifestread(p)
     p.add_argument('path', help='The path to add file:hashes from', type=Path)
     p.add_argument('--hash-algorithm', help='The hashing algorithm to use (defaults to the algorithm set in the manifest)', choices=hashlib.algorithms_available, default=None)
+    p.add_argument('--no-sysinfo', help='Don\'t update the system-info store in the manifest', action='store_true')
     args_common_output(p)
 def mode_update(args: argparse.Namespace):
     man = Manifest.from_file(args.manifest)
@@ -114,6 +115,8 @@ def mode_update(args: argparse.Namespace):
         man['files'] = fs
         man['creation']['nupdates'] += 1
         man['creation']['updated_at'] = round(time.time())
+        if not args.no_sysinfo:
+            man['system'] = getattr(ManifestFactor, f'field_system_info__{("none", "lite", "full")[man["system"]["_info_level"]]}')
         no_changes = False
     else:
         eprint(f'No new changes to write!')
