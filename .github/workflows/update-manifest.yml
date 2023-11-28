@@ -4,6 +4,7 @@ on:
         inputs:
             path:
                 required: true
+                type: string
         secrets:
             key:
                 required: true
