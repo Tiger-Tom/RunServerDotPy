@@ -35,6 +35,8 @@ class RunServer(types.ModuleType):
         'TellRaw', 'TR',
         # Load: 5
         'ChatCommands', 'CC',
+        # Load: 7
+        'Convenience', '_',
     )
     def __init__(self, bs: 'Bootstrapper'):
         super().__init__('RS')
@@ -102,20 +104,26 @@ class RunServer(types.ModuleType):
         self.logger.debug(f'finish:load_5@T+{pc}')
         # Load: 6
         self.logger.debug(f'start:load_6@T+{pc}')
+        self.Convenience = self._ = self.__import_mod('rs_convenience')
+        self.logger.debug(f'finish:load_6@T+{pc}')
+        # Load: 7
+        self.logger.debug(f'start:load_7@T+{pc}')
         self.Config.sync()
         self.PM.load_plugins()
-        self.logger.debug(f'finish:load_6@T+{pc}')
+        self.logger.debug(f'finish:load_7@T+{pc}')
         # Final log
         self.logger.debug(f'finish@T+{pc}')
     def __setup_frommod(self, module: str, keys: dict[tuple[str, str], str], *, call: bool = True):
         pc = util.PerfCounter(sec='', secs='')
         self.logger.info(f'Importing module: .lib.{module} [T+{pc}]')
-        m = importlib.import_module(f'.lib.{module}', __package__)
+        m = self.__import_mod(module)
         self.logger.info(f'.lib.{module} imported into {m} [T+{pc}]')
         for (l,s),n in keys.items():
             setattr(self, l, getattr(m, n)() if call else getattr(m, n))
             setattr(self, s, getattr(self, l))
             self.logger.debug(f'{l} = {s} = {module}.{n} [T+{pc}]')
+    def __import_mod(self, module: str) -> types.ModuleType:
+        return importlib.import_module(f'.lib.{module}', __package__)
     def __call__(self):
         self.logger.infop('Entrypoint starting')
         # Registering help command
