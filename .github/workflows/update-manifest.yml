@@ -4,8 +4,10 @@ on:
         branches:
           - main
         paths:
-          - '_rsruntime/**.py'
-          - '_rsplugins/**.py'
+          - '_rsruntime/**'
+          - '_rsruntime/**/*'
+          - '_rsplugins/**'
+          - '_rsplugins/**/*'
 jobs:
     filter_paths:
         name: "Check which paths need updating"
@@ -21,8 +23,10 @@ jobs:
                 filters: |
                     rsruntime:
                       - '_rsruntime/**'
+                      - '_rsruntime/**/*'
                     rsplugins_builtin:
                       - '_rsplugins/1000-builtin/**'
+                      - '_rsplugins/1000-builtin/**/*'
 
     update_manif:
         needs: filter_paths
