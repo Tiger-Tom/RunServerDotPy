@@ -10,34 +10,11 @@ on:
           - '_rsplugins/1000-builtin/**/*'
     workflow_dispatch:
 jobs:
-    filter_paths:
-        name: "Check which paths need updating"
-        runs-on: ubuntu-latest
-        outputs:
-            rsruntime: ${{ steps.filter_paths.outputs.rsruntime }}
-            plugins_builtin: ${{ steps.filter_paths.outputs.plugins_builtin }}
-        steps:
-          - uses: actions/checkout@v3
-          - uses: dorny/paths-filter@v2
-            id: filter_paths
-            with:
-                filters: |
-                    rsruntime:
-                      - '_rsruntime/**'
-                      - '_rsruntime/**/*'
-                    rsplugins_builtin:
-                      - '_rsplugins/1000-builtin/**'
-                      - '_rsplugins/1000-builtin/**/*'
-
     update_manif:
-        needs: filter_paths
         strategy:
             matrix:
-                manif:
-                  - {path: '_rsruntime', do: '${{ needs.filter_path_outputs.rsruntime }}'}
-                  - {path': '_rsplugins/1000-builtin', do: '${{ needs.filter_path.outputs.rsplugins_builtin }}'}
-        name: "Update manifest for ${{ matrix.manif.path }}"
-        if: ${{ matrix.manif.do }}
+                manif: ['_rsruntime', '_rsplugins/1000-builtin']
+        name: "Update manifest for ${{ matrix.manif }}"
         runs-on: ubuntu-latest
         steps:
           - uses: actions/checkout@v3
@@ -56,12 +33,12 @@ jobs:
               echo "$MAN_KEY" | python3 ./devel/pysign.py readinto ./key.pyk
           - name: "Update manifest"
             env:
-                MAN_PATH: ${{ matrix.manif.path }}
+                MAN_PATH: ${{ matrix.manif }}
             run: |
               python3 ./devel/mkmanifest.py update "$MAN_PATH/MANIFEST.ini" "$MAN_PATH/" --overwrite
           - name: "Sign manifest"
             env:
-                MAN_PATH: ${{ matrix.manif.path }}
+                MAN_PATH: ${{ matrix.manif }}
             run: |
               python3 ./devel/mkmanifest.py sign "$MAN_PATH/MANIFEST.ini" ./key.pyk --overwrite
           - name: "Remove key"
@@ -69,4 +46,4 @@ jobs:
           - name: "Commit and push changes"
             uses: stefanzweifel/git-auto-commit-action@v5
             with:
-                commit_message: "Automatic manifest update for ${{ matrix.manif.path }} (triggered by ${{ github.actor }}: ${{ github.sha }})"
+                commit_message: "Automatic manifest update for ${{ matrix.manif }} (triggered by ${{ github.actor }}: ${{ github.sha }})"
