@@ -37,7 +37,7 @@ jobs:
                   - {path: '_rsruntime', do: '${{ needs.filter_path_outputs.rsruntime }}'}
                   - {path': '_rsplugins/1000-builtin', do: '${{ needs.filter_path.outputs.rsplugins_builtin }}'}
         name: "Update manifest for ${{ matrix.manif.path }}"
-        if: ${{ needs.filter_paths.outputs[matrix.manif.id] }}
+        if: ${{ matrix.manif.do }}
         runs-on: ubuntu-latest
         steps:
           - uses: actions/checkout@v3
