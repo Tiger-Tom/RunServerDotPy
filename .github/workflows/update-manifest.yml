@@ -29,7 +29,7 @@ jobs:
             run: "python3 -m pip install -r requirements.txt"
           - name: "Extract key"
             run: |
-              echo "$MAN_KEY" | python3 ./devel/pysign.py readinto ./key.pykk
+              echo "$MAN_KEY" | python3 ./devel/pysign.py readinto ./key.pyk
           - name: "Update manifest"
             run: |
               python3 ./devel/mkmanifest.py update "$MAN_PATH/MANIFEST.ini" "$MAN_PATH/" --overwrite
