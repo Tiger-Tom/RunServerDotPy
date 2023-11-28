@@ -63,7 +63,7 @@ class SingleHook(GenericHooks[None, typing.Callable]):
 Hooks.SingleHook = SingleHook
 class FuncHooks[FuncTakes, FuncReturns](GenericHooks[typing.Callable[[FuncTakes], FuncReturns], typing.Callable[[FuncReturns], ...]]):
     '''
-        A hooks class that uses functions that take FuncTakes and return FuncReturns as keys 
+        A hooks class that uses functions that take FuncTakes and return FuncReturns as keys
         When called with a FuncTakes, each hook is called with the FuncTakes
             If a hook returns a falsey FuncReturns value, then nothing happens
             If a hook returns a truthy FuncReturns value, then each callback registered under that function is called with the FuncReturns value

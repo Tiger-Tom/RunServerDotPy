@@ -26,7 +26,7 @@ class ExceptionHandlers:
     threadexception_dump_path = Path('_thread_exception.dump')
     hookfail_dump_path = Path('_failed_hooks.dump')
     conffail_dump_path = Path('_failed_config_save.dump')
-    
+
     def __init__(self):
         import logging
         self.logger = RS.logger.getChild('EH')

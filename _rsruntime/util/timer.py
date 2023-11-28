@@ -33,10 +33,10 @@ class Timer:
         @abstractmethod
         @locked
         def reset(self) -> typing.Self: pass
-    
+
     class After(BaseTimer):
         __slots__ = ('thread', 'callable', 'length')
-        
+
         def __init__(self, func: typing.Callable, time: float):
             super().__init__(func, time)
             self.thread = None

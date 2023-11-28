@@ -31,7 +31,7 @@ class UserManager:
     Config['permissions/levels/__comment_3'] = ' Permission level values are always positive integers, being silently set to 255 if they are not and cannot be converted'
     Config['permissions/levels/__comment_4'] = 'The excessive number of default permissions are more for example/documentational use than for real use, but are put in anyway.'
     Config['permissions/levels/__comment_5'] = 'The large gaps in the default permissions are to allow modification if, somehow, finer control is needed.',
-    
+
     ## Insert defaults
     Config.mass_set_default('permissions/levels',
         LIMITED = 100, USER    = 80,
@@ -83,7 +83,7 @@ class UserManager:
         @property
         def is_selector(self) -> bool:
             return getattr(self, 'name', None).startswith('@')
-        
+
         @property
         def permission(self) -> 'Perm':
             if self.is_console: return RS.UM.Perm.OWNER
@@ -120,7 +120,7 @@ class UserManager:
         def __call__(self, **attrs: dict[str, ...]):
             for a,v in attrs.items(): setattr(self, a, v)
             return self
-        
+
         def __str__(self):
             return '<CONSOLE>' if self.is_console else \
                    f'"{getattr(self, "name", "[NAME UNKNOWN]")}" ({user.uuid})'
@@ -153,7 +153,7 @@ class UserManager:
         LineParser.register_callback( # player is assigned entity ID and origin
             re.compile(r'^(?P<username>\w+)\[\/(?P<origin>(?P<ip>[\d.]+):(?P<port>[\d]+))\] logged in with entity id (?P<entity_id>[\d]+) at \((?P<x>\-?[\d.]+), (?P<y>\-?[\d.]+), (?P<z>\-?[\d.]+)\)$'),
             lambda p,t,m: self[m.group('username')](ip=m.group('ip'), port=int(m.group('port')), origin=m.group('origin'), login_coords=(float(m.group('x')), float(m.group('y')), float(m.group('z')))))
-        
+
     def __getitem__(self, username: str) -> User:
         if username in self.users: return self.users[username]
         else: return self.User(username)

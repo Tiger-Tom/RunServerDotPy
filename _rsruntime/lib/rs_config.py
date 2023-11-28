@@ -32,7 +32,7 @@ class Config(INIBackedDict):
                 When pfx is not None, it is prepended (with a / if it doesn't already have one) to each key
             Values are either given through dict_vals or **values (keyword args)
                 Using both is probably bad but not prohibited
-                    A SyntaxWarning shall be issued upon you to remind you of your choices. 
+                    A SyntaxWarning shall be issued upon you to remind you of your choices.
                 If a value is in both and is not the same, a ValueError is raised
                     Once this has been checked, they are merged together
             If a total of 0 values are given, an error is logged

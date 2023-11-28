@@ -40,7 +40,7 @@ class BaseServerManager(ABC):
     Config.mass_set_default('java/', java_binary='java', java_args='-Xmx{allocated_ram} -Xms{allocated_ram} -jar')
     Config.mass_set_default('minecraft/', allocated_ram='1024M', server_args='--nogui')
     Config.mass_set_default('path/', base='./minecraft', server_jar='server.jar')
-    
+
     def __init__(self):
         self.logger = RS.logger.getChild(f'SM<{self.name}>')
         self.hooks = Hooks.SingleHook()
@@ -54,7 +54,7 @@ class BaseServerManager(ABC):
             return
         logger.debug(f'registering {cls.name} in ServerManager')
         ServerManager.register(cls)
-        
+
     # Non-abstract methods
     def handle_line(self, line: str):
         sys.stdout.write(line)
@@ -142,7 +142,7 @@ class BasePopenManager(BaseServerManager):
 
     cap_arbitrary_write = True
     cap_restartable = True
-    
+
     def start(self):
         self.popen = subprocess.Popen(self.cli_line(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, text=True, cwd=Config['minecraft/path/base'])
 
@@ -206,7 +206,7 @@ class ScreenManager(BaseServerManager):
         log_fifo       = './_rslog/screen.%(name)s.fifo',
         log_flush_secs = 1,
     )
-    
+
     def __init__(self):
         super().__init__()
         if shutil.which(Config['server_manager/screen/binary']) is None:
@@ -243,13 +243,13 @@ class ScreenManager(BaseServerManager):
             self.run_screen_noout('-X', 'kill')
     def start(self): raise NotImplementedError
     def write(self): raise NotImplementedError
-    
+
     cap_arbitrary_read = True
     cap_arbitrary_write = True
     cap_detachable = True
     cap_attachable = True
     cap_restartable = True
-    
+
     #bias = -float('inf') if shutil.which(Config('server_manager/screen/binary', 'screen')) is None else 10.0
     bias = -float('inf') # not implemented yet
 class RConManager(BaseServerManager):
@@ -284,7 +284,7 @@ class RConManager(BaseServerManager):
     cap_attachable = True
     cap_restartable = True
     cap_read_from_write = True
-    
+
     @classmethod
     @property
     def bias(cls) -> float:
@@ -311,7 +311,7 @@ class SelectManager(BasePopenManager):
         self.popen.stdin.write(line)
 
     cap_arbitrary_read = True
-    
+
     bias = 2.0
 class DummyServerManager(BaseServerManager):
     __slots__ = ()
@@ -329,7 +329,7 @@ class DummyServerManager(BaseServerManager):
     cap_restartable = True
 
     attr_is_dummy = True
-    
+
     bias = -50.0
 class PyInterpreterServerManager(DummyServerManager):
     __slots__ = ('interpreter',)

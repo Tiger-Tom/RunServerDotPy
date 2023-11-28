@@ -46,7 +46,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
 
     @abstractproperty
     def file_suffix() -> str: NotImplemented
-    
+
     _transaction_types = IntEnum('TransactionTypes', ('PRE_GETITEM', 'POST_GETITEM', 'SETITEM'))
     def _validate_transaction(self, key: tuple[str], ttype: _transaction_types, args: tuple[typing.Any] = (), *, _tree: MutableMapping | None = None) -> None:
         '''Allows subclasses to place extra restrictions on types of transactions by throwing exceptions to cancel them. Is a no-op by default'''
@@ -153,7 +153,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     __call__ = bettergetter
     @abstractmethod
     def sort(self, by: typing.Callable[[str | tuple[str]], typing.Any] = lambda k: k): NotImplemented
-    
+
     # Med-level item manipulation
     ## Getting
     @locked
@@ -216,7 +216,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     def values(self, start_key: Key) -> typing.Generator[[Deserialized], None, None]:
         '''Iterates over every value'''
         yield from map(self.getitem, self.keys(start_key))
-    
+
     # Low-level functions
     @abstractmethod
     def _init_topkey(self, topkey: str): NotImplemented
@@ -340,7 +340,7 @@ class JSONBackedDict(FileBackedDict[_JSON_Serializable, _JSON_Serialized, _JSON_
                     raise TypeError(f'{key} tried to set a subkey (dict) as a value')
                 if isinstance(_tree.get(key[-1], None), dict):
                     raise TypeError(f'{key} tried to overwrite a subkey (dict)')
-    
+
     def _init_topkey(self, topkey: str, *, _val: dict = {}):
         self._data[topkey] = _val
     def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = True) -> dict | None:
@@ -375,7 +375,7 @@ class JSONBackedDict(FileBackedDict[_JSON_Serializable, _JSON_Serialized, _JSON_
         for top,dat in self._data.items():
             self.dirty.add(top)
             self._data[top] = self._sorteddict(dat, (top,), by)
-        
+
 
     def _serialize(self, val: _JSON_Serializable) -> _JSON_Serialized:
         return val

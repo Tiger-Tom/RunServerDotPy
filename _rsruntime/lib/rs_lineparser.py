@@ -25,7 +25,7 @@ class MCLang:
     # Setup config
     Config.mass_set_default('minecraft/path', base='./minecraft/', server_jar='server.jar')
     Config.mass_set_default('minecraft/lang_parser', version=None, lang='en_us')
-    
+
     def __init__(self):
         self.logger = RS.logger.getChild('L')
         self.extract_lang()
@@ -89,7 +89,7 @@ class MCLang:
             self.lang = json.load(lf)
             self.logger.infop(f'Loaded lang in {pc}')
             return self.lang
-        
+
 class LineParser:
     __slots__ = ('logger', 'hooks_prefix', 'hooks_no_prefix', 'hooks_chat', 'chat_patt')
 

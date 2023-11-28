@@ -109,9 +109,9 @@ class TellRaw(list):
     def join(self, tellraws: tuple[typing.Self | str | dict]) -> typing.Self:
         return self.__class__(self.ijoin(tellraws))
     __mmul__ = join
-    
+
 TellRaw.NEWLINE = TellRaw().line_break()
-    
+
 class ChatCommands:
     __slots__ = ('logger', 'commands', 'aliases', 'help_sections')
 
@@ -133,7 +133,7 @@ class ChatCommands:
             union = '|',
             tokens = '',
         )
-        
+
         def __init__(self, func: typing.Callable):
             self.params = tuple(inspect.signature(func).parameters.values())[1:]
             self.args_line = self.render_args(self.params)
@@ -187,8 +187,8 @@ class ChatCommands:
                 return Config['chat_commands/help/formatter/argument/joiners/union'].join(cls.render_annotation(aa) for aa in ann.__args__ if aa not in {None, type(None)})
             elif isinstance(ann, str): return ann
             else: return ann.__qualname__
-            
-    
+
+
     class ChatCommand:
         '''
             Help for the command is specified by the doc-string of the target function
@@ -209,7 +209,7 @@ class ChatCommands:
             'patterns/command': r'[\w\d]+',
             'help/no_help': '<no help supplied>'
         })
-        
+
 
         def __init__(self, target: typing.Callable[['User', ...], None], *, permission: UserManager.Perm = UserManager.Perm.USER, help_section: str | tuple[str] = ()):
             self.target = target
@@ -254,10 +254,10 @@ class ChatCommands:
         top        = 'Top-level sections (shift-click a section for more help)',
         skip_list  = (),
     )
-        
-        
-        
-        
+
+
+
+
 
     HELP_SUBSECTIONS = 0
     def __init__(self):
@@ -304,7 +304,7 @@ class ChatCommands:
                              .text('Click to copy full error message', red,
                                    click_event=TellRaw.ClickEvent.COPY, click_contents=exc,
                                    hover_event=TellRaw.HoverEvent.TEXT, hover_contents=TellRaw().text(exc, TellRaw.TextFormat(color='#FF0000', underlined=True))))
-    
+
     def register_func(self, func: typing.Callable[['User', ...], None], aliases: set = set(), *, permission: UserManager.Perm = UserManager.Perm.USER, help_section: str | tuple[str] = ()) -> ChatCommand:
         cc = self.ChatCommand(func, permission=permission, help_section=help_section)
         self.register(cc, aliases)

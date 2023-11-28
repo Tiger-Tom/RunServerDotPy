@@ -33,7 +33,7 @@ class PluginManager:
             if hasattr(self.module, attr):
                 return getattr(self.module, attr)
             else: raise AttributeError(attr)
-    
+
     class _ManifestLoader:
         __slots__ = ('pm', 'logger')
         safe_name = staticmethod(lambda n: re.sub(r'[^\d\w\-\.,]', '-', n.replace(' ', '_')).strip('_-.,'))
@@ -117,7 +117,7 @@ class PluginManager:
     # Setup config
     Config.set_default('plugins/plugins_path', './_rsplugins/')
     Config.mass_set_default('plugins/glob/', early_load='**/__early_load__.py', basic='**/__plugin__.py', standalone='**/*.rs.py')
-    
+
     def __init__(self):
         self.logger = RS.logger.getChild('PM')
         self.ManifestLoader = self.ML = self._ManifestLoader(self)
@@ -131,7 +131,7 @@ class PluginManager:
         pc = PerfCounter(sec='', secs='')
         for p in Path(Config['plugins/plugins_path']).glob(Config['plugins/glob/early_load']):
             self.logger.infop(f'Executing early load on {p} (T+{pc})')
-            
+
     def load_plugins(self):
         bp = Path(Config['plugins/plugins_path'])
         self._traverse_plugins(sorted(set(bp.glob(Config['plugins/glob/basic'])) | set(bp.glob(Config['plugins/glob/standalone']))), PerfCounter(sec='', secs=''))

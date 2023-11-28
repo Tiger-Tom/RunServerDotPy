@@ -116,7 +116,7 @@ class Bootstrapper:
                 logging.FATAL:         FG_DRED,
                 logging.IRRECOVERABLE: FG_GRAY_BG_RED,
             }
-            
+
             def format(self, record: logging.LogRecord) -> str:
                 record.msg = f'{self._level_to_color[record.levelno]}{record.msg}{self.RESET}'
                 return super().format(record)
@@ -169,7 +169,7 @@ class Bootstrapper:
         # Finish up
         self.root_logger = logger
         return logger
-    
+
     # Bootstrapping
     ## Base function
     def bootstrap(self, close_after: bool = True):

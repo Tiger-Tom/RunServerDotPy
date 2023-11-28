@@ -20,13 +20,13 @@ class BetterPPrinter:
             tuple: (True, '()', ',', '\n', ', ', None),
             list: (False, '[]', ',', '\n', ', ', None),
             set: (False, '{}', ',', '\n', ', ', 'set()'),
-            
+
         },
         'maplike': {
             # <type>: (<prepend opening bracket with indent>, <opening bracket>, <closing bracket>, <key-val separator>, <key-value pair separator>),
             dict: (False, '{\n', '}', ': ', ',\n'),
         },
-            
+
     }
     __slots__ = tuple(_default_config)
     def __init__(self, **config):
