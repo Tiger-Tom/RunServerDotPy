@@ -5,10 +5,35 @@ on:
           - 'main'
         paths:
           - '_rsruntime/**'
+          - '_rsplugins/1000-builtin/**'
 
 jobs:
-    update_rsruntime_manif:
-        name: "Update _rsruntime/MANIFEST.ini"
+    filter_paths:
+        name: "Check which paths need updating"
+        runs-on: ubuntu-latest
+        outputs:
+            rsruntime: ${{ steps.filter_paths.outputs.rsruntime }}
+            plugins_builtin: ${{ steps.filter_paths.outputs.plugins_builtin }}
+        steps:
+          - uses: actions/checkout@v3
+          - uses: dorny/paths-filter@v2
+            id: filter_paths
+            with:
+                filters: |
+                    rsruntime:
+                      - '_rsruntime/**'
+                    rsplugins_builtin:
+                      - '_rsplugins/1000-builtin/**'
+
+    update_manif:
+        needs: filter_paths
+        strategy:
+            matrix:
+                manif:
+                  - {path: '_rsruntime', key: ${{ secrets.MAN_KEY__rsruntime }}, dorun: ${{ needs.filter_paths.outputs.rsruntime }}}
+                  - {path': '_rsplugins/1000-builtin', key: ${{ secrets.MAN_KEY__rsplugins_builtin }}, dorun: ${{ needs.filter_paths.outputs.rsplugins_builtin }}}
+        name: "Update manifest for ${{ matrix.manif.path }}"
+        if: ${{ matrix.manif.dorun }}
         runs-on: ubuntu-latest
         steps:
           - uses: actions/checkout@v3
@@ -22,11 +47,19 @@ jobs:
             run: "python3 -m pip install -r requirements.txt"
           - name: "Extract key"
             env:
-                MAN_KEY: ${{ secrets.MAN_KEY__RSRUNTIME }}
+                MAN_KEY: ${{ matrix.manif.key }}
             run: |
               echo "$MAN_KEY" | python3 ./devel/pysign.py readinto ./key.pyk
-          - name: "Use ./devel/rsruntime-updatemanifest.sh"
-            run: "./devel/rsruntime-updatemanifest.sh 2>&1 /dev/null"
+          - name: "Update manifest"
+            env:
+                MAN_PATH: ${{ matrix.manif.path }}
+            run: |
+              python3 ./devel/mkmanifest.py update "$MAN_PATH/MANIFEST.ini" "$MAN_PATH/" --overwrite
+          - name: "Sign manifest"
+            env:
+                MAN_PATH: ${{ matrix.manif.path }}
+            run: |
+              python3 ./devel/mkmanifest.py sign "$MAN_PATH/MANIFEST.ini" ./key.pyk --overwrite
           - name: "Remove key"
             run: "rm ./key.pyk"
           - name: "Commit and push changes"
