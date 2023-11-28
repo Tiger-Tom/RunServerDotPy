@@ -110,9 +110,11 @@ def mode_update(args: argparse.Namespace):
     man = Manifest.from_file(args.manifest)
     halg = man['_']['hash_algorithm'] = man['_']['hash_algorithm'] if (args.hash_algorithm is None) else args.hash_algorithm
     eprint(f'Updating manifest: files from {args.manifest}, algorithm {halg}')
-    man['files'] = ManifestFactory.gen_field_files(halg, args.path)
-    man['creation']['nupdates'] += 1
-    man['creation']['updated_at'] = round(time.time())
+    if man['files'] != (fs := ManifestFactory.gen_field_files(halg, args.path)):
+        man['files'] = fs
+        man['creation']['nupdates'] += 1
+        man['creation']['updated_at'] = round(time.time())
+    else: eprint(f'No new changes to write!')
     common_output(man, args)
     try: man.verify()
     except InvalidSignature:
