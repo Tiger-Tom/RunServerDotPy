@@ -3,11 +3,6 @@ on:
     push:
         branches:
           - main
-        paths:
-          - '_rsruntime/**'
-          - '_rsruntime/**/*'
-          - '_rsplugins/**'
-          - '_rsplugins/**/*'
 jobs:
     filter_paths:
         name: "Check which paths need updating"
