@@ -30,8 +30,8 @@ jobs:
         strategy:
             matrix:
                 manif:
-                  - {path: '_rsruntime', id: 'rsruntime'}}
-                  - {path': '_rsplugins/1000-builtin', id: 'rsplugins_builtin'}}
+                  - {path: '_rsruntime', id: 'rsruntime'}
+                  - {path': '_rsplugins/1000-builtin', id: 'rsplugins_builtin'}
         name: "Update manifest for ${{ matrix.manif.path }}"
         if: ${{ needs.filter_paths.outputs[matrix.manif.id] }}
         runs-on: ubuntu-latest
