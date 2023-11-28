@@ -52,7 +52,7 @@ class PluginManager:
             if Config['plugins/orphans/ignore_orphans']:
                 self.logger.warning('Set to ignore orphans (config plugins/orphans/ignore_orphans)')
                 return
-            for mf in set(base.glob('*.json', case_sensitive=False)) | set(base.glob('*manifest*', case_sensitive=False)):
+            for mf in set(base.glob('*.ini', case_sensitive=False)) | set(base.glob('*.json', case_sensitive=False)) | set(base.glob('*manifest*', case_sensitive=False)):
                 if (not mf.is_file()) or (mf.suffix in {'.py', '.pyc'}): continue
                 if mf.name in Config['plugins/orphans/skip']:
                     self.logger.warning(f'Set to skip orphan {mf.name} (config plugins/orphans/skip)')
@@ -84,15 +84,31 @@ class PluginManager:
             # there must be a gap or unreliable naming, fallback to using current time as suffix
             return self.available_path(path.with_suffix(f'{path.suffix}.{round(time.time())}'))
         # Manifest discovery
+        @staticmethod
+        def _discover_manifests_key(p: Path) -> tuple[int, str]:
+            '''
+                p is manifest.ini: 0; manifest.json: 1
+                p has "manifest" in name: 2
+                p has .ini extension: 3; .json extension: 4
+                p is not a file: 8
+                otherwise: 10
+            '''
+            if not p.is_file(): return 8
+            elif p.suffix == '.ini':
+                if p.name.lower() == 'manifest.ini': return 0
+                return 3
+            elif p.suffix == '.json':
+                if p.name.lower() == 'manifest.json': return 1
+                return 4
+            elif 'manifest' in p.name: return 2
+            else: return 10
         def discover_manifests(self, base: Path) -> typing.Generator[BS.Manifest, None, None]:
             '''Yields all manifests in a tree'''
-            for p in sorted(base.iterdir(),
-                            key=lambda p: (p.is_dir(), p.name.lower() != 'manifest.json', not p.match('*manifest*'), not p.match('*.json'), p.name)):
+            for p in sorted(base.iterdir(), key=self._discover_manifests_key):
                 if p.is_dir():
                     yield from self.discover_manifests(p)
-                if (p.name.lower() == 'manifest.json') or p.match('*manifest*') or p.match('*.json'):
-                    try:
-                        yield BS.Manifest(p)
+                elif self._discover_manifests_key(p) < 8:
+                    try: yield BS.Manifest.from_file(p)
                     except Exception as e:
                         self.logger.error(f'Could not load {p} as manifest ({e!r}), continuing anyway')
                     else: continue
