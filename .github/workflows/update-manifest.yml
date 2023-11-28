@@ -30,10 +30,10 @@ jobs:
         strategy:
             matrix:
                 manif:
-                  - {path: '_rsruntime', key: ${{ secrets.MAN_KEY__rsruntime }}, dorun: ${{ needs.filter_paths.outputs.rsruntime }}}
-                  - {path': '_rsplugins/1000-builtin', key: ${{ secrets.MAN_KEY__rsplugins_builtin }}, dorun: ${{ needs.filter_paths.outputs.rsplugins_builtin }}}
+                  - {path: '_rsruntime', id: 'rsruntime'}}
+                  - {path': '_rsplugins/1000-builtin', id: 'rsplugins_builtin'}}
         name: "Update manifest for ${{ matrix.manif.path }}"
-        if: ${{ matrix.manif.dorun }}
+        if: ${{ needs.filter_paths.outputs[matrix.manif.id] }}
         runs-on: ubuntu-latest
         steps:
           - uses: actions/checkout@v3
@@ -47,7 +47,7 @@ jobs:
             run: "python3 -m pip install -r requirements.txt"
           - name: "Extract key"
             env:
-                MAN_KEY: ${{ matrix.manif.key }}
+                MAN_KEY: ${{ secrets.MAN_KEY }}
             run: |
               echo "$MAN_KEY" | python3 ./devel/pysign.py readinto ./key.pyk
           - name: "Update manifest"
@@ -65,4 +65,4 @@ jobs:
           - name: "Commit and push changes"
             uses: stefanzweifel/git-auto-commit-action@v5
             with:
-                commit_message: "Automatic manifest update (triggered by ${{ github.actor }}: ${{ github.sha }})"
+                commit_message: "Automatic manifest update for ${{ matrix.manif.id }} (triggered by ${{ github.actor }}: ${{ github.sha }})"
