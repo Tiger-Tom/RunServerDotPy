@@ -82,7 +82,7 @@ class UserManager:
             return getattr(self, 'uuid', None) is self._console_uuid
         @property
         def is_selector(self) -> bool:
-            return getattr(self, 'name', None).startswith('@')
+            return getattr(self, 'name', '').startswith('@')
 
         @property
         def permission(self) -> 'Perm':
@@ -123,11 +123,18 @@ class UserManager:
 
         def __str__(self):
             return '<CONSOLE>' if self.is_console else \
+                   self.name   if self.is_selector else \
                    f'"{getattr(self, "name", "[NAME UNKNOWN]")}" ({user.uuid})'
         def __repr__(self):
             return '<User CONSOLE>' if self.is_console else f'<User "{getattr(self, "name", "[NAME UNKNOWN]")}" {user.uuid}>'
-    CONSOLE = User(_no_cache=True, name='<CONSOLE>'); CONSOLE.uuid=User._console_uuid
-    User.CONSOLE = CONSOLE
+
+        _at_sel_uuid: typing.ClassVar[object] = object()
+        @classmethod
+        def __mmull__(cls, selector: str):
+            u = cls(_no_cache=True, name=f'@{selector}')
+            u.uuid = cls._at_sel_uuid
+            return u
+    CONSOLE = User(_no_cache=True, name='<CONSOLE>'); CONSOLE.uuid=User._console_uuid; User.CONSOLE = CONSOLE
 
     def __init__(self):
         self.logger = RS.logger.getChild('UM')
