@@ -12,6 +12,7 @@ on:
 jobs:
     update_manif:
         strategy:
+            max-parallel: 1
             matrix:
                 manif: ['_rsruntime', '_rsplugins/1000-builtin']
         name: "Update manifest for ${{ matrix.manif }}"
