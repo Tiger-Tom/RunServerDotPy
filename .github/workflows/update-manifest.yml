@@ -28,8 +28,6 @@ jobs:
           - name: "Remove key"
             run: "rm ./key.pyk"
           - name: "Commit and push changes"
-            uses: EndBug/add-and-commit@v9
+            uses: stefanzweifel/git-auto-commit-action@v5
             with:
-                add: "./_rsruntime/MANIFEST.ini"
-                message: "Automatic manifest update"
-                #message: "${{ github.action }}[${{ github.id }}] triggered by ${{ github.actor }} ${{ github.sha }}"
+                commit_message: "${{ github.action }}[${{ github.id }}] triggered by ${{ github.actor }} ${{ github.sha }}"
