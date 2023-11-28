@@ -35,7 +35,7 @@ jobs:
               python3 ./devel/mkmanifest.py update "$MAN_PATH/MANIFEST.ini" "$MAN_PATH/" --overwrite
           - name: "Sign manifest"
             run: |
-              python3 ./devel/mkmanifest.py sign "$MAN_PATH/MANIFEST.ini" ./key.pyk
+              python3 ./devel/mkmanifest.py sign "$MAN_PATH/MANIFEST.ini" ./key.pyk --overwrite
           - name: "Remove key"
             run: "rm ./key.pyk"
           - name: "Commit and push changes"
