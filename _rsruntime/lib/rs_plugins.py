@@ -26,7 +26,7 @@ class PluginManager:
         def __init__(self, src: Path, name: str | None = None):
             self.source = src
             self.name = '<anonymous plugin>' if name is None else name
-            self.spec = iutil.spec_from_file_location(self.name, self.source)
+            self.spec = iutil.spec_from_file_location(src.with_suffix('').as_posix().replace('/', '.'), self.source)
             self.module = iutil.module_from_spec(self.spec)
             self.spec.loader.exec_module(self.module)
         def __getattr__(self, attr: str):
