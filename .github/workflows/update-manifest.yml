@@ -4,7 +4,7 @@ on:
         branches:
           - 'main'
         paths:
-          - './_rsruntime/**'
+          - '_rsruntime/**'
 
 jobs:
     update_rsruntime_manif:
