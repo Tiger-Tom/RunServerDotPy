@@ -31,4 +31,5 @@ jobs:
             uses: EndBug/add-and-commit@v9
             with:
                 add: "./_rsruntime/MANIFEST.ini"
+                message: "Automatic manifest update"
                 #message: "${{ github.action }}[${{ github.id }}] triggered by ${{ github.actor }} ${{ github.sha }}"
