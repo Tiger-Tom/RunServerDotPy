@@ -71,7 +71,7 @@ class PluginManager:
         ## Path utils
         def name_from_manif(self, man: BS.Manifest) -> str:
             '''Generates a name from a manifest's "name" field, "by" field, or a fallback'''
-            if (man.m_name is not None) and (n := self.safe_name(man.m_name)): return n
+            if (man.name is not None) and (n := self.safe_name(man.name)): return n
             if (man.m_creation['by'] is not None) and (n := self.safe_name(man.m_creation['by'])):
                 return self.unnamed_plugin_by.format(n)
             return self.unnamed_plugin
@@ -125,14 +125,16 @@ class PluginManager:
                 Updates and executes a manifest
                     always returns false, so that "any" can be used to resolve map()
             '''
-            try: man.update(man.upstream_manif()).execute()
+            try: man()
             except Exception as e:
-                self.logger.fatal(f'Could not update or execute manifest {man.m_name} because:\n{"".join(traceback.format_exception(e))}\n skipping...')
+                self.logger.fatal(f'Could not update or execute manifest {man.name} because:\n{"".join(traceback.format_exception(e))}\n skipping...')
             return True
 
     # Setup config
     Config.set_default('plugins/plugins_path', './_rsplugins/')
     Config.mass_set_default('plugins/glob/', early_load='**/__early_load__.py', basic='**/__plugin__.py', standalone='**/*.rs.py')
+
+    unsafe_name = re.compile('^[^\w\d\- ;]+$')
 
     def __init__(self):
         self.logger = RS.logger.getChild('PM')
@@ -154,9 +156,9 @@ class PluginManager:
     def _traverse_plugins(self, paths: set, pc: PerfCounter):
         captured = set()
         for p in paths: # note: add follow_symlinks=True upon release of 3.13
-            name = p.parent.name if (p.name == '__plugin__.py') else p.stem[:-3]
+            name = self.unsafe_name.sub('_', p.parent.name if (p.name == '__plugin__.py') else p.stem[:-3])
             self.logger.infop(f'Loading plugin: {name} (T+{pc})')
-            if Config(f'plugins/skip_load/{name}', False):
+            if Config(f'plugins/skip_load/p__{name}', False):
                 self.logger.warning(f'Plugin {name} has been skipped (config plugins/skip_load/{name})')
                 continue
             for c in captured:
@@ -170,7 +172,7 @@ class PluginManager:
                 self.logger.fatal(f'Name {name} already exists in loaded plugins: a plugin with the same name loaded first! Cannot load plugin, skipping')
                 continue
             captured.add(p)
-            self.plugins[name] = self.Plugin(p, m.m_name if ((m := self.ML.nearest_manifest(p.parent)) is not None) else name)
+            self.plugins[name] = self.Plugin(p, m.name if ((m := self.ML.nearest_manifest(p.parent)) is not None) else name)
     def start(self):
         for n,p in self.plugins.items():
             if not hasattr(p, '__start__'): continue
