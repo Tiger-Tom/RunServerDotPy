@@ -1,0 +1,16 @@
+name: Auto-update _rsplugins/1000-builtin/MANIFEST.ini
+on:
+    push:
+        branches:
+          - 'v3.x.x'
+        paths:
+          - '_rsplugins/1000-builtin/**'
+          - '_rsplugins/1000-builtin/**/*'
+    workflow_dispatch:
+jobs:
+    update_manif:
+        uses: ./.github/workflows/update-manifest.yml
+        with:
+            path: './_rsplugins/1000-builtin'
+        secrets:
+            key: ${{ secrets.MAN_KEY }}

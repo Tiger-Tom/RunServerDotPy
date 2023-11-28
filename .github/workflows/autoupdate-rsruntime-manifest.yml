@@ -1,0 +1,16 @@
+name: Auto-update _rsruntime/MANIFEST.ini
+on:
+    push:
+        branches:
+          - 'v3.x.x'
+        paths:
+          - '_rsruntime/**'
+          - '_rsruntime/**/*'
+    workflow_dispatch:
+jobs:
+    update_manif:
+        uses: ./.github/workflows/update-manifest.yml
+        with:
+            path: './_rsruntime'
+        secrets:
+            key: ${{ secrets.MAN_KEY }}

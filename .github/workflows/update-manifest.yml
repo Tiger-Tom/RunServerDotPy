@@ -1,47 +1,40 @@
-name: Update Manifests
+name: Update a manifest
 on:
-    push:
-        branches:
-          - 'v3.x.x'
-        paths:
-          - '_rsruntime/**'
-          - '_rsruntime/**/*'
-          - '_rsplugins/1000-builtin/**'
-          - '_rsplugins/1000-builtin/**/*'
-    workflow_dispatch:
+    workflow_call:
+        inputs:
+            path:
+                required: true
+        secrets:
+            key:
+                required: true
+
+concurrency:
+    group: ${{ github.workflow }}-${{ github.ref }}
+
 jobs:
-    update_manif:
-        strategy:
-            max-parallel: 1
-            matrix:
-                manif: ['_rsruntime', '_rsplugins/1000-builtin']
-        name: "Update manifest for ${{ matrix.manif }}"
+    update_manifest:
+        name: "Update manifest ${{ inputs.path }}"
         runs-on: ubuntu-latest
+        env:
+            MAN_KEY: ${{ secrets.key }}
+            MAN_PATH: ${{ inputs.path }}
         steps:
           - uses: actions/checkout@v3
           - uses: actions/setup-python@v4
             with:
                 python-version: '3.12'
                 cache: pip
-          - name: "Print python3 version"
-            run: "python3 --version"
           - name: "Explicitly install requirements"
             run: "python3 -m pip install -r requirements.txt"
           - name: "Extract key"
-            env:
-                MAN_KEY: ${{ secrets.MAN_KEY }}
             run: |
-              echo "$MAN_KEY" | python3 ./devel/pysign.py readinto ./key.pyk
+              echo "$MAN_KEY" | python3 ./devel/pysign.py readinto ./key.pykk
           - name: "Update manifest"
-            env:
-                MAN_PATH: ${{ matrix.manif }}
             run: |
               python3 ./devel/mkmanifest.py update "$MAN_PATH/MANIFEST.ini" "$MAN_PATH/" --overwrite
           - name: "Sign manifest"
-            env:
-                MAN_PATH: ${{ matrix.manif }}
             run: |
-              python3 ./devel/mkmanifest.py sign "$MAN_PATH/MANIFEST.ini" ./key.pyk --overwrite
+              python3 ./devel/mkmanifest.py sign "$MAN_PATH/MANIFEST.ini" ./key.pyk
           - name: "Remove key"
             run: "rm ./key.pyk"
           - name: "Commit and push changes"
