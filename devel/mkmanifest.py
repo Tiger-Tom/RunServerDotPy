@@ -114,11 +114,15 @@ def mode_update(args: argparse.Namespace):
         man['files'] = fs
         man['creation']['nupdates'] += 1
         man['creation']['updated_at'] = round(time.time())
-    else: eprint(f'No new changes to write!')
+        no_changes = False
+    else:
+        eprint(f'No new changes to write!')
+        no_changes = True
     common_output(man, args)
     try: man.verify()
     except InvalidSignature:
         eprint(f'\nYou may want to run "sign" on the manifest now, as it currently fails verification')
+    if no_changes: exit(-1)
 
 def args_sign(p: argparse.ArgumentParser):
     args_common_manifestread(p, 'The path of the manifest to sign')
