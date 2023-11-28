@@ -2,7 +2,12 @@ name: Update Manifests
 on:
     push:
         branches:
-          - main
+          - 'v3.x.x'
+        paths:
+          - '_rsruntime/**'
+          - '_rsruntime/**/*'
+          - '_rsplugins/1000-builtin/**'
+          - '_rsplugins/1000-builtin/**/*'
 jobs:
     filter_paths:
         name: "Check which paths need updating"
