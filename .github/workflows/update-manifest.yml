@@ -1,8 +1,10 @@
 name: Update Manifests
-on: workflow_dispatch
-#    push:
-#        branches: [ main ]
-#    workflow_dispatch:
+on:
+    push:
+        branches:
+          - 'main'
+        paths:
+          - './_rsruntime/**'
 
 jobs:
     update_rsruntime_manif:
