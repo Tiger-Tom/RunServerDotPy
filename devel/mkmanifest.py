@@ -131,7 +131,7 @@ def args_sign(p: argparse.ArgumentParser):
     args_common_output(p)
 def mode_sign(args: argparse.Namespace):
     man = Manifest.from_file(args.manifest)
-    key = EdPrivK.from_private_bytes(args.key.read_bytes())
+    key = EdPrivK.from_private_bytes((args.key[0] if isinstance(args.key, list) else args.key).read_bytes())
     eprint(f'Signing manifest with {base64.b85encode(key.private_bytes_raw()).decode()}')
     man['_']['pubkey'] = base64.b85encode(key.public_key().public_bytes_raw()).decode()
     man['_']['signature'] = base64.b85encode(key.sign(man.compile())).decode()
