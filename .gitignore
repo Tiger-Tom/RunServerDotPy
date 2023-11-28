@@ -10,6 +10,9 @@ _rslog/
 _rsusers/
 # Backed up files
 *.old
+# Manifests
+**/MANIFEST.ini
+**/MANIFEST.json
 
 ####################
 
