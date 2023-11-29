@@ -326,9 +326,10 @@ class ChatCommands:
               - None if the line doesn't match as a ChatCommand
         '''
         if m := self.command_patt.fullmatch(line):
+            is_cmd = m.group('cmd') in self
             return (is_cmd, self[m.group('cmd')] if is_cmd else m.group('cmd'), m.group('args'))
         return None
-    def run_command(self, user: UserManager.User, line: str, not_secure: bool):
+    def run_command(self, user: UserManager.User, line: str, not_secure: bool = False):
         mat = self.parse_command(line)
         if mat is None: return # not a ChatCommand
         try:
