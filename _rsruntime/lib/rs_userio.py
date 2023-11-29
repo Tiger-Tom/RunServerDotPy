@@ -340,10 +340,10 @@ class ChatCommands:
                 return
             exc = ''.join(traceback.format_exception(e))
             user.tell(TellRaw.text(f'A failure occured whilst running command {line!r}:', TellRaw.TextFormat(color='#FF0000')).line_break() \
-                             .text(repr(e), TellRaw.TextFormat(color='#FF0000')).line_break() \
-                             .text('Click to copy full error message', red,
+                             .text(repr(e), '#FF0000').line_break() \
+                             .text('Click to copy full error message', '#FF0000',
                                    click_event=TellRaw.ClickEvent.COPY, click_contents=exc,
-                                   hover_event=TellRaw.HoverEvent.TEXT, hover_contents=TellRaw().text(exc, TellRaw.TextFormat(color='#FF0000', underlined=True))))
+                                   hover_event=TellRaw.HoverEvent.TEXT, hover_contents=TellRaw().text(exc, '#FF0000', TellRaw.TF.UNDERLINED)))
 
     def register_func(self, func: typing.Callable[['User', ...], None], aliases: set = set(), *, permission: UserManager.Perm = UserManager.Perm.USER, help_section: str | tuple[str] = ()) -> ChatCommand:
         cc = self.ChatCommand(func, permission=permission, help_section=help_section)
