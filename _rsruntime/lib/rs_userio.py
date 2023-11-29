@@ -335,6 +335,7 @@ class ChatCommands:
         try:
             if not mat[0]:
                 raise KeyError(f'ChatCommand {mat[1]} was not found, perhaps try {self.helpcmd_for()}?')
+            mat[1](user, *mat[1].params.parse_args(*mat[1].split_args(mat[2])))
         except Exception as e:
             if user is user.CONSOLE:
                 print(f'Failure whilst running command {line!r}:\n{"".join(traceback.format_exception(e))}')
