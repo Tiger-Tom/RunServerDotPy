@@ -202,7 +202,7 @@ def mode_modify(args: argparse.Namespace):
     man = Manifest.from_file(args.manifest)
     for fn,fv in args.modify.items():
         for sfn,v in fv.items():
-            eprint(f'Modified field {fn}/{sfn}: {man[fn][sfn]!r} -> {v}')
+            eprint(f'Modified field {fn}/{sfn}: {man[fn].get(sfn, NotImplemented)!r} -> {v}')
             man[fn][sfn] = v
     common_output(man, args)
 #</Header>
