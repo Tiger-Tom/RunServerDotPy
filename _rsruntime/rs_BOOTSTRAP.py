@@ -243,6 +243,7 @@ ManifestDict_metadata = typing.TypedDict("ManifestDict['metadata']", {
     'description': str | None,
     'manifest_upstream': str,
     'content_upstream': str,
+    'meta_version': typing.NotRequired[str],
 })
 ManifestDict_system = typing.TypedDict("ManifestDict['system']", {
     'os_name': str | None,
@@ -558,7 +559,7 @@ class Manifest(UserDict):
     DEFAULT_FORMAT = {
         'terse':   '\'{metadata.name}\' by {creation.by}',
         'normal':  '\'{metadata.name}\' by {creation.by}{f_alias} (updated {fd_updated} to rev.{creation.nupdates}): "{metadata.description}"',
-        'verbose': '\'{metadata.name}\' by {creation.by}{f_alias}\n'
+        'verbose': '\'{metadata.name}\' by {creation.by}{f_alias} (meta-version: {o_metaversion})\n'
                    '{metadata.description}\n'
                    ' Created on {fd_created}, updated on {fd_updated} to rev.{creation.nupdates}\n'
                    ' Contains {n_files} file(s) hashed with {_.hash_algorithm} ({_.encoding})\n'
@@ -593,6 +594,7 @@ class Manifest(UserDict):
             fmtdict['f_pyver'] = f'{".".join(str(v) for v in s["python_version"][:3])} {s["python_version"][3]} {s["python_version"][4]}'
             fmtdict['f_system'] = fmt['sysfmt'][2].format_map(fmtdict)
         fmtdict['n_files'] = len(self['files'])
+        fmtdict['o_metaversion'] = self['metadata'].get('meta_version', '<not provided>')
         return fmt[level].format_map(fmtdict)
     def _loglvl_to_infolvl(self) -> str:
         lvl = self.logger.getEffectiveLevel()
