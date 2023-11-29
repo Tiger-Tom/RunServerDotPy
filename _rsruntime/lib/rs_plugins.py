@@ -205,3 +205,8 @@ class PluginManager:
             if not hasattr(p, '__start__'): continue
             self.logger.infop(f'Starting plugin {n}')
             p.__start__(p)
+    def restart(self):
+        for n,p in self.plugins.items():
+            if not hasattr(p, '__restart__'): continue
+            self.logger.infop(f'Restarting plugin {n}')
+            p.__restart__()

@@ -132,13 +132,17 @@ class RunServer(types.ModuleType):
         self.ServerManager = self.SM = self.ServerManager()
         # Start plugins
         self.PM.start()
-        # Start server
+        # Main server loop
         while True:
+            # Start server
             self.SM.start()
+            # Handle forced no-restarts
             if self.F.force_no_restart or ((not self.F.force_restart) and (not self.C('server_manager/autorestart/restart', True))): break
+            # Handle impossible restarts
             if not self.SM.cap_restartable:
                 self.logger.fatal(f'A restart was requested, but the ServerManager (type {self.SM.type}) does not support restarting')
                 break
+            # Prompt user to cancel restart (if needed)
             try:
                 for s in range(self.C('server_manager/autorestart/delay', 5), 0, -1):
                     print(f'Restarting in {s} second{"" if s == 1 else "s"}, issue KeyboardInterrupt (usually CTRL+C) to cancel')
@@ -146,3 +150,5 @@ class RunServer(types.ModuleType):
             except KeyboardInterrupt:
                 print('Restart aborted')
                 break
+            # Restart plugins
+            self.PM.restart()
