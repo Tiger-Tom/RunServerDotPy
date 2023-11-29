@@ -161,7 +161,7 @@ class PluginManager:
     Config.set_default('plugins/plugins_path', './_rsplugins/')
     Config.mass_set_default('plugins/glob/', early_load='**/__early_load__.py', basic='**/__plugin__.py', standalone='**/*.rs.py')
 
-    unsafe_name = re.compile('^[^\w\d\- ;]+$')
+    unsafe_name = re.compile(r'^[^\w\d\- ;]+$')
 
     def __init__(self):
         self.logger = RS.logger.getChild('PM')
