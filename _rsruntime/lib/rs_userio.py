@@ -1,12 +1,13 @@
 #!/bin/python3
 
 #> Imports
-# Parsing
-import re
-import json
 import inspect
 from functools import wraps
 import traceback
+# Parsing
+import re
+import json
+from shlex import shlex
 # Types
 import typing
 from types import UnionType
@@ -230,6 +231,9 @@ class ChatCommands:
             # Validate arguments and call command
             self.target(user, *self.params.parse_args(*args))
 
+        def split_args(self, args: str) -> tuple[str]:
+            return shlex.split(args)
+
         @property
         def name(self) -> str: return self.target.__name__
         @property
@@ -323,7 +327,7 @@ class ChatCommands:
         if mat is None: return # not a ChatCommand
         try:
             if not mat[0]:
-                raise KeyError(f'ChatCommand {mat[1]} was not found, perhaps try }?')
+                raise KeyError(f'ChatCommand {mat[1]} was not found, perhaps try {self.helpcmd_for()}?')
         except Exception as e:
             if user is user.CONSOLE:
                 print(f'Failure whilst running command {line!r}:\n{"".join(traceback.format_exception(e))}')
@@ -382,6 +386,7 @@ class ChatCommands:
                                hover_contents=(Config['chat_commands/help/section/hover'],))
                 for sect, text in secttexts)
     def help(self, user: UserManager.User, on: str | typing.Literal[Config['chat_commands/help/section/subcommand']] | None = None, section: None | str = None):
+        # pending rework
         '''Docstring supplied later'''
         is_console = user == UserManager.CONSOLE
         if on is None:
@@ -395,29 +400,24 @@ class ChatCommands:
         else:
             try: cmd = self[on]
             except KeyError: raise KeyError(f'Help for command/alias {on} not found')
-            help_vals = (
-                    Config['chat_commands/patterns/line'].format(
-                        char=Config['chat_commands/patterns/char'],
-                        command=Config['chat_commands/help/formatter/aliassep'].join((cmd.name, *cmd.aliases)),
-                        args=f' {cmd.params.args_line}'),
-                    cmd.help,
-                ) if is_console else (
-                    TellRaw() \
-                        .text(Config['chat_commands/patterns/line'].format(
-                                  char=Config['chat_commands/patterns/char'],
-                                  command=Config['chat_commands/help/formatter/aliassep'].join((cmd.name, *cmd.aliases)),
-                                  args=f' {cmd.params.render_args()}'),
-                              insertion=Config['chat_commands/patterns/line'].format(
-                                  char=Config['chat_commands/patterns/char'],
-                                  command=cmd.name, args=''),
-                              hover_event=TellRaw.HoverEvent.TEXT,
-                              hover_contents=(Config['chat_commands/help/command/hover'],)),
-                    TellRaw.text(cmd.help))
+            cmdhlp = self.compose_command(Config['chat_commands/help/formatter/aliassep'].join((cmd.name, *cmd.aliases)), cm.params.args_line or None)
+            help_vals = (cmdhelp if is_console else TellRaw().text(cmdhlp,
+                                                                   insertion=self.compose_command(cmd.name),
+                                                                   hover_event=TellRaw.HoverEvent.TEXT
+                                                                   hover_contents=(Config['chat_commands/help/command/hover'])))
         if is_console: print('\n'.join(help_vals))
-        else: user.tell(TellRaw.NEWLINE@help_vals)
+        else: user.tell(help_vals)
     help.__doc__ = f'''
         Shows help on commands or sections.
             If on is "{Config['chat_commands/help/section/subcommand']}", then shows help on the section specified by "section"
             If on is a command, then shows help on that command
             If on is not supplied, then shows a list of top-level sections
     '''
+    def helpcmd_for(self, item: str | None = None, for_section: bool = False):
+        '''Composes a help command for the item'''
+        if item is None:
+            assert not for_section, 'item should be None only if for_section is False'
+            return self.compose_command('help')
+        elif for_section:
+            return self.compose_command('help', Config['chat_commands/arguments/argsep'].join(('section', item)))
+        return self.compose_command('help', item)
