@@ -41,4 +41,4 @@ jobs:
           - name: "Commit and push changes"
             uses: stefanzweifel/git-auto-commit-action@v5
             with:
-                commit_message: "Automatic manifest update for ${{ matrix.manif }} (triggered by ${{ github.actor }}: ${{ github.sha }})"
+                commit_message: "Automatic manifest update for ${{ inputs.path }} (triggered by ${{ github.actor }}: ${{ github.sha }})"
