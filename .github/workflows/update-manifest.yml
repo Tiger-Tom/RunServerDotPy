@@ -33,6 +33,9 @@ jobs:
           - name: "Update manifest"
             run: |
               python3 ./devel/mkmanifest.py update "$MAN_PATH/MANIFEST.ini" "$MAN_PATH/" --overwrite
+          - name: "Embed commit meta-version"
+            run: |
+              python3 ./devel/mkmanifest.py modify --metadata.meta_version="'Commit ${{ github.sha }}'" "$MAN_PATH/MANIFEST.ini" --overwrite
           - name: "Sign manifest"
             run: |
               python3 ./devel/mkmanifest.py sign "$MAN_PATH/MANIFEST.ini" ./key.pyk --overwrite
