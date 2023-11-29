@@ -7,7 +7,7 @@ import traceback
 # Parsing
 import re
 import json
-from shlex import shlex
+import shlex
 # Types
 import typing
 from types import UnionType
