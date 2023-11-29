@@ -7,4 +7,4 @@ import RS
 #</Imports
 
 #> Main >/
-print(f'Hello {rs}, I\'m early!')
+print(f'Hello {RS}, I\'m early!')
