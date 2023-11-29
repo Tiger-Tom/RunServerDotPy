@@ -275,7 +275,7 @@ class ChatCommands:
                 char=re.escape(Config['chat_commands/char']),
                 command=f'(?P<cmd>{Config["patterns/command"]})',
                 argsep=f'(?:{Config["chat_commands/arguments/argsep"]})?',
-                args='(?P<args>.*)'))
+                args='(?P<args>.*)')))
     def __call__(self, func: typing.Callable[['User', ...], None] | None = None, **kwargs):
         '''
             Decorator to use register_func
