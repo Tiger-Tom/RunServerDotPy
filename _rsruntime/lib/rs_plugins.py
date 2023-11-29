@@ -6,9 +6,10 @@ import time
 import traceback
 # Files
 from pathlib import Path
-from importlib import util as iutil
+from importlib import util as iutil, machinery as imach
 # Types
 import typing
+from types import ModuleType
 #</Imports
 
 # RunServer Module
@@ -21,24 +22,44 @@ class PluginManager:
     __slots__ = ('logger', 'ManifestLoader', 'ML', 'plugins')
 
     class Plugin:
-        __slots__ = ('logger', 'source', 'name', 'spec', 'config', 'c', 'module')
+        __slots__ = ('source', 'base', 'name', 'logger', 'config', 'c', 'module', 'modules', 'specs')
 
         Config.set_default('plugins/config/base_path', './_rsconfig/plugins/')
 
         def __init__(self, src: Path, name: str | None = None):
             self.source = src
+            self.base = src.parent
             self.name = '<anonymous plugin>' if name is None else name
             self.logger = RS.logger.getChild('PM').getChild(self.name)
-            self.spec = iutil.spec_from_file_location(src.with_suffix('').as_posix().replace('/', '.'), self.source)
             self.config = self.c = Config.__class__(Path(Config['plugins/config/base_path'], f'{self.name}.ini'))
-            self.module = iutil.module_from_spec(self.spec)
-            self.module._ = RS._
-            self.module.this = self
-            self.spec.loader.exec_module(self.module)
+            self.modules = {}; self.specs = {}
+            self.module = self._chainload_tomod(self.name, self.source)
+            self._populate(self.module)
+            self._chainload_execute(self.name)
         def __getattr__(self, attr: str):
             if hasattr(self.module, attr):
                 return getattr(self.module, attr)
             else: raise AttributeError(attr)
+
+        def chainload(self, module: Path | str) -> ModuleType:
+            path = self.base / module
+            name = path.with_suffix('').as_posix().replace('/', '.')
+            self.logger.info(f'Chainloading {module} ({name}) from {path}')
+            self._populate(self._chainload_tomod(name, path))
+            self._chainload_execute(name)
+
+        def _chainload_tomod(self, name: str, path: Path) -> ModuleType:
+            self.logger.debug(f'Chainloading {name}: converting {path} to spec and module')
+            self.specs[name] = iutil.spec_from_file_location(path.with_suffix('').as_posix().replace('/', '.'), path)
+            self.modules[name] = iutil.module_from_spec(self.specs[name])
+            return self.modules[name]
+        def _populate(self, module: ModuleType):
+            self.logger.debug(f'Populating {module}')
+            module.this = self
+            module._ = RS._
+        def _chainload_execute(self, name: str):
+            self.logger.debug(f'Chainloading {name}: executing {self.modules[name]} via {self.specs[name].loader}')
+            self.specs[name].loader.exec_module(self.modules[name])
 
     class _ManifestLoader:
         __slots__ = ('pm', 'logger')
