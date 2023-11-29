@@ -67,12 +67,10 @@ def args_manifest_system(p: argparse.ArgumentParser):
     p.add_argument('--system-info-level', help='The level of system-info to write (default: "full")', choices=('full', 'lite', 'none'), default='full')
 # Common functions
 def common_output(man: Manifest, args: argparse.Namespace):
-    mt = (man.render_json() if args.render_json else man.render_ini()).strip()
+    mt = (man.render_json() if args.render_json else man.render_ini()).strip() + '\n'
     eprint(mt)
     if args.overwrite: args.manifest.write_text(mt)
     else: args.output.write(mt)
-    if args.output == sys.stdout:
-        eprint() # print a newline to prevent terminal issues in case output is not redirected
 # Modes
 def args_make(p: argparse.ArgumentParser):
     p.add_argument('path', help='The path to add files:hashes from', type=Path)
