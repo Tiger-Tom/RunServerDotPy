@@ -14,12 +14,11 @@ from RS.Util import INIBackedDict
 class Config(INIBackedDict):
     '''A thin wrapper around INIBackedDict'''
     __slots__ = ('logger',)
-    conf_path = Path('./_rsconfig/')
 
-    def __init__(self):
+    def __init__(self, conf_path: Path = Path('./_rsconfig/')):
         self.logger = RS.logger.getChild('C')
-        self.conf_path.mkdir(parents=True, exist_ok=True)
-        super().__init__(self.conf_path, 60.0)
+        conf_path.mkdir(parents=True, exist_ok=True)
+        super().__init__(conf_path, 60.0)
         self.start_autosync()
         RS.BS.register_onclose(self.close)
     def set_default(self, option: str | tuple[str], value: typing.Any):

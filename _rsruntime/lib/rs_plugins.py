@@ -14,20 +14,23 @@ import typing
 # RunServer Module
 import RS
 from RS import Config, BS
-from RS.Util import PerfCounter
+from RS.Util import INIBackedDict, PerfCounter
 
 #> Header >/
 class PluginManager:
     __slots__ = ('logger', 'ManifestLoader', 'ML', 'plugins')
 
     class Plugin:
-        __slots__ = ('logger', 'source', 'name', 'spec', 'module')
+        __slots__ = ('logger', 'source', 'name', 'spec', 'config', 'c', 'module')
+
+        Config.set_default('plugins/config/base_path', './_rsconfig/plugins/')
 
         def __init__(self, src: Path, name: str | None = None):
             self.source = src
             self.name = '<anonymous plugin>' if name is None else name
             self.logger = RS.logger.getChild('PM').getChild(self.name)
             self.spec = iutil.spec_from_file_location(src.with_suffix('').as_posix().replace('/', '.'), self.source)
+            self.config = self.c = Config.__class__(Path(Config['plugins/config/base_path'], f'{self.name}.ini'))
             self.module = iutil.module_from_spec(self.spec)
             self.module._ = RS._
             self.module.this = self
