@@ -200,13 +200,13 @@ class PluginManager:
                 continue
             captured.add(p)
             self.plugins[name] = self.Plugin(p, m.name if ((m := self.ML.nearest_manifest(p.parent)) is not None) else name)
+
+    def _pmagic(self, method: str, log: str = 'Called {plug_name}.__{method}__'):
+        for n,p in self.plugins.items():
+            if not hasattr(p, f'__{method}__'): continue
+            self.logger.infop(log.format(plugin=p, plug_name=n, method=method))
+            getattr(p, f'__{method}__')(p)
     def start(self):
-        for n,p in self.plugins.items():
-            if not hasattr(p, '__start__'): continue
-            self.logger.infop(f'Starting plugin {n}')
-            p.__start__(p)
+        self._pmagic('start', 'Starting plugin {plug_name}')
     def restart(self):
-        for n,p in self.plugins.items():
-            if not hasattr(p, '__restart__'): continue
-            self.logger.infop(f'Restarting plugin {n}')
-            p.__restart__(p)
+        self._pmagic('restart', 'Restarting plugin {plug_name}')
