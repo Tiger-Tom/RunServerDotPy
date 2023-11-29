@@ -125,7 +125,6 @@ class ChatCommands:
         __slots__ = ('params', 'args_line')
 
         # Setup config
-        Config.set_default('chat_commands/arguments/argsep', ' ')
         Config.mass_set_default('chat_commands/help/formatter/argument/brackets/',
             required         = '<{argstr}>',
             required_literal = '({argstr})',
@@ -166,7 +165,7 @@ class ChatCommands:
 
         @classmethod
         def render_args(cls, args: tuple[inspect.Parameter]) -> str:
-            return Config['chat_commands/arguments/argsep'].join(map(cls.render_arg, args))
+            return ' '.join(map(cls.render_arg, args))
 
         @classmethod
         def render_arg(cls, arg: inspect.Parameter) -> str:
@@ -255,15 +254,22 @@ class ChatCommands:
     Config.mass_set_default('chat_commands/help/', {
         'command': 'help',
         'formatter/aliassep': '|',
-        'command/hover': 'Shift-click to insert command',
     })
     Config.mass_set_default('chat_commands/help/section/',
         subcommand = 'section',
         list_item  = '- Section "{sect}"',
         hover      = 'Shift-click for more information on this section',
         top        = 'Top-level sections (shift-click a section for more help)',
+        subtop     = 'Help for subsection "{sect}"',
         skip_list  = (),
     )
+    Config.mass_set_default('chat_commands/help/command/',
+        top        = 'Commands in section',
+        list_item  = '- Command "{cmd}"',
+        hover_cmd  = 'Shift-click to insert command',
+        hover_help = 'Shift-click for more information on command',
+    )
+
 
     HELP_SUBSECTIONS = 0
     def __init__(self):
@@ -274,11 +280,11 @@ class ChatCommands:
         # Register hooks
         LineParser.register_chat_callback(self.run_command)
         # Precompile command pattern
-        self.command_patt = re.compile(Config['chat_commands/line_outer'].format(
-            line=Config['chat_commands/line'].format(
-                char=re.escape(Config['chat_commands/char']),
-                command=f'(?P<cmd>{Config["patterns/command"]})',
-                argsep=f'(?:{Config["chat_commands/arguments/argsep"]})?',
+        self.command_patt = re.compile(Config['chat_commands/patterns/line_outer'].format(
+            line=Config['chat_commands/patterns/line'].format(
+                char=re.escape(Config['chat_commands/patterns/char']),
+                command=f'(?P<cmd>{Config["chat_commands/patterns/command"]})',
+                argsep=f'(?: )*',
                 args='(?P<args>.*)')))
     def __call__(self, func: typing.Callable[['User', ...], None] | None = None, **kwargs):
         '''
@@ -310,8 +316,8 @@ class ChatCommands:
         '''Compiles cmd and args together using various configuration to compose a command string'''
         Command['chat_commands/patterns/line'].format(
             char=Config['chat_commands/char'], command=cmd,
-            argsep=('' if args is None else Config['chat_commands/arguments/argsep']),
-            args=('' if args is None else args))
+            argsep=('' if args is None else ' '),
+            args=('' if args is None else (args if isinstance(args, str) else ' '.join(args))))
     def parse_command(self, line: str) -> tuple[bool, ChatCommand | str, str]:
         '''
             Returns:
@@ -370,43 +376,73 @@ class ChatCommands:
             if not create: return None
             container[self.HELP_SUBSECTIONS][section[0]] = {self.HELP_SUBSECTIONS: {}}
         return self._get_helpsubsect(container[self.HELP_SUBSECTIONS][section[0]], section[1:], create)
-    def _help_section(self, sections: tuple[str], to_console: bool = False) -> typing.Iterator[TellRaw | str]:
-        secttexts = ((sect, Config['chat_commands/help/section/list_item'].format(sect=sect)) for sect in sections if sect is not self.HELP_SUBSECTIONS)
-        if to_console: return (secttext[1] for secttext in secttexts if secttext not in Config['chat_commands/help/section/skip_list'])
-        return (TellRaw().text(text,
-                               insertion=Config['chat_commands/patterns/line'].format(
-                                   char=Config['chat_commands/patterns/char'],
-                                   argsep=Config['chat_commands/arguments/argsep'],
-                                   command=Config['chat_commands/arguments/argsep'].join((
-                                               Config['chat_commands/help/command'],
-                                               Config['chat_commands/help/section/subcommand'],
-                                               sect)),
-                                   args=''),
-                               hover_event=TellRaw.HoverEvent.TEXT,
-                               hover_contents=(Config['chat_commands/help/section/hover'],))
-                for sect, text in secttexts)
-    def help(self, user: UserManager.User, on: str | typing.Literal[Config['chat_commands/help/section/subcommand']] | None = None, section: None | str = None):
-        # pending rework
+    def help(self, user: UserManager.User, on: str | typing.Literal[Config['chat_commands/help/section/subcommand']] | None = None, section: None | str = None, force_console: bool | None = None):
         '''Docstring supplied later'''
-        is_console = user == UserManager.CONSOLE
+        is_console = (user == UserManager.CONSOLE) if (force_console is None) else force_console
+        # No-arg mode
         if on is None:
-            help_vals = self._help_section(sorted(self.help_sections.keys()), is_console)
-        elif on == Config['chat_commands/help/section/subcommand']:
+            # top-level section
+            if is_console:
+                for sect in sorted(self.help_sections[self.HELP_SUBSECTIONS].keys()):
+                    if sect is self.HELP_SUBSECTIONS: continue
+                    print(f'- {sect}')
+                return
+            tr = TellRaw().text(Config['chat_commands/help/section/top'], fmt=TellRaw.TF.BOLD)
+            for sect in sorted(self.help_sections.keys()):
+                if sect is self.HELP_SUBSECTIONS: continue
+                tr.line_break() \
+                  .text(Config['chat_commands/help/section/list_item'].format(sect=sect), fmt=TellRaw.TF.UNDERLINED,
+                        insertion=self.helpcmd_for(sect, for_section=True),
+                        hover_event=TellRaw.HoverEvent.TEXT, hover_contents=Config['chat_commands/help/section/hover'])
+            user.tell(tr)
+            return
+        # Sub-section mode
+        elif on is Config['chat_commands/help/section/subcommand']:
             if section is None:
                 raise TypeError('Command missing an argument <section>')
             elif (sectc := self._get_helpsubsect(self.help_sections, section.split('/'), False)) is not None:
-                help_vals = self._help_section(sectc.keys(), is_console)
-            else: raise KeyError(f'Help for section {section} not found')
+                if is_console:
+                    for sect in sorted(sectc[self.HELP_SUBSECTIONS].keys()):
+                        if sect is self.HELP_SUBSECTIONS: continue
+                        print(f'- Section {sect}')
+                    for cmd in sorted(sectc.keys()):
+                        if cmd is self.HELP_SUBSECTIONS: continue
+                        print(f'- Command {cmd}')
+                    return
+                tr = TellRaw()
+                nn = False
+                if (subsects := sorted(sect for sect in sect[self.HELP_SUBSECTIONS].keys() if sect is not self.HELP_SUBSECTIONS)):
+                    tr.text(Config['chat_commands/help/section/subtop'].format(sect=section), fmt=TellRaw.TF.BOLD)
+                    for sect in subsects:
+                        tr.line_break() \
+                          .text(Config['chat_commands/help/section/list_item'].format(sect=sect), fmt=TellRaw.TF.UNDERLINED,
+                                insertion=self.helpcmd_for('/'.join((section, sect)), for_section=True),
+                                hover_event=TellRaw.HoverEvent.TEXT, hover_contents=Config['chat_commands/help/section/hover'])
+                    nn = True
+                if (subcmds := sorted(cmd for cmd in sect.keys() if cmd is not self.HELP_SUBSECTIONS)):
+                    if nn: tr.line_break()
+                    tr.text(Config['chat_commands/help/command/top'], fmt=TellRaw.TR.BOLD)
+                    for cmd in subcmds:
+                        tr.line_break() \
+                          .text(Config['chat_commands/help/command/list_item'].format(cmd=cmd), fmt=TellRaw.TF.UNDERLINED,
+                                insertion=self.helpcmd_for(cmd),
+                                hover_event=TellRaw.HoverEvent.TEXT, hover_contents=Config['chat_commands/help/command/hover_help'])
+                user.tell(tr)
+                return
+            else: raise KeyError(f'Help for section {section!r} not found')
+        # Command mode
+        try: cmd = self[on]
+        except KeyError: raise KeyError(f'Help for command/alias "{on}" not found')
+        cmdline = self.compose_command(Config['chat_commands/help/formatter/aliassep'].join((cmd.name, *cmd.aliases)), cmd.params.args_line or None)
+        if is_console:
+            print(cmdline)
+            print(cmd.help)
         else:
-            try: cmd = self[on]
-            except KeyError: raise KeyError(f'Help for command/alias {on} not found')
-            cmdhlp = self.compose_command(Config['chat_commands/help/formatter/aliassep'].join((cmd.name, *cmd.aliases)), cm.params.args_line or None)
-            help_vals = (cmdhelp if is_console else TellRaw().text(cmdhlp,
-                                                                   insertion=self.compose_command(cmd.name),
-                                                                   hover_event=TellRaw.HoverEvent.TEXT
-                                                                   hover_contents=(Config['chat_commands/help/command/hover'])))
-        if is_console: print('\n'.join(help_vals))
-        else: user.tell(help_vals)
+            user.tell(TellRaw().text(cmdline, fmt=TellRaw.TF.UNDERLINED,
+                                     insertion=self.compose_command(cmd.name),
+                                     hover_event=TellRaw.HoverEvent.TEXT, hover_contents=Config['chat_commands/help/command/hover_cmd']) \
+                               .line_break() \
+                               .text(cmd.help, fmt=TellRaw.TF.ITALIC))
     help.__doc__ = f'''
         Shows help on commands or sections.
             If on is "{Config['chat_commands/help/section/subcommand']}", then shows help on the section specified by "section"
@@ -419,5 +455,5 @@ class ChatCommands:
             assert not for_section, 'item should be None only if for_section is False'
             return self.compose_command('help')
         elif for_section:
-            return self.compose_command('help', Config['chat_commands/arguments/argsep'].join(('section', item)))
+            return self.compose_command('help', ('section', item))
         return self.compose_command('help', item)
