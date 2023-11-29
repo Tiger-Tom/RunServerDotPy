@@ -108,6 +108,10 @@ class BaseServerManager(ABC):
     @abstractproperty
     def _type(): pass
 
+    # Overridable non-abstract methods
+    def stop(self): raise NotImplementedError
+    def kill(self): raise NotImplementedError
+
     # Capabilities
     @abstractproperty
     def cap_arbitrary_read() -> bool: pass
@@ -119,6 +123,7 @@ class BaseServerManager(ABC):
     cap_stoppable: bool = True # we usually have control via /stop
     cap_restartable: bool = False # we cannot always restart it
     cap_read_from_write: bool = False # most places cannot separate normal output from command output immediately
+    cap_killable: bool = False
 
     # Misc. attributes
     attr_is_dummy: bool = False
@@ -142,9 +147,12 @@ class BasePopenManager(BaseServerManager):
 
     cap_arbitrary_write = True
     cap_restartable = True
+    cap_killable = True
 
     def start(self):
         self.popen = subprocess.Popen(self.cli_line(), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, bufsize=1, text=True, cwd=Config['minecraft/path/base'])
+    def kill(self):
+        self.popen.kill()
 
 # Manager
 class ServerManager:
@@ -309,6 +317,9 @@ class SelectManager(BasePopenManager):
             self.handle_line(line)
     def write(self, line: str):
         self.popen.stdin.write(line)
+    def stop(self):
+        self.write('save-all')
+        self.write('stop')
 
     cap_arbitrary_read = True
 
@@ -323,6 +334,7 @@ class DummyServerManager(BaseServerManager):
         self.hooks(input('>DUMMY SERVER INPUT >'))
     def write(self, line: str):
         print(f'>DUMMY SERVER WRITE > {line}')
+        
 
     cap_arbitrary_read = True
     cap_arbitrary_write = True
