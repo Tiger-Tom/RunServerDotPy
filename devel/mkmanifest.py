@@ -116,7 +116,7 @@ def mode_update(args: argparse.Namespace):
         man['creation']['nupdates'] += 1
         man['creation']['updated_at'] = round(time.time())
         if not args.no_sysinfo:
-            man['system'] = getattr(ManifestFactor, f'field_system_info__{("none", "lite", "full")[man["system"]["_info_level"]]}')
+            man['system'] = getattr(ManifestFactory, f'field_system_info__{("none", "lite", "full")[man["system"]["_info_level"]]}')
         no_changes = False
     else:
         eprint(f'No new changes to write!')
