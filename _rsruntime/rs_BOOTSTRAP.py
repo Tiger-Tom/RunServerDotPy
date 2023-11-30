@@ -297,7 +297,7 @@ class Manifest(UserDict):
         if not skip_verify_local:
             try: self.verify()
             except InvalidSignature:
-                self.logger.fatal(f'Local manifest has an invalid signature! Will continue anyway, but keep in mind that upstream manifests may fail as well')
+                self.logger.fatal('Local manifest has an invalid signature! Will continue anyway, but keep in mind that upstream manifests may fail as well')
         self.upgrade(ask_download)
         self.logger.infop(f'(New) Local manifest: {self._log_info()}')
         self.execute(ask_execute)
@@ -483,7 +483,7 @@ class Manifest(UserDict):
         with request.urlopen(url, timeout=cls.DOWNLOAD_TIMEOUT) as r: data = r.read().decode()
         if path_type is None: path_type = cls.suffix_to_type.get(url[url.rindex('.'):] if ('.' in url) else '', None) # Guess it through the suffix
         if path_type is None: # Try every handler
-                logger.warning(f'path_type not given, and guessing it via the URL\'s extension ({suffix=!r}) failed')
+                logger.warning(f'path_type not given, and guessing it via the URL\'s extension failed!')
                 for k in cls.type_to_suffix:
                     logger.infop(f'Trying {k} handler on contents of {url}')
                     try: return getattr(cls, f'from_{k}')(data)
