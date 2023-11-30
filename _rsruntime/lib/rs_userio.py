@@ -238,6 +238,7 @@ class ChatCommands:
         @property
         def help(self) -> str:
             if getattr(self, '_help', None) is not None: return self._help
+            if self.target.__doc__ is None: return Config['chat_commands/help/no_help']
             doc = self.target.__doc__.lstrip('\n').rstrip()
             lspace = len(min(re.finditer(r'^([ \t]+)[^ \t\n].*$', doc, re.MULTILINE), key=lambda m: len(m.group(1))).group(1))
             self._help = ('\n'.join(
@@ -314,8 +315,8 @@ class ChatCommands:
 
     def compose_command(self, cmd: str, args: str | None) -> str:
         '''Compiles cmd and args together using various configuration to compose a command string'''
-        Command['chat_commands/patterns/line'].format(
-            char=Config['chat_commands/char'], command=cmd,
+        return Config['chat_commands/patterns/line'].format(
+            char=Config['chat_commands/patterns/char'], command=cmd,
             argsep=('' if args is None else ' '),
             args=('' if args is None else (args if isinstance(args, str) else ' '.join(args))))
     def parse_command(self, line: str) -> tuple[bool, ChatCommand | str, str]:
@@ -373,7 +374,7 @@ class ChatCommands:
     def _register_helpsect(self, section: tuple[str], cmd: ChatCommand):
         self._get_helpsubsect(self.help_sections, section, True)[cmd.name] = cmd
     def _get_helpsubsect(self, container: dict, section: tuple[str], create: bool) -> dict | None:
-        if not len(section): return container[self.HELP_SUBSECTIONS]
+        if not len(section): return container
         elif section[0] not in container[self.HELP_SUBSECTIONS]:
             if not create: return None
             container[self.HELP_SUBSECTIONS][section[0]] = {self.HELP_SUBSECTIONS: {}}
@@ -385,12 +386,12 @@ class ChatCommands:
         if on is None:
             # top-level section
             if is_console:
-                for sect in sorted(self.help_sections[self.HELP_SUBSECTIONS].keys()):
+                for sect in sorted(self.help_sections[self.HELP_SUBSECTIONS].keys(), key=str):
                     if sect is self.HELP_SUBSECTIONS: continue
                     print(f'- {sect}')
                 return
             tr = TellRaw().text(Config['chat_commands/help/section/top'], fmt=TellRaw.TF.BOLD)
-            for sect in sorted(self.help_sections.keys()):
+            for sect in sorted(self.help_sections[self.HELP_SUBSECTIONS].keys(), key=str):
                 if sect is self.HELP_SUBSECTIONS: continue
                 tr.line_break() \
                   .text(Config['chat_commands/help/section/list_item'].format(sect=sect), fmt=TellRaw.TF.UNDERLINED,
@@ -399,21 +400,21 @@ class ChatCommands:
             user.tell(tr)
             return
         # Sub-section mode
-        elif on is Config['chat_commands/help/section/subcommand']:
+        elif on == Config['chat_commands/help/section/subcommand']:
             if section is None:
                 raise TypeError('Command missing an argument <section>')
             elif (sectc := self._get_helpsubsect(self.help_sections, section.split('/'), False)) is not None:
                 if is_console:
-                    for sect in sorted(sectc[self.HELP_SUBSECTIONS].keys()):
+                    for sect in sorted(sectc.get(self.HELP_SUBSECTIONS, {}).keys(), key=str):
                         if sect is self.HELP_SUBSECTIONS: continue
                         print(f'- Section {sect}')
-                    for cmd in sorted(sectc.keys()):
+                    for cmd in sorted(sectc.keys(), key=str):
                         if cmd is self.HELP_SUBSECTIONS: continue
                         print(f'- Command {cmd}')
                     return
                 tr = TellRaw()
                 nn = False
-                if (subsects := sorted(sect for sect in sect[self.HELP_SUBSECTIONS].keys() if sect is not self.HELP_SUBSECTIONS)):
+                if (subsects := sorted(sect for sect in sect.get(self.HELP_SUBSECTIONS, {}).keys() if sect is not self.HELP_SUBSECTIONS)):
                     tr.text(Config['chat_commands/help/section/subtop'].format(sect=section), fmt=TellRaw.TF.BOLD)
                     for sect in subsects:
                         tr.line_break() \
