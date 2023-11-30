@@ -142,6 +142,11 @@ class ChatCommands:
         def __init__(self, func: typing.Callable):
             self.params = tuple(inspect.signature(func).parameters.values())[1:]
             self.args_line = self.render_args(self.params)
+
+        custom_vals_to_strs = {
+            True: Config['chat_commands/help/formatter/special_literal/true_yes'], False: Config['chat_commands/help/formatter/special_literal/false_no'],
+        }; custom_strs_to_vals = {v: k for k,v in custom_vals_to_strs.items()}
+
         def parse_args(self, *args) -> typing.Generator[typing.Any, None, None]:
             eargs = enumerate(args)
             prms = iter(self.params)
@@ -149,13 +154,14 @@ class ChatCommands:
                 try: p = next(prms)
                 except StopIteration:
                     raise TypeError(f'Too many arguments, expected at most {len(self.params)}')
-                if p.kind == p.VAR_POSITIONAL: yield (a, *(a for ei,ea in eargs))
+                if p.kind == p.VAR_POSITIONAL: yield (a, *(ea for ei,ea in eargs))
                 elif p.annotation is p.empty: yield a
                 elif getattr(p.annotation, '__origin__', None) is typing.Literal:
                     if a not in p.annotation.__args__:
                         raise ValueError(f'Expected one of {p.annotation.__args__}, not {a}')
                     yield a
                 elif isinstance(p.annotation, type): yield p.annotation(a)
+                elif a in custom_strs_to_vals: yield custom_strs_to_vals[a]
                 else: yield a
             for p in prms:
                 if p.kind == p.VAR_POSITIONAL: yield ()
@@ -166,7 +172,6 @@ class ChatCommands:
         @classmethod
         def render_args(cls, args: tuple[inspect.Parameter]) -> str:
             return ' '.join(map(cls.render_arg, args))
-
         @classmethod
         def render_arg(cls, arg: inspect.Parameter) -> str:
             if (arg.kind == inspect.Parameter.KEYWORD_ONLY) or (arg.kind == arg.VAR_KEYWORD):
@@ -191,6 +196,7 @@ class ChatCommands:
             elif (getattr(ann, '__origin__', None) is typing.Union) or isinstance(ann, UnionType):
                 return Config['chat_commands/help/formatter/argument/joiners/union'].join(cls.render_annotation(aa) for aa in ann.__args__ if aa not in {None, type(None)})
             elif isinstance(ann, str): return ann
+            elif ann in self.custom_vals_to_strs: return self.custom_vals_to_strs[ann]
             else: return ann.__qualname__
 
 
