@@ -138,6 +138,10 @@ class ChatCommands:
             union = '|',
             tokens = '',
         )
+        Config.mass_set_default('chat_commands/help/formatter/special_literal/',
+            true_yes = 'yes',
+            false_no = 'no',
+        )
 
         def __init__(self, func: typing.Callable):
             self.params = tuple(inspect.signature(func).parameters.values())[1:]
@@ -190,13 +194,13 @@ class ChatCommands:
             return braks.format(argstr=Config['chat_commands/help/formatter/argument/joiners/tokens'].join(build))
         @classmethod
         def render_annotation(cls, ann: typing.Any) -> str:
-            if ann in {None, type(None)}: return 'None'
+            if ann in cls.custom_vals_to_strs: return cls.custom_vals_to_strs[ann]
+            elif ann in {None, type(None)}: return 'None'
             elif getattr(ann, '__origin__', None) is typing.Literal:
                 return Config['chat_commands/help/formatter/argument/joiners/literals'].join(cls.render_annotation(aa) for aa in ann.__args__ if aa not in {None, type(None)})
             elif (getattr(ann, '__origin__', None) is typing.Union) or isinstance(ann, UnionType):
                 return Config['chat_commands/help/formatter/argument/joiners/union'].join(cls.render_annotation(aa) for aa in ann.__args__ if aa not in {None, type(None)})
             elif isinstance(ann, str): return ann
-            elif ann in self.custom_vals_to_strs: return self.custom_vals_to_strs[ann]
             else: return ann.__qualname__
 
 
