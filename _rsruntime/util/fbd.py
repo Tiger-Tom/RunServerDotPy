@@ -24,6 +24,8 @@ from .timer import Timer
 #> Header >/
 __all__ = ('JSONBackedDict', 'INIBackedDict')
 
+type Key = str | tuple[str, ...]
+
 # ABC
 class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource):
     '''
@@ -48,7 +50,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     def file_suffix() -> str: NotImplemented
 
     _transaction_types = IntEnum('TransactionTypes', ('PRE_GETITEM', 'POST_GETITEM', 'SETITEM'))
-    def _validate_transaction(self, key: tuple[str], ttype: _transaction_types, args: tuple[typing.Any] = (), *, _tree: MutableMapping | None = None) -> None:
+    def _validate_transaction(self, key: tuple[str, ...], ttype: 'FileBackedDict._transaction_types', args: tuple = (), *, _tree: MutableMapping | None = None) -> None:
         '''Allows subclasses to place extra restrictions on types of transactions by throwing exceptions to cancel them. Is a no-op by default'''
 
     # Concrete methods #
@@ -60,9 +62,8 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
         self.mtimes = {}; self.dirty = set()
 
     # Key functions
-    Key = str | tuple[str]
     @classmethod
-    def key(cls, key: Key, *, top_level: bool = False) -> tuple[str]: # key key key
+    def key(cls, key: Key, *, top_level: bool = False) -> tuple[str, ...]: # key key key
         '''Transform a string / tuple of strings into a key'''
         if isinstance(key, str): key = key.split(cls.key_sep)
         if not key: raise ValueError('Empty key')
@@ -133,7 +134,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     def _from_string(self, topkey: str, value: str): NotImplemented
 
     # High-level item manipulation
-    def bettergetter(self, key: Key, default: typing.Literal[Behavior.RAISE] | typing.Any = Behavior.RAISE, set_default: bool = True) -> Deserialized | typing.Any:
+    def bettergetter(self, key: Key, default: typing.ForwardRef('FileBackedDict.Behavior.RAISE') | typing.Any = Behavior.RAISE, set_default: bool = True) -> Deserialized | typing.Any:
         '''
             Gets the value of key
                 If the key is missing, then:
@@ -152,12 +153,12 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
         return default
     __call__ = bettergetter
     @abstractmethod
-    def sort(self, by: typing.Callable[[str | tuple[str]], typing.Any] = lambda k: k): NotImplemented
+    def sort(self, by: typing.Callable[[str | tuple[str, ...]], typing.Any] = lambda k: k): NotImplemented
 
     # Med-level item manipulation
     ## Getting
     @locked
-    def get(self, key: Key, default: typing.Literal[Behavior.RAISE] | Serializable = Behavior.RAISE, *, _tree: MutableMapping | None = None) -> Deserialized:
+    def get(self, key: Key, default: typing.ForwardRef('FileBackedDict.Behavior.RAISE') | Serializable = Behavior.RAISE, *, _tree: MutableMapping | None = None) -> Deserialized:
         '''
             Gets the value of key
                 If the key is missing, then raises KeyError if default is Behavior.RAISE, otherwise returns default
@@ -194,7 +195,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
     __contains__ = contains
     ## Iterating
     @locked
-    def items_full(self, start_key: Key, key_join: bool = True) -> typing.Generator[tuple[str | tuple[str], Deserialized], None, None]:
+    def items_full(self, start_key: Key, key_join: bool = True) -> typing.Generator[tuple[str | tuple[str, ...], Deserialized], None, None]:
         '''Iterates over every (key, value) pair, yielding the entire key'''
         yield from ((k, self[k]) for k in self.keys(start_key, key_join))
     @locked
@@ -202,7 +203,7 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
         '''Iterates over every (key, value) pair, yielding the last part of the key'''
         yield from ((k[-1], self[k]) for k in self.keys(start_key, False))
     @locked
-    def keys(self, start_key: Key | None = None, key_join: bool = True) -> typing.Generator[str | tuple[str], None, None]:
+    def keys(self, start_key: Key | None = None, key_join: bool = True) -> typing.Generator[str | tuple[str, ...], None, None]:
         '''Iterates over every key'''
         if start_key is None:
             skey = ()
@@ -230,20 +231,20 @@ class FileBackedDict[Serializable, Serialized, Deserialized](ABC, LockedResource
             else: raise KeyError(topkey)
         return self._data[topkey]
     @abstractmethod
-    def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> MutableMapping | None: NotImplemented
+    def _gettree(self, key: tuple[str, ...], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> MutableMapping | None: NotImplemented
     @abstractmethod
     def _serialize(self, val: Serializable) -> Serialized: NotImplemented
     @abstractmethod
     def _deserialize(self, value: Serialized) -> Deserialized: NotImplemented
 
 # ConfigParser (INI) implementation
-_INI_Serializable = typing.Union[type(...), type(None),                   # simple types
-                                 bool, int, float, complex,               # numeric types
-                                 str, bytes, tuple, list, set, frozenset] # collection types
-_INI_Serialized = str
-_INI_Deserialized = typing.Union[type(...), type(None),                   # simple types
-                                 bool, int, float, complex,               # numeric types
-                                 str, bytes, tuple, frozenset]            # collection types
+type _INI_Serializable = typing.Union[type(...), type(None),                   # simple types
+                                      bool, int, float, complex,               # numeric types
+                                      str, bytes, tuple, list, set, frozenset] # collection types
+type _INI_Serialized = str
+type _INI_Deserialized = typing.Union[type(...), type(None),                   # simple types
+                                      bool, int, float, complex,               # numeric types
+                                      str, bytes, tuple, frozenset]            # collection types
 class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Deserialized]):
     '''A FileBackedDict implementation that uses ConfigParser as a backend'''
     __slots__ = ()
@@ -253,7 +254,7 @@ class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Dese
     def _init_topkey(self, topkey: str):
         self._data[topkey] = ConfigParser()
         self._data[topkey].optionxform = lambda o: o
-    def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> SectionProxy | None:
+    def _gettree(self, key: tuple[str, ...], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = False) -> SectionProxy | None:
         '''Gets the section that contains key[-1]'''
         top = self._gettop(key[0], make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)
         if top is None: return None
@@ -273,7 +274,7 @@ class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Dese
         self._init_topkey(topkey)
         self._data[topkey].read_string(value)
 
-    def sort(self, by: typing.Callable[[str | tuple[str]], typing.Any] = lambda k: k):
+    def sort(self, by: typing.Callable[[str | tuple[str, ...]], typing.Any] = lambda k: k):
         '''Sorts the data of this INIBackedDict in-place, marking all touched sections as dirty'''
         for top,cfg in self._data.items():
             self.dirty.add(top)
@@ -306,22 +307,22 @@ class INIBackedDict(FileBackedDict[_INI_Serializable, _INI_Serialized, _INI_Dese
         return desv
 
 # JSON implementation
-_JSON_Serializable = typing.Union[type(None),       # simple type
-                                  bool, int, float, # numeric types
-                                  str, tuple, list] # collection types
-_JSON_Serialized = typing.Union[type(None),         # simple type
-                                bool, int, float,   # numeric types
-                                str, list]          # collection types
-_JSON_Deserialized = typing.Union[type(None),       # simple type
-                                  bool, int, float, # numeric types
-                                  str, tuple]       # collection types
+type _JSON_Serializable = typing.Union[type(None),       # simple type
+                                       bool, int, float, # numeric types
+                                       str, tuple, list] # collection types
+type _JSON_Serialized = typing.Union[type(None),         # simple type
+                                     bool, int, float,   # numeric types
+                                     str, list]          # collection types
+type _JSON_Deserialized = typing.Union[type(None),       # simple type
+                                       bool, int, float, # numeric types
+                                       str, tuple]       # collection types
 class JSONBackedDict(FileBackedDict[_JSON_Serializable, _JSON_Serialized, _JSON_Deserialized]):
     '''A FileBackedDict implementation that uses JSON as a backend'''
     __slots__ = ()
 
     file_suffix = '.json'
 
-    def _validate_transaction(self, key: tuple[str], ttype: FileBackedDict._transaction_types, args: tuple[typing.Any] = (), *, _tree: MutableMapping | None = None) -> None:
+    def _validate_transaction(self, key: tuple[str, ...], ttype: FileBackedDict._transaction_types, args: tuple = (), *, _tree: MutableMapping | None = None) -> None:
         '''
             Place restrictions on:
                 POST_GETITEM:
@@ -343,7 +344,7 @@ class JSONBackedDict(FileBackedDict[_JSON_Serializable, _JSON_Serialized, _JSON_
 
     def _init_topkey(self, topkey: str, *, _val: dict = {}):
         self._data[topkey] = _val
-    def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = True) -> dict | None:
+    def _gettree(self, key: tuple[str, ...], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = True) -> dict | None:
         '''Gets the section that contains key[-1]'''
         cwd = self._gettop(key[0], make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)
         if cwd is None: return cwd
@@ -365,12 +366,12 @@ class JSONBackedDict(FileBackedDict[_JSON_Serializable, _JSON_Serialized, _JSON_
         self._init_topkey(topkey, _val=json.loads(value))
 
     @classmethod
-    def _sorteddict(cls, data: dict[str, dict | typing.Any], keys: tuple[str], by: typing.Callable[[tuple[str]], typing.Any]) -> dict[str, dict | typing.Any]:
+    def _sorteddict(cls, data: dict[str, dict | typing.Any], keys: tuple[str, ...], by: typing.Callable[[tuple[str, ...]], typing.Any]) -> dict[str, dict | typing.Any]:
         sdata = {}
         for k,v in sorted(data.items(), key=lambda it: by(keys+(it[0],))):
             sdata[k] = self._sorteddict(v, keys+(k,), by) if isinstance(v, dict) else v
         return sdata
-    def sort(self, by: typing.Callable[[tuple[str]], typing.Any] = lambda k: k):
+    def sort(self, by: typing.Callable[[tuple[str, ...]], typing.Any] = lambda k: k):
         '''Sorts the data of this JSONBackedDict (semi-)in-place, marking all touched sections as dirty'''
         for top,dat in self._data.items():
             self.dirty.add(top)
@@ -394,6 +395,6 @@ class _CoJSONBackedDict(JSONBackedDict):
         if not i_want_to_try_it_please:
             raise Exception('CoJSONBackedDict is very broken and should not be used for anything serious. Pass i_want_to_try_it_please=True if you want to just mess around!')
         super().__init__(*args, **kwargs)
-    def _gettree(self, key: tuple[str], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = True) -> dict | None:
+    def _gettree(self, key: tuple[str, ...], *, make_if_missing: bool, fetch_if_missing: bool = True, no_raise_keyerror: bool = True) -> dict | None:
         '''Gets the section that contains key[-1], but in a funky way'''
         return super()._gettree(key+(None,), make_if_missing=make_if_missing, fetch_if_missing=fetch_if_missing, no_raise_keyerror=no_raise_keyerror)

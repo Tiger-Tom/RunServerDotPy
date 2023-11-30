@@ -78,7 +78,7 @@ class Timer:
             self.reset(True)
 
     @staticmethod
-    def set_timer(timer_type: BaseTimer, func: typing.Callable, secs: float, activate_now: bool = True) -> BaseTimer:
+    def set_timer(timer_type: type['Timer.BaseTimer'], func: typing.Callable, secs: float, activate_now: bool = True) -> 'Timer.BaseTimer':
         if activate_now: return timer_type(func, secs).start()
         return timer_type(func, secs)
     @staticmethod

@@ -38,7 +38,7 @@ class MCLang:
             return ((m, time.struct_time(time.localtime()[:3] + time.strptime(m.group('time'), '%H:%M:%S')[3:6] + time.localtime()[6:])), m.group('line'))
         return (None, line)
     ## Patterns
-    def lang_to_pattern(self, lang: str, group_names: tuple[str] | None = None, *, prefix_suffix: str = '^{}$') -> re.Pattern:
+    def lang_to_pattern(self, lang: str, group_names: tuple[str, ...] | None = None, *, prefix_suffix: str = '^{}$') -> re.Pattern:
         l = enumerate(lang)
         patt = []; held_groups = set(); next_group = 1
         pattern_gen = lambda t: f'{r"\d+" if t == "d" else ".+"}?'
@@ -106,7 +106,7 @@ class LineParser:
                 Otherwise, lines that don't have a prefix are passed; the callback should have the signature: `callback(match: re.Match)`
         '''
         (self.hooks_prefix if with_prefix else self.hooks_no_prefix).register(patt, callback)
-    def register_chat_callback(self, callback: typing.Callable[['User', str, bool], None]):
+    def register_chat_callback(self, callback: typing.Callable[[typing.ForwardRef('RS.UM.User'), str, bool], None]):
         '''
             Registers a callback for when chat is recieved
                 The callback should have the signature `callback(user: RS.UserManager.User, message: str, insecure: bool)`

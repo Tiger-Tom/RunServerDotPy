@@ -47,6 +47,7 @@ class PluginManager:
             self.logger.info(f'Chainloading {module} ({name}) from {path}')
             self._populate(self._chainload_tomod(name, path))
             self._chainload_execute(name)
+            return self.modules[name]
 
         def _chainload_tomod(self, name: str, path: Path) -> ModuleType:
             self.logger.debug(f'Chainloading {name}: converting {path} to spec and module')
@@ -112,7 +113,7 @@ class PluginManager:
             return self.available_path(path.with_suffix(f'{path.suffix}.{round(time.time())}'))
         # Manifest discovery
         @staticmethod
-        def _discover_manifests_key(p: Path) -> tuple[int, str]:
+        def _discover_manifests_key(p: Path) -> int:
             '''
                 p is manifest.ini: 0; manifest.json: 1
                 p has "manifest" in name: 2
@@ -180,7 +181,7 @@ class PluginManager:
     def load_plugins(self):
         bp = Path(Config['plugins/plugins_path'])
         self._traverse_plugins(sorted(set(bp.glob(Config['plugins/glob/basic'])) | set(bp.glob(Config['plugins/glob/standalone']))), PerfCounter(sec='', secs=''))
-    def _traverse_plugins(self, paths: set, pc: PerfCounter):
+    def _traverse_plugins(self, paths: typing.Iterable[Path], pc: PerfCounter):
         captured = set()
         for p in paths: # note: add follow_symlinks=True upon release of 3.13
             name = self.unsafe_name.sub('_', p.parent.name if (p.name == '__plugin__.py') else p.stem[:-3])

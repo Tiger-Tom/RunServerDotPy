@@ -21,11 +21,11 @@ class Config(INIBackedDict):
         super().__init__(conf_path, 60.0)
         self.start_autosync()
         RS.BS.register_onclose(self.close)
-    def set_default(self, option: str | tuple[str], value: typing.Any):
+    def set_default(self, option: str | tuple[str], value: INIBackedDict.__bases__[0].__parameters__[0]):
         '''Sets an option if it does not exist'''
         if option not in self:
             self[option] = value
-    def mass_set_default(self, pfx: str | None = None, dict_vals: dict[str, ...] | None = None, **values: dict[str, ...]):
+    def mass_set_default(self, pfx: str | None = None, dict_vals: dict[str, INIBackedDict.__bases__[0].__parameters__[0]] | None = None, **values: INIBackedDict.__bases__[0].__parameters__[0]):
         '''
             Sets a large amount of default values
                 When pfx is not None, it is prepended (with a / if it doesn't already have one) to each key

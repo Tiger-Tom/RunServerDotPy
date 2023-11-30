@@ -201,10 +201,10 @@ class Bootstrapper:
         fl = SourceFileLoader(f'{__package__}.RS', ep)
         self.logger.warning(f'ACCESSING ENTRYPOINT: {fl}')
         return fl.load_module()
-    def stage_entrypoint(self, rs_outer: types.ModuleType) -> 'RunServer':
+    def stage_entrypoint(self, rs_outer: types.ModuleType) -> 'rs_outer.RunServer':
         self.logger.warning(f'STAGING ENTRYPOINT: {rs_outer.RunServer.__init__}')
         return rs_outer.RunServer(self)
-    def chainload_entrypoint(self, rs: 'RunServer'):
+    def chainload_entrypoint(self, rs: typing.Callable):
         self.logger.warning(f'ENTERING ENTRYPOINT: {rs.__call__}')
         rs()
         self.logger.fatal('EXITED ENTRYPOINT')
@@ -219,7 +219,7 @@ class Bootstrapper:
         logging.shutdown()
         if do_exit is False: self.is_closed = True
         else: exit(do_exit)
-    def register_onclose(self, cb: typing.Callable[[None], None]):
+    def register_onclose(self, cb: typing.Callable[[], None]):
         self.shutdown_callbacks.add(cb)
 
 # Manifests
@@ -249,18 +249,18 @@ ManifestDict_system = typing.TypedDict("ManifestDict['system']", {
     'os_name': str | None,
     'platform': str | None,
     'architecture': str | None,
-    'python_version': tuple[int | str] | None,
+    'python_version': tuple[int, int, int, str, int] | tuple[int, int, int] | None,
     'python_implementation': str | None,
     'os_release': str | None,
     'os_version': str | None,
     'hostname': str | None,
     '_info_level': int,
 })
-ManifestDict_files = typing.Dict[str, bytes]
+ManifestDict_files = typing.Dict[str, str]
 ManifestDict_ignore = typing.TypedDict("ManifestDict['ignore']", {
     'skip_upstream_upgrade': bool,
     'skip_all_files': bool,
-    'skip_files': tuple[str],
+    'skip_files': tuple[str, ...],
 }, total=False)
 ManifestDict_format = typing.TypedDict("ManifestDict['format']", {
     'terse': str,
@@ -454,7 +454,7 @@ class Manifest(UserDict):
         return {k: {ik: literal_eval(iv) for ik,iv in v.items()} for k,v in p.items() if k != 'DEFAULT'}
     ### From files
     @classmethod
-    def from_file(cls, path: Path, path_type: typing.Literal[*type_to_suffix] | None = None) -> typing.Self:
+    def from_file(cls, path: Path, path_type: typing.Literal['json', 'ini'] | None = None) -> typing.Self:
         '''
             Initializes Manifest from a file.
             Can load from the following file types:
@@ -477,7 +477,7 @@ class Manifest(UserDict):
         if path_type not in cls.type_to_suffix: raise TypeError(f'Illegal path type {path_type!r}')
         return getattr(cls, f'from_{path_type}')(data).set_path(base=path.parent, own=path)
     @classmethod
-    def from_remote(cls, url: str, path_type: typing.Literal[*type_to_suffix] | None = None) -> typing.Self:
+    def from_remote(cls, url: str, path_type: typing.Literal['ini', 'json'] | None = None) -> typing.Self:
         '''Initializes Manifest from a file, has the same path_type properties of from_file'''
         logger = cls._logger()
         with request.urlopen(url, timeout=cls.DOWNLOAD_TIMEOUT) as r: data = r.read().decode()
@@ -513,7 +513,7 @@ class Manifest(UserDict):
     def i_d_files(self) -> typing.Generator[tuple[str, bytes], None, None]:
         return ((k, base64.b85decode(v)) for k,v in self.data['files'].items())
     @property
-    def d_files(self) -> dict[Path, bytes]: return dict(self.i_d_files())
+    def d_files(self) -> dict[str, bytes]: return dict(self.i_d_files())
     @property
     def d_sig(self) -> bytes: return base64.b85decode(self['_']['signature'])
     @property
@@ -531,7 +531,7 @@ class Manifest(UserDict):
         type(None): lambda v: bytes((255,)),
     }
     @classmethod
-    def _compile_value(cls, val: typing.Union[*_val_compilers] | tuple | list) -> bytes:
+    def _compile_value(cls, val: None | bytes | str | int | tuple | list) -> bytes:
         if isinstance(val, (tuple, list)):
             return b''.join(cls._compile_value(v) for v in val)
         if type(val) not in cls._val_compilers:

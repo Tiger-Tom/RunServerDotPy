@@ -46,7 +46,7 @@ class LockedResource:
                     print("lock acquired!")
     '''
     __slots__ = ('lock',)
-    def __init__(self, *, lock_class: AbstractContextManager = RLock):
+    def __init__(self, *, lock_class: AbstractContextManager | typing.Callable[[None], AbstractContextManager] = RLock):
         self.lock = lock_class()
 ## Class decorators
 def LockedClass(lock_class: AbstractContextManager = RLock, *, I_KNOW_WHAT_IM_DOING: bool = False):

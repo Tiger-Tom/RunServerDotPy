@@ -174,7 +174,7 @@ class ChatCommands:
                 else: yield p.default
 
         @classmethod
-        def render_args(cls, args: tuple[inspect.Parameter]) -> str:
+        def render_args(cls, args: tuple[inspect.Parameter, ...]) -> str:
             return ' '.join(map(cls.render_arg, args))
         @classmethod
         def render_arg(cls, arg: inspect.Parameter) -> str:
@@ -203,13 +203,12 @@ class ChatCommands:
             elif isinstance(ann, str): return ann
             else: return ann.__qualname__
 
-
     class ChatCommand:
         '''
             Help for the command is specified by the doc-string of the target function
             The target function must have at least an argument for the object of the calling user
             The command-line string (A.E. "<arg0:int> (arg1:arg1_1|arg1_2) [arg2:str=abc] [arg3] [arg4:int] [varargs...]") is generated automatically using the target function's arguments
-                That command-line string would be generated from a function such as: `def test(user: 'User', arg0: int, arg1: typing.Literal['arg1_1', 'arg1_2'], arg2: str = 'abc', arg3=None, arg4: int = None, *varargs)`
+                That command-line string would be generated from a function such as: `def test(user: UserManager.User, arg0: int, arg1: typing.Literal['arg1_1', 'arg1_2'], arg2: str = 'abc', arg3=None, arg4: int = None, *varargs)`
                 Annotations of multiple possible literal arguments should be given as `typing.Literal[literal0, literal1, ...]`, which results in `(literal0|literal1|...)`
                 Annotations and default values are detected from the function signature, as in: `arg: int = 0`, which results in `[arg:int=0]`
                     A default value of "None" indicates the argument as optional without hinting the default, as in: `arg=None`, which results in `[arg]`
@@ -226,7 +225,7 @@ class ChatCommands:
         })
 
 
-        def __init__(self, target: typing.Callable[['User', ...], None], *, permission: UserManager.Perm = UserManager.Perm.USER, help_section: str | tuple[str] = ()):
+        def __init__(self, target: typing.Callable[[UserManager.User, ...], None], *, permission: UserManager.Perm = UserManager.Perm.USER, help_section: str | tuple[str, ...] = ()):
             self.target = target
             assert re.fullmatch(Config['chat_commands/patterns/command'], self.name) is not None, f'Illegal command name {self.name}'
             self.permission = permission
@@ -240,7 +239,7 @@ class ChatCommands:
             # Validate arguments and call command
             self.target(user, *self.params.parse_args(*args))
 
-        def split_args(self, args: str) -> tuple[str]:
+        def split_args(self, args: str) -> tuple[str, ...]:
             return shlex.split(args)
 
         @property
@@ -297,7 +296,7 @@ class ChatCommands:
                 command=f'(?P<cmd>{Config["chat_commands/patterns/command"]})',
                 argsep=f'(?: )*',
                 args='(?P<args>.*)')))
-    def __call__(self, func: typing.Callable[['User', ...], None] | None = None, **kwargs):
+    def __call__(self, func: typing.Callable[[UserManager.User, ...], None] | None = None, **kwargs):
         '''
             Decorator to use register_func
             Can be used as a decorator in two ways:
@@ -308,7 +307,7 @@ class ChatCommands:
                 @ChatCommands(aliases={'cmd', 'c'}, permission=UserManager.Perm.ADMIN, help_section=('help section',))
                 def command(user: UserManager.User, ...): ...
         '''
-        def wrapper(func: typing.Callable[['User', ...], None]):
+        def wrapper(func: typing.Callable[[UserManager.User, ...], None]):
             self.register_func(func, **kwargs)
             return func
         if (func is not None):
@@ -316,7 +315,7 @@ class ChatCommands:
                 raise TypeError(f'{func!r} must be a callable')
             return wrapper(func)
         return wrapper
-    def __getitem__(self, cmd_or_alias: str) -> ChatCommand:
+    def __getitem__(self, cmd_or_alias: str) -> 'ChatCommands.ChatCommand':
         if (c := self.commands.get(cmd_or_alias, None)) is not None: return c
         elif (c := self.aliases.get(cmd_or_alias, None)) is not None: return c
         raise KeyError(cmd_or_alias)
@@ -358,11 +357,11 @@ class ChatCommands:
                                    click_event=TellRaw.ClickEvent.COPY, click_contents=exc,
                                    hover_event=TellRaw.HoverEvent.TEXT, hover_contents=TellRaw().text(exc, '#FF0000', TellRaw.TF.UNDERLINED)))
 
-    def register_func(self, func: typing.Callable[['User', ...], None], aliases: set = set(), *, permission: UserManager.Perm = UserManager.Perm.USER, help_section: str | tuple[str] = ()) -> ChatCommand:
+    def register_func(self, func: typing.Callable[[UserManager.User, ...], None], aliases: set = set(), *, permission: UserManager.Perm = UserManager.Perm.USER, help_section: str | tuple[str, ...] = ()) -> 'ChatCommands.ChatCommand':
         cc = self.ChatCommand(func, permission=permission, help_section=help_section)
         self.register(cc, aliases)
         return cc
-    def register(self, cmd: ChatCommand, aliases: set = set()) -> bool:
+    def register(self, cmd: 'ChatCommands.ChatCommand', aliases: set = set()) -> 'ChatCommands.ChatCommand':
         if cmd.name in self.commands:
             raise ValueError(f'Command name {cmd.name} is already taken')
         if cmd.name in self.aliases:
@@ -380,10 +379,11 @@ class ChatCommands:
             cmd.aliases.add(a)
         self._register_helpsect(cmd.help_section, cmd)
         self.logger.infop(f'Registered command {cmd.name}{" <- " if cmd.aliases else ""}{" | ".join(cmd.aliases)}')
+        return cmd
 
-    def _register_helpsect(self, section: tuple[str], cmd: ChatCommand):
+    def _register_helpsect(self, section: tuple[str, ...], cmd: 'ChatCommands.ChatCommand'):
         self._get_helpsubsect(self.help_sections, section, True)[cmd.name] = cmd
-    def _get_helpsubsect(self, container: dict, section: tuple[str], create: bool) -> dict | None:
+    def _get_helpsubsect(self, container: dict, section: tuple[str, ...], create: bool) -> dict | None:
         if not len(section): return container
         elif section[0] not in container[self.HELP_SUBSECTIONS]:
             if not create: return None

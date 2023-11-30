@@ -48,11 +48,11 @@ class BaseServerManager(ABC):
         self.hooks.register(LineParser.handle_line)
     def __init_subclass__(cls):
         logger = RS.logger.getChild('SM._base')
-        logger.debug(f'subclassed by {"abstract" if isabstract(cls) else "concrete"} {cls.name}')
         if isabstract(cls):
+            logger.debug(f'subclassed by abstract {cls.name}')
             cls.register_base()
             return
-        logger.debug(f'registering {cls.name} in ServerManager')
+        logger.debug(f'subclassed by concrete {cls.name}, registering {cls.name} in ServerManager')
         ServerManager.register(cls)
 
     # Non-abstract methods
@@ -102,9 +102,8 @@ class BaseServerManager(ABC):
     @abstractmethod
     def write(self): pass
     # Abstract properties
-    @classmethod
     @abstractproperty
-    def bias(cls) -> float: pass
+    def bias() -> float: NotImplemented
     @abstractproperty
     def _type(): pass
 
@@ -114,9 +113,9 @@ class BaseServerManager(ABC):
 
     # Capabilities
     @abstractproperty
-    def cap_arbitrary_read() -> bool: pass
+    def cap_arbitrary_read() -> bool: NotImplemented
     @abstractproperty
-    def cap_arbitrary_write() -> bool: pass
+    def cap_arbitrary_write() -> bool: NotImplemented
     ## With defaults
     cap_detachable: bool = False
     cap_attachable: bool = False
