@@ -1,6 +1,11 @@
 #!/bin/python3
 
-'''This is simply a stub file that fetches the bootstrapper (if it's missing) and executes it'''
+'''
+This is simply a stub file that executes the bootstrapper
+However, it also adds some extra optional features:
+- Fetching the bootstrapper if its missing (unless RS_NOFETCHBOOTSTRAPPER)
+- Runtime type-checking (if RS_USETYPEGUARD, requires the "typeguard" package)
+'''
 
 #> Imports
 import os
@@ -22,6 +27,7 @@ if __name__ == '__main__':
     try:
         from _rsruntime.rs_BOOTSTRAP import Bootstrapper
     except ImportError as e:
+        if os.getenv('RS_NOFETCHBOOTSTRAPPER'): raise
         from urllib import request
         print(e, file=sys.stderr)
         bpath = Path('_rsruntime/rs_BOOTSTRAP.py')
