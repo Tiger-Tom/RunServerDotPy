@@ -6,6 +6,7 @@ on:
         paths:
           - 'docs/*.md'
           - 'docs/**/*.md'
+    workflow_call:
     workflow_dispatch:
 jobs:
     push_docs:

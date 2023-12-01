@@ -29,3 +29,7 @@ jobs:
             uses: stefanzweifel/git-auto-commit-action@v5
             with:
                 commit_message: "Automatic documentation update (triggered by ${{ github.actor }}: ${{ github.sha }})"
+    docs_to_wiki:
+        name: "Upload docs to wiki"
+        uses: ./.github/workflows/docs-to-wiki.yml
+        secrets: inherit
