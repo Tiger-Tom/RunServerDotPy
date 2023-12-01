@@ -7,6 +7,10 @@ on:
           - '_rsruntime/*.py'
           - '_rsruntime/**/*.py'
     workflow_dispatch:
+
+concurrency:
+    group: pull_push_on_${{ github.ref }}
+
 jobs:
     gen_autodocs:
         name: "Generate AutoDocs"

@@ -10,7 +10,7 @@ on:
                 required: true
 
 concurrency:
-    group: ${{ github.workflow }}-${{ github.ref }}
+    group: pull_push_on_${{ github.ref }}
 
 jobs:
     update_manifest:
