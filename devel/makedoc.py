@@ -92,7 +92,9 @@ def translate_sig(s: inspect.Signature, eglobs: dict = {}, elocs: dict = {}, *, 
         if p.default is not inspect._empty:
             if hasann: yield ' = '
             else: yield '='
-            yield _translate_item(p.default, eglobs, elocs)
+            if isinstance(p.default, str):
+                yield repr(p.default)
+            else: yield _translate_item(p.default, eglobs, elocs)
         if long is not None:
             long += 1
             if long > paramlen: long = 0
