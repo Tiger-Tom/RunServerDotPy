@@ -1,4 +1,4 @@
-name: Auto-update _rsplugins/1000-builtin/MANIFEST.ini
+name: "Manif/Update _rsplugins/1000-builtin"
 on:
     push:
         branches:

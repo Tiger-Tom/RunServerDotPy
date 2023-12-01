@@ -1,4 +1,4 @@
-name: Push docs/ to Wiki
+name: "Docs/Push docs to Wiki"
 on:
     push:
         branches:

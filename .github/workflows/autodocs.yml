@@ -1,4 +1,4 @@
-name: Generate autodocs
+name: "Docs/Generate autodocs"
 on:
     push:
         branches:

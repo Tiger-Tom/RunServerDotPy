@@ -1,4 +1,4 @@
-name: Auto-update _rsruntime/MANIFEST.ini
+name: "Manif/Update _rsruntime"
 on:
     push:
         branches:
