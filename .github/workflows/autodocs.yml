@@ -1,0 +1,27 @@
+name: Generate autodocs
+on:
+    push:
+        branches:
+          - 'v3.x.x'
+        paths:
+          - '_rsruntime/*.py'
+          - '_rsruntime/**/*.py'
+    workflow_dispatch:
+jobs:
+    gen_autodocs:
+        name: "Generate AutoDocs"
+        runs-on: ubuntu-latest
+        steps:
+          - uses: actions/checkout@v3
+          - uses: actions/setup-python@v4
+            with:
+                python-version: '3.12'
+                cache: pip
+          - name: "Explicitly install requirements"
+            run: "python3 -m pip install -r requirements.txt"
+          - name: "Execute makedoc.py"
+            run: "python3 -m ./devel/makedoc.py"
+          - name: "Commit and push changes"
+            uses: stefanzweifel/git-auto-commit-action@v5
+            with:
+                commit_message: "Automatic documentation update (triggered by ${{ github.actor }}: ${{ github.sha }})"

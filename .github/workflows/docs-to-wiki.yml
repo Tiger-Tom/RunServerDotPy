@@ -1,0 +1,19 @@
+name: Push docs/ to Wiki
+on:
+    push:
+        branches:
+          - 'v3.x.x'
+        paths:
+          - 'docs/*.md'
+          - 'docs/**/*.md'
+    workflow_dispatch:
+jobs:
+    push_docs:
+        name: "Push docs to wiki"
+        runs-on: ubuntu-latest
+        steps:
+          - uses: 
+          - uses: OrlovM/Wiki-Action@v1
+            with:
+                path: 'docs'
+                token: ${{ secrets.GITHUB_TOKEN }}
