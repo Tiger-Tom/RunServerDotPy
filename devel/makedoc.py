@@ -199,6 +199,7 @@ def md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, sh
 bs = Bootstrapper()
 bs.root_logger.setLevel(ERROR)
 bs.args.no_color = bs.args.quiet = True
+bs.args.dry_run = bs.is_dry_run = True
 ## Entrypoint
 RS_outer = bs.access_entrypoint('./_rsruntime/rs_ENTRYPOINT.py')
 RS = bs.stage_entrypoint(RS_outer)

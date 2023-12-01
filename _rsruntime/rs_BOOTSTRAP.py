@@ -45,7 +45,7 @@ RS = NotImplemented
 class Bootstrapper:
     '''Does the necessary startup and take-down for RunServer'''
 
-    __slots__ = ('args', 'args_unknown', 'root_logger', 'logger', 'Manifest', 'base_manifest', 'shutdown_callbacks', 'is_closed', '__contained_RS_module', '__contained_RS')
+    __slots__ = ('args', 'args_unknown', 'is_dry_run', 'root_logger', 'logger', 'Manifest', 'base_manifest', 'shutdown_callbacks', 'is_closed', '__contained_RS_module', '__contained_RS')
     # Remotes
     dl_man = 'https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy/v3.x.x/_rsruntime/MANIFEST.ini'
     # Logger formats
@@ -88,7 +88,9 @@ class Bootstrapper:
         unat_grp.add_argument('--unattended-install', help='When executing manifests, don\'t ask before installing new files', action='store_true')
         unat_grp.add_argument('--unattended-replace', help='When executing manifests, don\'t ask before replacing existing files', action='store_true')
         unat_grp.add_argument('--unattended', help='Combined effects of --unattended-install and --unattended-replace', action='store_true')
+        p.add_argument('--dry-run', help='Indicate to the entrypoint that this should be a dry-run', action='store_true')
         self.args, self.args_unknown = p.parse_known_args(args)
+        self.is_dry_run = self.args.dry_run
     ## Setup logging
     def setup_logger(self) -> logging.Logger:
         '''Sets up self.logger, as well as logging.INFOPLUS/IRRECOVERABLE and Logger.infop/irrec()'''

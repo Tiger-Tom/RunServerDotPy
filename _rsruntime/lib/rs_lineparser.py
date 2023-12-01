@@ -14,7 +14,7 @@ import typing
 
 # RunServer Module
 import RS
-from RS import Config
+from RS import Bootstrapper, Config
 from RS.Util import Hooks, PerfCounter
 
 #> Header >/
@@ -77,6 +77,11 @@ class MCLang:
     def extract_lang(self) -> dict[str, str]:
         '''Extracts the language file from a server JAR file, sets and returns self.lang'''
         self.logger.debug('Extracting lang')
+        if Bootstrapper.is_dry_run:
+            self.logger.error('Is a dry-run')
+            from collections import defaultdict
+            self.lang = defaultdict(str)
+            return self.lang
         pc = PerfCounter()
         jzp = zipfile.Path(Path(Config['minecraft/path/base'], Config['minecraft/path/server_jar']))
         vers = Config['minecraft/lang_parser/version']

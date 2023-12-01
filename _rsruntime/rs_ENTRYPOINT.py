@@ -126,6 +126,9 @@ class RunServer(types.ModuleType):
         return importlib.import_module(f'.lib.{module}', __package__)
     def __call__(self):
         self.logger.infop('Entrypoint starting')
+        if self.BS.is_dry_run:
+            self.logger.fatal('Is a dry run')
+            return
         # Registering help command
         self.CC.register_func(self.CC.help, {'?',})
         # Instantiate ServerManager
