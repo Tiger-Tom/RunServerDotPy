@@ -151,24 +151,24 @@ def md_function(func: typing.Callable, level: int = 0):
     build.extend(md_docstr(func.__doc__))
     return '\n'.join(build)
 # RS
-def _md_rs_heldclass(head: str, level: int, cls: type, long: str, short: str | None = None) -> str | None:
-    eprint(f'render {head=} {level=} {cls=} {long=} {short=}')
-    if (p := Path(f'docs/doc/._headoverride/{head}.md')).exists():
-        eprint(f'render {head=} overridden {p=}')
+def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, short: str | None = None) -> str | None:
+    eprint(f'render {headl=} {heads=} {level=} {cls=} {long=} {short=}')
+    if (p := Path(f'docs/doc/._headoverride/{headl}/{long}.md')).exists():
+        eprint(f'render {headl=} {long=} overridden @ {p=}')
         return p.read_text()
     if cls is None: return None
     build = []
-    build.append(mdHeader(f'`{long}` (`{head}.{short or long}`)').render())
+    build.append(mdHeader(f'`{long}` (`{headl}.{long}` | `{heads}.{short or long}`)').render())
     if m := sys.modules.get(getattr(cls, '__module__', None), None):
         p = Path(m.__file__).relative_to(Path.cwd())
         build.append(f'[`{p}`](/{p} "Source")  ')
-    rp = f'parts/{head.replace(".", "/")}/{long}.md'
+    rp = f'parts/{headl.replace(".", "/")}/{long}.md'
     build.append(f'[Standalone doc: {rp}](./{rp})  ')
     if d := getattr(cls, '__doc__', None): build.append('\n'.join(md_docstr(d)))
     #if d := getattr(getattr(cls, '__init__', None), '__doc__', None):
     #    build.append('\n'.join(md_docstr(d)))
     if inspect.ismodule(cls):
-        if cls.__name__ in sys.modules: return
+        if not cls.__file__.startswith(str(Path.cwd())): return None
         for sn in sorted(dir(cls)):
             if hasattr(cls, '__all__'):
                 if sn not in getattr(cls, '__all__', set()): continue
@@ -176,21 +176,20 @@ def _md_rs_heldclass(head: str, level: int, cls: type, long: str, short: str | N
             #elif sn.startswith('_'): continue
             build.append('')
             eprint(f'subrender {sn=}')
-            build.append(md_rs_heldclass(getattr(cls, sn), sn).render(f'{head}.{short}', level + 1))
-        else:
-            return '\n\n'.join(b for b in build if b is not None)
+            build.append(md_rs_heldclass(f'{headl}.{long}', f'{heads}.{short or long}', level + 1, getattr(cls, sn), sn))
+        return '\n\n'.join(b for b in build if b is not None)
     membs = tuple((a, getattr(cls, a)) for a in dir(cls) if (not a.startswith('_')) and hasattr(cls, a))
     for f in sorted((f for n,f in membs if (inspect.isroutine(f) and callable(f))), key=func_get_name):
         build.append('')
         build.append(md_function(f, level + 1))
     return '\n'.join(build)
-def md_rs_heldclass(head: str, level: int, cls: type, long: str, short: str | None = None) -> str | None:
-        r = _md_rs_heldclass(head, level, cls, long, short)
+def md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, short: str | None = None) -> str | None:
+        r = _md_rs_heldclass(headl, heads, level, cls, long, short)
         if r is None: return None
-        rp = Path(f'parts/{head.replace(".", "/")}/{long}.md')
+        rp = Path(f'parts/{headl.replace(".", "/")}/{long}.md')
         p = Path('docs/autodocs/', rp)
         p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(r if not level else _md_rs_heldclass(head, 0, cls, long, short))
+        p.write_text(r if not level else _md_rs_heldclass(headl, heads, 0, cls, long, short))
         return f'{r}\n**[Standalone: {rp}](./{rp})**'
 #</Header
 
@@ -218,6 +217,6 @@ if not os.getenv('RSDOC_NOHEAD'):
 
 dprint(mdHeader('`RunServer` (imported as `RS`)').render())
 dprint('\n'.join(md_docstr(RS.__doc__)), end='\n\n')
-dprint('\n\n\n'.join((r for r in (md_rs_heldclass('RS', 0, getattr(RS, l), l, s) for l,s in zip(RS.__slots__[1::2], RS.__slots__[2::2])) if r is not None)))
+dprint('\n\n\n'.join((r for r in (md_rs_heldclass('RunServer', 'RS', 0, getattr(RS, l), l, s) for l,s in zip(RS.__slots__[1::2], RS.__slots__[2::2])) if r is not None)))
 
 dfile.close()
