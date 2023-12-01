@@ -43,6 +43,8 @@ RS = NotImplemented
 
 #> Header >/
 class Bootstrapper:
+    '''Does the necessary startup and take-down for RunServer'''
+
     __slots__ = ('args', 'args_unknown', 'root_logger', 'logger', 'Manifest', 'base_manifest', 'shutdown_callbacks', 'is_closed', '__contained_RS_module', '__contained_RS')
     # Remotes
     dl_man = 'https://raw.githubusercontent.com/Tiger-Tom/RunServerDotPy/v3.x.x/_rsruntime/MANIFEST.ini'
@@ -66,10 +68,12 @@ class Bootstrapper:
     ## Check Python version
     @classmethod
     def ensure_python_version(cls):
+        '''Ensure that the Python version meets the minimum requirements'''
         if sys.version_info < cls.minimum_vers:
             raise NotImplementedError(f'Python version {".".join(map(str, sys.version_info[:3]))} doesn\'t meet the minimum requirements, needs {".".join(map(str, cls.minimum_vers))}')
     ## Argument parser
     def parse_arguments(self, args=None):
+        '''Generate and ArgumentParser and parse (known) arguments'''
         p = argparse.ArgumentParser('RunServer.py')
         log_grp = p.add_argument_group('Logging')
         log_l_grp = log_grp.add_mutually_exclusive_group()
@@ -87,6 +91,7 @@ class Bootstrapper:
         self.args, self.args_unknown = p.parse_known_args(args)
     ## Setup logging
     def setup_logger(self) -> logging.Logger:
+        '''Sets up self.logger, as well as logging.INFOPLUS/IRRECOVERABLE and Logger.infop/irrec()'''
         log_path = (Path.cwd() / '_rslog')
         log_path.mkdir(exist_ok=True)
         # Create new logging levels
@@ -173,6 +178,7 @@ class Bootstrapper:
     # Bootstrapping
     ## Base function
     def bootstrap(self, close_after: bool = True):
+        '''Executes the base manifest, then accesses, assigns, and chainloads the entrypoint'''
         self.run_base_manifest()
         if self.args.update_only:
             self.logger.fatal('--update-only argument supplied, exiting')
@@ -187,6 +193,7 @@ class Bootstrapper:
         if close_after: self.close()
     ## Install and execute base manifest
     def run_base_manifest(self):
+        '''Executes the base manifest (_rsruntime/MANIFEST.ini)'''
         mp = Path('_rsruntime/MANIFEST.ini')
         if not mp.exists():
             self.logger.error(f'Manifest at {mp} does not exist, attempting to download')
@@ -198,13 +205,16 @@ class Bootstrapper:
         self.base_manifest = Manifest.from_file(mp)()
     ## Load entrypoint
     def access_entrypoint(self, ep: str) -> types.ModuleType:
+        '''Loads the entrypoint's surrounding module'''
         fl = SourceFileLoader(f'{__package__}.RS', ep)
         self.logger.warning(f'ACCESSING ENTRYPOINT: {fl}')
         return fl.load_module()
     def stage_entrypoint(self, rs_outer: types.ModuleType) -> 'rs_outer.RunServer':
+        '''Initializes the entrypoint's class (with self as an argument)'''
         self.logger.warning(f'STAGING ENTRYPOINT: {rs_outer.RunServer.__init__}')
         return rs_outer.RunServer(self)
     def chainload_entrypoint(self, rs: typing.Callable):
+        '''Runs the entrypoint's __call__ method'''
         self.logger.warning(f'ENTERING ENTRYPOINT: {rs.__call__}')
         rs()
         self.logger.fatal('EXITED ENTRYPOINT')
@@ -212,6 +222,7 @@ class Bootstrapper:
     # Utility functions
     ## Shutdown functions
     def close(self, do_exit: bool | int = False):
+        '''Executes all shutdown callbacks and closes logging (logging.shutdown()), and exits with exit code do_exit if it isn't False'''
         if self.is_closed: return
         self.logger.irrec('Instructed to perform orderly shutdown, executing shutdown callbacks...')
         for h in self.shutdown_callbacks: h()
@@ -220,6 +231,7 @@ class Bootstrapper:
         if do_exit is False: self.is_closed = True
         else: exit(do_exit)
     def register_onclose(self, cb: typing.Callable[[], None]):
+        '''Registers a function to run when self.close() is called'''
         self.shutdown_callbacks.add(cb)
 
 # Manifests
