@@ -207,19 +207,20 @@ RS_outer = bs.access_entrypoint('./_rsruntime/rs_ENTRYPOINT.py')
 RS = bs.stage_entrypoint(RS_outer)
 bs.close()
 
-dpath = Path('docs/autodocs/RunServer.md')
-dpath.parent.mkdir(parents=True, exist_ok=True)
-dfile = dpath.open('w')
-def dprint(*k, **kw):
-    print(*k, **kw)
-    print(*k, **kw, file=dfile)
+if not os.getenv('RSDOC_NORUN'):
+    dpath = Path('docs/autodocs/RunServer.md')
+    dpath.parent.mkdir(parents=True, exist_ok=True)
+    dfile = dpath.open('w')
+    def dprint(*k, **kw):
+        print(*k, **kw)
+        print(*k, **kw, file=dfile)
 
-if not os.getenv('RSDOC_NOHEAD'):
-    dprint('*This documentation was generated with `devel/makedoc.py`*')
-    dprint('\n'.join(md_docstr(__doc__)), end='\n\n')
+    if not os.getenv('RSDOC_NOHEAD'):
+        dprint('*This documentation was generated with `devel/makedoc.py`*')
+        dprint('\n'.join(md_docstr(__doc__)), end='\n\n')
 
-dprint(mdHeader('`RunServer` (imported as `RS`)').render())
-dprint('\n'.join(md_docstr(RS.__doc__)), end='\n\n')
-dprint('\n\n\n'.join((r for r in (md_rs_heldclass('RunServer', 'RS', 0, getattr(RS, l), l, s) for l,s in zip(RS.__slots__[1::2], RS.__slots__[2::2])) if r is not None)))
+    dprint(mdHeader('`RunServer` (imported as `RS`)').render())
+    dprint('\n'.join(md_docstr(RS.__doc__)), end='\n\n')
+    dprint('\n\n\n'.join((r for r in (md_rs_heldclass('RunServer', 'RS', 0, getattr(RS, l), l, s) for l,s in zip(RS.__slots__[1::2], RS.__slots__[2::2])) if r is not None)))
 
-dfile.close()
+    dfile.close()
