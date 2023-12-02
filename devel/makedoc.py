@@ -33,14 +33,7 @@ from _rsruntime.rs_BOOTSTRAP import Bootstrapper
 #> Header
 # Helper functions
 ## Indentation
-nleading_whitespace = re.compile(r'^(\s*\n)')
 leading_whitespace = re.compile(r'^( *)[^ ].*$', re.MULTILINE)
-whitespace_line = re.compile('^ +$', re.MULTILINE)
-def render_indents(s: str) -> str:
-    s = whitespace_line.sub('\n', nleading_whitespace.sub('', s.lstrip('\n').rstrip()))
-    if not leading_whitespace.search(s): return s # no leading whitespace at all
-    lspace = min(len(m.group(1)) for m in leading_whitespace.finditer(s) if m)
-    return '\n'.join(line[lspace:] for line in s.split('\n'))
 def indent_to_level(s: str) -> typing.Generator[tuple[int, str], None, None]:
     buff = []
     prev = 0
@@ -55,7 +48,7 @@ def indent_to_level(s: str) -> typing.Generator[tuple[int, str], None, None]:
         else: yield 0, l
 ## Functions
 def func_get_name(func: typing.Callable):
-    func = getattr(func, '__func__', func) # func func func func
+    func = inspect.unwrap(func)
     return func.__name__ if hasattr(func, '__name__') else func.__qualname__
 ## Translation
 def _translate_item(i: str | typing.Any, eglobs: dict, elocs: dict, *, _indirect: bool = False) -> str | typing.Any:
@@ -103,9 +96,8 @@ def translate_sig(s: inspect.Signature, eglobs: dict = {}, elocs: dict = {}, *, 
         if (r := s.return_annotation) is not inspect._empty:
             yield f' -> {_translate_item(r, eglobs, elocs)}'
         yield '\n```'
-    else: yield '\n```\n</details>'
-    
-    
+    else: yield '\n```\n</details>'    
+
 # Markdown classes
 class mdHeader(str):
     __slots__ = ()
@@ -124,7 +116,7 @@ class mdCode(str):
 class mdBlockQuote(str):
     __slots__ = ()
     def irender(self, level: int = 0) -> typing.Generator[str, None, None]:
-        for line in render_indents(self).split('\n'):
+        for line in inspect.cleandoc(self).split('\n'):
             yield f'>{">"*int(level)} {line}'
     def render(self, level: int = 0) -> str:
         return '\n'.join(self.irender(level))
@@ -134,7 +126,7 @@ def md_docstr(dstr: str):
         yield mdBlockQuote('<no doc>').render(0)
         return
     workin = []; prev = 0
-    for lvl,line in indent_to_level(render_indents(dstr)):
+    for lvl,line in indent_to_level(inspect.cleandoc(dstr)):
         if workin and prev != lvl:
             yield mdBlockQuote('\n'.join(workin)).render(prev)
             workin = []; prev = lvl
@@ -147,10 +139,10 @@ def md_function(func: typing.Callable, level: int = 0):
     build.append(f'```python\n{"@staticmethod\n" if not hasattr(func, "__self__") else "@classmethod\n" if inspect.isclass(func.__self__) else ""}'
                  f'{"@abstractmethod\n" if getattr(func, "__isabstractmethod__", False) else ""}'
                  f'def {func_get_name(func)}{"".join(translate_sig(sig))}')
-    if c := getattr(getattr(func, '__func__', getattr(func, '__wrapped__', func)), '__code__', None):
+    if c := getattr(inspect.unwrap(func), '__code__', None):
         p = Path(c.co_filename).relative_to(Path.cwd())
         build.append(f'[`{p}@{c.co_firstlineno}:{max(lent[-1] for lent in c.co_lines() if isinstance(lent[-1], int))}`](/{p}#L{c.co_firstlineno})  ')
-    build.extend(md_docstr(func.__doc__))
+    build.extend(md_docstr(inspect.getdoc(func)))
     return '\n'.join(build)
 # RS
 def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, short: str | None = None) -> str | None:
