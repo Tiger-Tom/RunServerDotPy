@@ -13,7 +13,7 @@ import os
 import sys
 from pathlib import Path
 from logging import ERROR
-from types import SimpleNamespace
+from types import GenericAlias, SimpleNamespace
 from functools import wraps
 #</Imports
 
@@ -54,6 +54,8 @@ def func_get_name(func: typing.Callable):
 def _translate_item(i: str | typing.Any, eglobs: dict, elocs: dict, *, _indirect: bool = False) -> str | typing.Any:
     if getattr(i, '__origin__', None) is typing.Union:
         return ' | '.join(_translate_item(p, eglobs, elocs) for p in i.__args__)
+    elif isinstance(i, GenericAlias):
+        return f'{_translate_item(i.__origin__, eglobs, elocs)}[{", ".join(_translate_item(a, eglobs, elocs) for a in i.__args__)}]'
     elif (i is None) or isinstance(i, type(None)): return str(None)
     elif not isinstance(i, str):
         eprint(f'{type(i)=} {i=} {repr(i)=}')
