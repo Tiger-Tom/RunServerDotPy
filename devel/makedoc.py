@@ -52,6 +52,11 @@ def func_get_name(func: typing.Callable):
     return func.__name__ if hasattr(func, '__name__') else func.__qualname__
 ## Translation
 def _translate_item(i: str | typing.Any, eglobs: dict, elocs: dict, *, _indirect: bool = False) -> str | typing.Any:
+    match str(i).split('.'):
+        case '_rsruntime', 'lib', f, cls:
+            if f.startswith('rs_'):
+                #return f'RS.{cls}'
+                return cls
     if getattr(i, '__origin__', None) is typing.Union:
         return ' | '.join(_translate_item(p, eglobs, elocs) for p in i.__args__)
     elif isinstance(i, GenericAlias):
@@ -63,8 +68,6 @@ def _translate_item(i: str | typing.Any, eglobs: dict, elocs: dict, *, _indirect
     if not _indirect:
         try: return _translate_item(eval(i), eglobs, elocs) # !
         except: pass
-    match i.split('.'):
-        case _: pass
     return i
 def translate_sig(s: inspect.Signature, eglobs: dict = {}, elocs: dict = {}, *, paramlen: int = 2, longindent: str = '    ') -> typing.Generator[str, None, None]:
     yield '('
