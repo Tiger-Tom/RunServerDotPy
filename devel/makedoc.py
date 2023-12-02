@@ -184,7 +184,7 @@ def md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, sh
         p = Path('docs/autodocs/', rp)
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(r if not level else _md_rs_heldclass(headl, heads, 0, cls, long, short))
-        return f'{r}\n**[Standalone: {rp}](./{rp})**'
+        return r
 #</Header
 
 #> Main >/
