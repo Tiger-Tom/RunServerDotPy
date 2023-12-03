@@ -82,7 +82,7 @@ def translate_sig(s: inspect.Signature, eglobs: dict = {}, elocs: dict = {}, *, 
         yield '...)'
         if (r := s.return_annotation) is not inspect._empty:
             yield f' -> {_translate_item(r, eglobs, elocs)}'
-        yield '\n```\n<details><summary>Parameters...</summary>\n```python\n'
+        yield '\n```\n<details>\n<summary>Parameters...</summary>\n\n```python\n'
     for i,p in enumerate(s.parameters.values()):
         if i:
             if long == 0: yield f',\n{longindent}'
@@ -143,16 +143,22 @@ def md_docstr(dstr: str):
             workin = []; prev = lvl
         workin.append(line)
     yield mdBlockQuote('\n'.join(workin)).render(prev)
-def md_function(func: typing.Callable, level: int = 0):
+def md_function(func: typing.Callable, level: int = 0, max_source_lines: int = 16):
     build = []
     sig = inspect.signature(func)
+    try:
+        source = inspect.cleandoc("\n"+inspect.getsource(func))
+    except TypeError: source = None
+    else:
+        if source.count('\n') > max_source_lines: source = None
     build.append(mdHeader(f'{func_get_name(func)}{"(...)" if sig.parameters else "()"}').render(level))
     build.append(f'```python\n{"@staticmethod\n" if not hasattr(func, "__self__") else "@classmethod\n" if inspect.isclass(func.__self__) else ""}'
                  f'{"@abstractmethod\n" if getattr(func, "__isabstractmethod__", False) else ""}'
                  f'def {func_get_name(func)}{"".join(translate_sig(sig, getattr(func, "__globals__", None)))}')
     if c := getattr(inspect.unwrap(func), '__code__', None):
         p = Path(c.co_filename).relative_to(Path.cwd())
-        build.append(f'[`{p}@{c.co_firstlineno}:{max(lent[-1] for lent in c.co_lines() if isinstance(lent[-1], int))}`](/{p}#L{c.co_firstlineno})  ')
+        build.append(f'[`{p}@{c.co_firstlineno}:{max(lent[-1] for lent in c.co_lines() if isinstance(lent[-1], int))}`](/{p}#L{c.co_firstlineno})')
+    if source: build.append(f'\n<details>\n<summary>Source Code</summary>\n\n```python\n{source}\n```\n</details>\n')
     build.extend(md_docstr(inspect.getdoc(func)))
     return '\n'.join(build)
 # RS
