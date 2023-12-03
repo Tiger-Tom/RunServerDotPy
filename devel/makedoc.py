@@ -146,7 +146,7 @@ def md_function(func: typing.Callable, level: int = 0):
     build.append(mdHeader(f'{func_get_name(func)}{"(...)" if sig.parameters else "()"}').render(level))
     build.append(f'```python\n{"@staticmethod\n" if not hasattr(func, "__self__") else "@classmethod\n" if inspect.isclass(func.__self__) else ""}'
                  f'{"@abstractmethod\n" if getattr(func, "__isabstractmethod__", False) else ""}'
-                 f'def {func_get_name(func)}{"".join(translate_sig(sig))}')
+                 f'def {func_get_name(func)}{"".join(translate_sig(sig, getattr(func, "__globals__", None)))}')
     if c := getattr(inspect.unwrap(func), '__code__', None):
         p = Path(c.co_filename).relative_to(Path.cwd())
         build.append(f'[`{p}@{c.co_firstlineno}:{max(lent[-1] for lent in c.co_lines() if isinstance(lent[-1], int))}`](/{p}#L{c.co_firstlineno})  ')
