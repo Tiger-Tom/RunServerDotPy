@@ -58,6 +58,8 @@ def _translate_item(i: str | typing.Any, eglobs: dict, elocs: dict, *, _indirect
             if f.startswith('rs_'):
                 #return f'RS.{cls}'
                 return cls
+        case 'rs_outer', cls:
+            return cls
     if getattr(i, '__origin__', None) is typing.Union:
         return ' | '.join(_translate_item(p, eglobs, elocs) for p in i.__args__)
     elif isinstance(i, GenericAlias):
