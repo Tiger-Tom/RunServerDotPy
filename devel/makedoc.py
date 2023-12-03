@@ -159,7 +159,7 @@ def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, s
         return p.read_text()
     if cls is None: return None
     build = []
-    build.append(mdHeader(f'`{long}` (`{headl}.{long}` | `{heads}.{short or long}`)').render())
+    build.append(mdHeader(f'`{long}` (`{headl}.{long}` | `{heads}.{short or long}`)').render(level))
     if m := sys.modules.get(getattr(cls, '__module__', None), None):
         p = Path(m.__file__).relative_to(Path.cwd())
         build.append(f'[`{p}`](/{p} "Source")  ')
