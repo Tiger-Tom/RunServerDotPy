@@ -11,6 +11,7 @@ import inspect
 import typing
 import os
 import sys
+import builtins
 from pathlib import Path
 from logging import ERROR
 from types import GenericAlias, SimpleNamespace
@@ -150,6 +151,7 @@ def md_function(func: typing.Callable, level: int = 0):
     build.extend(md_docstr(inspect.getdoc(func)))
     return '\n'.join(build)
 # RS
+types = set(t for t in builtins.__dict__.values() if isinstance(t, type))
 def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, short: str | None = None) -> str | None:
     eprint(f'render {headl=} {heads=} {level=} {cls=} {long=} {short=}')
     if (p := Path(f'docs/doc/._headoverride/{headl}/{long}.md')).exists():
@@ -179,6 +181,10 @@ def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, s
         return '\n\n'.join(b for b in build if b is not None)
     membs = tuple((a, getattr(cls, a)) for a in dir(cls) if (not a.startswith('_')) and hasattr(cls, a))
     for f in sorted((f for n,f in membs if (inspect.isroutine(f) and callable(f))), key=func_get_name):
+        if getattr(f, '__objclass__', None) in types: continue
+        if hasattr(f, '__name__') and hasattr(f, '__self__') and ((fs := getattr(f.__self__.__class__, '_fields', None)) is not None):
+            # namedtuples
+            if f.__name__ not in fs: continue
         build.append('')
         build.append(md_function(f, level + 1))
     return '\n'.join(build)
