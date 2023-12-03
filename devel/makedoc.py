@@ -14,8 +14,9 @@ import sys
 import builtins
 from pathlib import Path
 from logging import ERROR
-from types import GenericAlias, SimpleNamespace
+from types import SimpleNamespace
 from functools import wraps
+from collections.abc import Callable
 #</Imports
 
 #eprint = lambda *k,**kw: print(*k, **kw, file=sys.stderr)
@@ -53,6 +54,7 @@ def func_get_name(func: typing.Callable):
     return func.__name__ if hasattr(func, '__name__') else func.__qualname__
 ## Translation
 def _translate_item(i: str | typing.Any, eglobs: dict, elocs: dict, *, _indirect: bool = False) -> str | typing.Any:
+    if (i is None) or isinstance(i, type(None)) or (i == type(None).__name__): return str(None)
     match str(i).split('.'):
         case '_rsruntime', 'lib', f, cls:
             if f.startswith('rs_'):
@@ -60,12 +62,13 @@ def _translate_item(i: str | typing.Any, eglobs: dict, elocs: dict, *, _indirect
                 return cls
         case 'rs_outer', cls:
             return cls
-    if getattr(i, '__origin__', None) is typing.Union:
-        return ' | '.join(_translate_item(p, eglobs, elocs) for p in i.__args__)
-    elif isinstance(i, GenericAlias):
+    if hasattr(i, '__origin__') and hasattr(i, '__args__'):
+        if i.__origin__ is typing.Union:
+            return ' | '.join(_translate_item(p, eglobs, elocs) for p in i.__args__)
+        if i.__origin__ is Callable:
+            return f'Callable{f"""({", ".join(_translate_item(a, eglobs, elocs) for a in i.__args__[:-1])})""" if len(i.__args__) > 1 else ""}{f" -> {_translate_item(i.__args__[-1], eglobs, elocs)}" if (i.__args__[-1] not in {None, type(None)}) else ""}'
         return f'{_translate_item(i.__origin__, eglobs, elocs)}[{", ".join(_translate_item(a, eglobs, elocs) for a in i.__args__)}]'
-    elif (i is None) or isinstance(i, type(None)): return str(None)
-    elif not isinstance(i, str):
+    if not isinstance(i, str):
         eprint(f'{type(i)=} {i=} {repr(i)=}')
         return _translate_item(i.__name__ if hasattr(i, '__name__') else getattr(i, '__qualname__', str(i)), eglobs, elocs, _indirect=True)
     if not _indirect:
