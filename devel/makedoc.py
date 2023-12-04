@@ -163,14 +163,15 @@ def md_function(func: typing.Callable, level: int = 0, max_source_lines: int = 1
     return '\n'.join(build)
 # RS
 types = set(t for t in builtins.__dict__.values() if isinstance(t, type))
-def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, short: str | None = None) -> str | None:
+def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, short: str | None = None, no_header: bool = False) -> str | None:
     eprint(f'render {headl=} {heads=} {level=} {cls=} {long=} {short=}')
     if (p := Path(f'docs/doc/._headoverride/{headl}/{long}.md')).exists():
         eprint(f'render {headl=} {long=} overridden @ {p=}')
         return p.read_text()
     if cls is None: return None
     build = []
-    build.append(mdHeader(f'`{long}` (`{headl}.{long}` | `{heads}.{short or long}`)').render(level))
+    if not no_header:
+        build.append(mdHeader(f'`{long}` (`{headl}.{long}` | `{heads}.{short or long}`)').render(level))
     if m := sys.modules.get(getattr(cls, '__module__', None), None):
         p = Path(m.__file__).relative_to(Path.cwd())
         build.append(f'[`{p}`](/{p} "Source")  ')
@@ -181,23 +182,19 @@ def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, s
     #    build.append('\n'.join(md_docstr(d)))
     if inspect.ismodule(cls):
         if not cls.__file__.startswith(str(Path.cwd())): return None
-        already_added = set()
-        for sn in sorted(dir(cls)):
-            if hasattr(cls, '__all__'):
-                if sn not in getattr(cls, '__all__', set()): continue
-            elif not sn[0].isupper(): continue
-            #elif sn.startswith('_'): continue
+        clses = {id(getattr(cls, sn)): {sn,} for sn in dir(cls)
+                 if (hasattr(cls, '__all__') and sn in cls.__all__) or ((not hasattr(cls, '__all__')) and sn[0].isupper())}
+        for sn in dir(cls):
+            if (i := id(getattr(cls, sn))) in clses:
+                clses[i].add(sn)
+        for sns in clses.values():
+            sns = sorted(sns, key=lambda sn: (not sn[0].isupper(), -len(sn), sn))
             build.append('')
-            eprint(f'subrender {sn=}')
-            for aasn in already_added:
-                if getattr(cls, sn) is getattr(cls, aasn):
-                    build.append(mdHeader(f'`{sn}` (`{headl}.{long}.{sn}` | `{heads}.{short or long}.{sn}`)').render(level + 1))
-                    build.append(f'Alias to {mdHeader(f"`{aasn}` (`{headl}.{long}.{aasn}` | `{heads}.{short or long}.{aasn}`)").link()}')
-                    break
-            else:
-                build.append(md_rs_heldclass(f'{headl}.{long}', f'{heads}.{short or long}', level + 1, getattr(cls, sn), sn))
-                already_added.add(sn)
-        return '\n\n'.join(b for b in build if b is not None)
+            build.append(mdHeader(f'`{sns[0]}` (`{headl}.{long}.{sns[0]}` | `{heads}.{short or long}.{sns[0]}`)').render(level + 1))
+            for sn in sns[1:]:
+                build.append(mdHeader(f' OR `{sn}` (`{headl}.{long}.{sn}` | `{heads}.{short or long}.{sn}`)').render(level + 2))
+            build.append(md_rs_heldclass(f'{headl}.{long}', f'{heads}.{short or long}', level + 1, getattr(cls, sns[0]), sns[0], no_header=True))
+        return '\n'.join(b for b in build if b is not None)
     membs = tuple((a, getattr(cls, a)) for a in dir(cls) if (not a.startswith('_')) and hasattr(cls, a))
     for f in sorted((f for n,f in membs if (inspect.isroutine(f) and callable(f))), key=func_get_name):
         if getattr(f, '__objclass__', None) in types: continue
@@ -207,13 +204,13 @@ def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, s
         build.append('')
         build.append(md_function(f, level + 1))
     return '\n'.join(build)
-def md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, short: str | None = None) -> str | None:
-    r = _md_rs_heldclass(headl, heads, level, cls, long, short)
+def md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, short: str | None = None, no_header: bool = False) -> str | None:
+    r = _md_rs_heldclass(headl, heads, level, cls, long, short, no_header)
     if r is None: return None
     rp = Path(f'parts/{headl.replace(".", "/")}/{long}.md')
     p = Path('docs/autodocs/', rp)
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(r if not level else _md_rs_heldclass(headl, heads, 0, cls, long, short))
+    p.write_text(r if not level else _md_rs_heldclass(headl, heads, 0, cls, long, short, no_header))
     return r
 #</Header
 
