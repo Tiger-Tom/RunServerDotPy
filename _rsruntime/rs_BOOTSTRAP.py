@@ -191,6 +191,7 @@ class Bootstrapper:
         if RS != NotImplemented:
             self.logger.warning(f'Tried to set {__file__}-level RS, but it appears to have already been set?')
         else: RS = self.__contained_RS
+        self.init_entrypoint(RS)
         self.chainload_entrypoint(RS)
         if close_after: self.close()
     ## Install and execute base manifest
@@ -212,10 +213,14 @@ class Bootstrapper:
         self.logger.warning(f'ACCESSING ENTRYPOINT: {fl}')
         return fl.load_module()
     def stage_entrypoint(self, rs_outer: types.ModuleType) -> 'rs_outer.RunServer':
+        '''Stages the entrypoint's class'''
+        self.logger.warning(f'STAGING ENTRYPOINT: {rs_outer.RunServer.__new__}')
+        return rs_outer.RunServer.__new__(rs_outer.RunServer)
+    def init_entrypoint(self, rs: 'RS'):
         '''Initializes the entrypoint's class (with self as an argument)'''
-        self.logger.warning(f'STAGING ENTRYPOINT: {rs_outer.RunServer.__init__}')
-        return rs_outer.RunServer(self)
-    def chainload_entrypoint(self, rs: typing.Callable):
+        self.logger.warning(f'INITIALIZING ENTRYPOINT: {rs.__init__}')
+        rs.__init__(self)
+    def chainload_entrypoint(self, rs: 'RS'):
         '''Runs the entrypoint's __call__ method'''
         self.logger.warning(f'ENTERING ENTRYPOINT: {rs.__call__}')
         rs()
