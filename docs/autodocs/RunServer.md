@@ -14,7 +14,7 @@
 ```python
 def access_entrypoint(ep: str) -> types.ModuleType
 ```
-[`_rsruntime/rs_BOOTSTRAP.py@209:213`](/_rsruntime/rs_BOOTSTRAP.py#L209)
+[`_rsruntime/rs_BOOTSTRAP.py@210:214`](/_rsruntime/rs_BOOTSTRAP.py#L210)
 
 <details>
 <summary>Source Code</summary>
@@ -34,7 +34,7 @@ def access_entrypoint(self, ep: str) -> types.ModuleType:
 ```python
 def bootstrap(close_after: bool = True)
 ```
-[`_rsruntime/rs_BOOTSTRAP.py@182:195`](/_rsruntime/rs_BOOTSTRAP.py#L182)
+[`_rsruntime/rs_BOOTSTRAP.py@182:196`](/_rsruntime/rs_BOOTSTRAP.py#L182)
 
 <details>
 <summary>Source Code</summary>
@@ -52,6 +52,7 @@ def bootstrap(self, close_after: bool = True):
     if RS != NotImplemented:
         self.logger.warning(f'Tried to set {__file__}-level RS, but it appears to have already been set?')
     else: RS = self.__contained_RS
+    self.init_entrypoint(RS)
     self.chainload_entrypoint(RS)
     if close_after: self.close()
 ```
@@ -61,15 +62,15 @@ def bootstrap(self, close_after: bool = True):
 
 ## chainload_entrypoint(...)
 ```python
-def chainload_entrypoint(rs: Callable)
+def chainload_entrypoint(rs: RS)
 ```
-[`_rsruntime/rs_BOOTSTRAP.py@218:222`](/_rsruntime/rs_BOOTSTRAP.py#L218)
+[`_rsruntime/rs_BOOTSTRAP.py@223:227`](/_rsruntime/rs_BOOTSTRAP.py#L223)
 
 <details>
 <summary>Source Code</summary>
 
 ```python
-def chainload_entrypoint(self, rs: typing.Callable):
+def chainload_entrypoint(self, rs: 'RS'):
     '''Runs the entrypoint's __call__ method'''
     self.logger.warning(f'ENTERING ENTRYPOINT: {rs.__call__}')
     rs()
@@ -83,7 +84,7 @@ def chainload_entrypoint(self, rs: typing.Callable):
 ```python
 def close(do_exit: bool | int = False)
 ```
-[`_rsruntime/rs_BOOTSTRAP.py@226:234`](/_rsruntime/rs_BOOTSTRAP.py#L226)
+[`_rsruntime/rs_BOOTSTRAP.py@231:239`](/_rsruntime/rs_BOOTSTRAP.py#L231)
 
 <details>
 <summary>Source Code</summary>
@@ -124,6 +125,25 @@ def ensure_python_version(cls):
 
 > Ensure that the Python version meets the minimum requirements
 
+## init_entrypoint(...)
+```python
+def init_entrypoint(rs: RS)
+```
+[`_rsruntime/rs_BOOTSTRAP.py@219:222`](/_rsruntime/rs_BOOTSTRAP.py#L219)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def init_entrypoint(self, rs: 'RS'):
+    '''Initializes the entrypoint's class (with self as an argument)'''
+    self.logger.warning(f'INITIALIZING ENTRYPOINT: {rs.__init__}')
+    rs.__init__(self)
+```
+</details>
+
+> Initializes the entrypoint's class (with self as an argument)
+
 ## parse_arguments(...)
 ```python
 def parse_arguments(args=None)
@@ -135,7 +155,7 @@ def parse_arguments(args=None)
 ```python
 def register_onclose(cb: Callable)
 ```
-[`_rsruntime/rs_BOOTSTRAP.py@235:237`](/_rsruntime/rs_BOOTSTRAP.py#L235)
+[`_rsruntime/rs_BOOTSTRAP.py@240:242`](/_rsruntime/rs_BOOTSTRAP.py#L240)
 
 <details>
 <summary>Source Code</summary>
@@ -153,7 +173,7 @@ def register_onclose(self, cb: typing.Callable[[], None]):
 ```python
 def run_base_manifest()
 ```
-[`_rsruntime/rs_BOOTSTRAP.py@197:207`](/_rsruntime/rs_BOOTSTRAP.py#L197)
+[`_rsruntime/rs_BOOTSTRAP.py@198:208`](/_rsruntime/rs_BOOTSTRAP.py#L198)
 
 <details>
 <summary>Source Code</summary>
@@ -186,20 +206,20 @@ def setup_logger() -> logging.Logger
 ```python
 def stage_entrypoint(rs_outer: types.ModuleType) -> RunServer
 ```
-[`_rsruntime/rs_BOOTSTRAP.py@214:217`](/_rsruntime/rs_BOOTSTRAP.py#L214)
+[`_rsruntime/rs_BOOTSTRAP.py@215:218`](/_rsruntime/rs_BOOTSTRAP.py#L215)
 
 <details>
 <summary>Source Code</summary>
 
 ```python
 def stage_entrypoint(self, rs_outer: types.ModuleType) -> 'rs_outer.RunServer':
-    '''Initializes the entrypoint's class (with self as an argument)'''
-    self.logger.warning(f'STAGING ENTRYPOINT: {rs_outer.RunServer.__init__}')
-    return rs_outer.RunServer(self)
+    '''Stages the entrypoint's class'''
+    self.logger.warning(f'STAGING ENTRYPOINT: {rs_outer.RunServer.__new__}')
+    return rs_outer.RunServer.__new__(rs_outer.RunServer)
 ```
 </details>
 
-> Initializes the entrypoint's class (with self as an argument)
+> Stages the entrypoint's class
 
 
 # `Util` (`RunServer.Util` | `RS.U`)
@@ -2133,6 +2153,101 @@ def fromhex(string)
 
 
 
+## `TimedLoadDebug` (`RunServer.Util.TimedLoadDebug` | `RS.U.TimedLoadDebug`)
+[`_rsruntime/util/timed_load_debug.py`](/_rsruntime/util/timed_load_debug.py "Source")  
+[Standalone doc: parts/RunServer/Util/TimedLoadDebug.md](./parts/RunServer/Util/TimedLoadDebug.md)  
+> Helper class for debugging time spent doing things
+
+### final(...)
+```python
+@staticmethod
+def final(self)
+```
+[`_rsruntime/util/timed_load_debug.py@27:29`](/_rsruntime/util/timed_load_debug.py#L27)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def final(self):
+    self.logfn(self.msgfmt[0][1].format(opc=self.ocounter, ipc=self.icounter))
+    self.ocounter = None # stop accidental multiple final() calls
+```
+</details>
+
+> <no doc>
+
+### foreach(...)
+```python
+@classmethod
+def foreach(logfunc: Callable(str), each: tuple[tuple[str, Callable], Ellipsis], tld_args)
+```
+[`_rsruntime/util/timed_load_debug.py@40:45`](/_rsruntime/util/timed_load_debug.py#L40)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+@classmethod
+def foreach(cls, logfunc: typing.Callable[[str], None], *each: tuple[tuple[str, typing.Callable[[], None]], ...], **tld_args):
+    '''Executes each callable (second element of every "each" tuple) in each and times it with TimedLoadDebug, setting {c} as the first element of every "each" tuple'''
+    tld = cls(logfunc, iterable=(n for n,c in each), **tld_args)
+    for n,c in each:
+        with tld: c()
+```
+</details>
+
+> Executes each callable (second element of every "each" tuple) in each and times it with TimedLoadDebug, setting {c} as the first element of every "each" tuple
+
+### ienter(...)
+```python
+@staticmethod
+def ienter(self)
+```
+[`_rsruntime/util/timed_load_debug.py@30:32`](/_rsruntime/util/timed_load_debug.py#L30)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def ienter(self):
+    self.icounter = PerfCounter(sec='', secs='')
+    self.logfn(self.msgfmt[1][0].format(c=next(self.cur[0]), opc=self.ocounter, ipc=self.icounter))
+```
+</details>
+
+> <no doc>
+
+### iexit(...)
+```python
+@staticmethod
+def iexit(...)
+```
+<details>
+<summary>Parameters...</summary>
+
+```python
+    self, exc_type: type | None, exc_value: typing.Any | None,
+    traceback: traceback
+```
+</details>
+[`_rsruntime/util/timed_load_debug.py@34:37`](/_rsruntime/util/timed_load_debug.py#L34)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def iexit(self, exc_type: type | None, exc_value: typing.Any | None, traceback: TracebackType):
+    r = self.msgfmt[2](exc_type, exc_value, traceback)
+    if r is False: return
+    self.logfn(self.msgfmt[1][1].format(c=next(self.cur[1]), opc=self.ocounter, ipc=self.icounter) if r is None else r)
+```
+</details>
+
+> <no doc>
+
+
+
 ## `Timer` (`RunServer.Util.Timer` | `RS.U.Timer`)
 [`_rsruntime/util/timer.py`](/_rsruntime/util/timer.py "Source")  
 [Standalone doc: parts/RunServer/Util/Timer.md](./parts/RunServer/Util/Timer.md)  
@@ -2806,6 +2921,90 @@ def register_unraisable_hook(self, callback: typing.Callable[['UnraisableHookArg
 > <no doc>
 
 
+# `MinecraftManager` (`RunServer.MinecraftManager` | `RS.MC`)
+[`_rsruntime/lib/rs_mcmgr.py`](/_rsruntime/lib/rs_mcmgr.py "Source")  
+[Standalone doc: parts/RunServer/MinecraftManager.md](./parts/RunServer/MinecraftManager.md)  
+
+## init2()
+```python
+def init2()
+```
+[`_rsruntime/lib/rs_mcmgr.py@32:47`](/_rsruntime/lib/rs_mcmgr.py#L32)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def init2(self):
+    if Config['minecraft/manager/auto_fetch_if_missing'] or Config['minecraft/manager/auto_update']:
+        try: self.setup_manifest()
+        except Exception as e:
+            self.logger.fatal(f'Could not setup Minecraft version manifest:\n{"".join(traceback.format_exception(e))}')
+            self.has_manifest = False
+        else: self.has_manifest = True
+    if not (p := Path(Config['minecraft/path/base'], Config['minecraft/path/server_jar'])).exists():
+        self.logger.warning(f'{p} does not exist!')
+        if not self.has_manifest:
+            self.logger.irrec('Minecraft version manifest failed earlier; cannot continue')
+            raise FileNotFoundError(str(p))
+        if not Config['minecraft/manager/auto_fetch_if_missing']:
+            self.logger.irrec('Config minecraft/manager/auto_fetch_if_missing is false, cannot download!')
+            raise FileNotFoundError(str(p))
+        self.missing_fetch()
+```
+</details>
+
+> <no doc>
+
+## missing_fetch()
+```python
+def missing_fetch()
+```
+[`_rsruntime/lib/rs_mcmgr.py@65:66`](/_rsruntime/lib/rs_mcmgr.py#L65)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def missing_fetch(self):
+    ...
+```
+</details>
+
+> <no doc>
+
+## setup_manifest()
+```python
+def setup_manifest()
+```
+[`_rsruntime/lib/rs_mcmgr.py@49:63`](/_rsruntime/lib/rs_mcmgr.py#L49)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def setup_manifest(self):
+    self.logger.info(f'Fetching {Config["minecraft/manager/version_manifest_url"]}')
+    with request.urlopen(Config['minecraft/manager/version_manifest_url']) as r:
+        data = json.load(r)
+    tfmt = Config['minecraft/manager/time_fmt']
+    versions = {v['id']: v | {
+            'time': strptime(v['time'], tfmt), '_time': v['time'],
+            'releaseTime': strptime(v['releaseTime'], tfmt), '_releaseTime': v['releaseTime']
+        } for v in data['versions']}
+    self.versions = self.VersionsType(versions=versions,
+        latest=max((versions[data['latest']['release']], versions[data['latest']['snapshot']]), key=lambda v: v['time']),
+        latest_release=versions[data['latest']['release']],
+        latest_snapshot=versions[data['latest']['snapshot']],
+        releases = {k: v for k,v in versions.items() if v['type'] == 'release'},
+        snapshots = {k: v for k,v in versions.items() if v['type'] == 'snapshot'},
+    )
+```
+</details>
+
+> <no doc>
+
+
 # `MCLang` (`RunServer.MCLang` | `RS.L`)
 [`_rsruntime/lib/rs_lineparser.py`](/_rsruntime/lib/rs_lineparser.py "Source")  
 [Standalone doc: parts/RunServer/MCLang.md](./parts/RunServer/MCLang.md)  
@@ -2816,6 +3015,23 @@ def extract_lang() -> dict[str, str]
 ```
 [`_rsruntime/lib/rs_lineparser.py@77:96`](/_rsruntime/lib/rs_lineparser.py#L77)
 > Extracts the language file from a server JAR file, sets and returns self.lang
+
+## init2()
+```python
+def init2()
+```
+[`_rsruntime/lib/rs_lineparser.py@30:31`](/_rsruntime/lib/rs_lineparser.py#L30)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def init2(self):
+    self.extract_lang()
+```
+</details>
+
+> <no doc>
 
 ## lang_to_pattern(...)
 ```python
@@ -2853,7 +3069,7 @@ def strip_prefix(self, line: str) -> tuple[tuple[re.Match, time.struct_time] | N
 ```python
 def handle_line(line: str)
 ```
-[`_rsruntime/lib/rs_lineparser.py@120:125`](/_rsruntime/lib/rs_lineparser.py#L120)
+[`_rsruntime/lib/rs_lineparser.py@121:126`](/_rsruntime/lib/rs_lineparser.py#L121)
 
 <details>
 <summary>Source Code</summary>
@@ -2870,11 +3086,28 @@ def handle_line(self, line: str):
 
 > <no doc>
 
+## init2()
+```python
+def init2()
+```
+[`_rsruntime/lib/rs_lineparser.py@106:107`](/_rsruntime/lib/rs_lineparser.py#L106)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def init2(self):
+    self.chat_patt = RS.MCLang.lang_to_pattern(RS.MCLang.lang['chat.type.text'], ('username', 'message'), prefix_suffix=r'^(?P<not_secure>(?:\[Not Secure\] )?){}$')
+```
+</details>
+
+> <no doc>
+
 ## register_callback(...)
 ```python
 def register_callback(patt: Pattern, callback: Callable(Match, Match, struct_time) | Callable(Match), with_prefix: bool = True)
 ```
-[`_rsruntime/lib/rs_lineparser.py@107:113`](/_rsruntime/lib/rs_lineparser.py#L107)
+[`_rsruntime/lib/rs_lineparser.py@108:114`](/_rsruntime/lib/rs_lineparser.py#L108)
 
 <details>
 <summary>Source Code</summary>
@@ -2898,7 +3131,7 @@ def register_callback(self, patt: re.Pattern, callback: typing.Callable[[re.Matc
 ```python
 def register_chat_callback(callback: Callable(ForwardRef('RS.UM.User'), str, bool))
 ```
-[`_rsruntime/lib/rs_lineparser.py@114:119`](/_rsruntime/lib/rs_lineparser.py#L114)
+[`_rsruntime/lib/rs_lineparser.py@115:120`](/_rsruntime/lib/rs_lineparser.py#L115)
 
 <details>
 <summary>Source Code</summary>
@@ -3007,7 +3240,7 @@ def start(self):
 @classmethod
 def preferred_order() -> list[type[BaseServerManager]]
 ```
-[`_rsruntime/lib/rs_servmgr.py@199:201`](/_rsruntime/lib/rs_servmgr.py#L199)
+[`_rsruntime/lib/rs_servmgr.py@198:200`](/_rsruntime/lib/rs_servmgr.py#L198)
 
 <details>
 <summary>Source Code</summary>
@@ -3026,7 +3259,7 @@ def preferred_order(cls) -> list[typing.Type[BaseServerManager]]:
 @classmethod
 def register(manager_type: type[BaseServerManager])
 ```
-[`_rsruntime/lib/rs_servmgr.py@196:198`](/_rsruntime/lib/rs_servmgr.py#L196)
+[`_rsruntime/lib/rs_servmgr.py@195:197`](/_rsruntime/lib/rs_servmgr.py#L195)
 
 <details>
 <summary>Source Code</summary>
@@ -3049,7 +3282,7 @@ def register(cls, manager_type: typing.Type[BaseServerManager]):
 ```python
 def close()
 ```
-[`_rsruntime/lib/rs_usermgr.py@168:170`](/_rsruntime/lib/rs_usermgr.py#L168)
+[`_rsruntime/lib/rs_usermgr.py@169:171`](/_rsruntime/lib/rs_usermgr.py#L169)
 
 <details>
 <summary>Source Code</summary>
@@ -3058,6 +3291,38 @@ def close()
 def close(self):
     self.fbd.stop_autosync()
     self.fbd.sync()
+```
+</details>
+
+> <no doc>
+
+## init2()
+```python
+def init2()
+```
+[`_rsruntime/lib/rs_usermgr.py@147:163`](/_rsruntime/lib/rs_usermgr.py#L147)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def init2(self):
+    # Register hooks
+    LineParser.register_callback( # player joins
+        MCLang.lang_to_pattern(MCLang.lang['multiplayer.player.joined'], ('username',)),
+        lambda m,p,t: self[m.group('username')](connected=True, last_connected=t))
+    LineParser.register_callback( # player joins, has changed name
+        MCLang.lang_to_pattern(MCLang.lang['multiplayer.player.joined.renamed'], ('username', 'old_name')),
+        lambda m,p,t: self[m.group('username')](connected=True, old_name=m.group('old_name'), last_connected=t))
+    LineParser.register_callback( # player leaves
+        MCLang.lang_to_pattern(MCLang.lang['multiplayer.player.left'], ('username',)),
+        lambda m,p,t: self[m.group('username')](connected=False, last_disconnected=t))
+    LineParser.register_callback( # player is assigned UUID
+        re.compile(r'^UUID of player (?P<username>\w+) is (?P<uuid>[a-z0-6\-]+)$'),
+        lambda m,p,t: self[m.group('username')](uuid=m.group('uuid')))
+    LineParser.register_callback( # player is assigned entity ID and origin
+        re.compile(r'^(?P<username>\w+)\[\/(?P<origin>(?P<ip>[\d.]+):(?P<port>[\d]+))\] logged in with entity id (?P<entity_id>[\d]+) at \((?P<x>\-?[\d.]+), (?P<y>\-?[\d.]+), (?P<z>\-?[\d.]+)\)$'),
+        lambda p,t,m: self[m.group('username')](ip=m.group('ip'), port=int(m.group('port')), origin=m.group('origin'), login_coords=(float(m.group('x')), float(m.group('y')), float(m.group('z')))))
 ```
 </details>
 
@@ -3208,7 +3473,7 @@ def text(...)
 ```python
 def compose_command(cmd: str, args: str | None) -> str
 ```
-[`_rsruntime/lib/rs_userio.py@325:330`](/_rsruntime/lib/rs_userio.py#L325)
+[`_rsruntime/lib/rs_userio.py@328:333`](/_rsruntime/lib/rs_userio.py#L328)
 
 <details>
 <summary>Source Code</summary>
@@ -3237,7 +3502,7 @@ def help(...)
     force_console: bool | None = None
 ```
 </details>
-[`_rsruntime/lib/rs_userio.py@392:458`](/_rsruntime/lib/rs_userio.py#L392)
+[`_rsruntime/lib/rs_userio.py@395:461`](/_rsruntime/lib/rs_userio.py#L395)
 > Shows help on commands or sections.
 > If on is "section", then shows help on the section specified by "section"
 > If on is a command, then shows help on that command
@@ -3247,7 +3512,7 @@ def help(...)
 ```python
 def helpcmd_for(item: str | None = None, for_section: bool = False)
 ```
-[`_rsruntime/lib/rs_userio.py@465:472`](/_rsruntime/lib/rs_userio.py#L465)
+[`_rsruntime/lib/rs_userio.py@468:475`](/_rsruntime/lib/rs_userio.py#L468)
 
 <details>
 <summary>Source Code</summary>
@@ -3266,11 +3531,31 @@ def helpcmd_for(self, item: str | None = None, for_section: bool = False):
 
 > Composes a help command for the item
 
+## init2()
+```python
+def init2()
+```
+[`_rsruntime/lib/rs_userio.py@297:301`](/_rsruntime/lib/rs_userio.py#L297)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def init2(self):
+    # Register hooks
+    LineParser.register_chat_callback(self.run_command)
+    # Register help command
+    self.register_func(self.help, {'?',})
+```
+</details>
+
+> <no doc>
+
 ## parse_command(...)
 ```python
 def parse_command(line: str) -> tuple[bool, _rsruntime.lib.rs_userio.ChatCommands.ChatCommand | str, str]
 ```
-[`_rsruntime/lib/rs_userio.py@331:341`](/_rsruntime/lib/rs_userio.py#L331)
+[`_rsruntime/lib/rs_userio.py@334:344`](/_rsruntime/lib/rs_userio.py#L334)
 
 <details>
 <summary>Source Code</summary>
@@ -3299,7 +3584,7 @@ def parse_command(self, line: str) -> tuple[bool, ChatCommand | str, str]:
 ```python
 def register(cmd: ChatCommands.ChatCommand, aliases: set = set()) -> ChatCommands.ChatCommand
 ```
-[`_rsruntime/lib/rs_userio.py@364:382`](/_rsruntime/lib/rs_userio.py#L364)
+[`_rsruntime/lib/rs_userio.py@367:385`](/_rsruntime/lib/rs_userio.py#L367)
 > <no doc>
 
 ## register_func(...)
@@ -3314,7 +3599,7 @@ def register_func(...) -> ChatCommands.ChatCommand
     help_section: str | tuple[str, ...] = ()
 ```
 </details>
-[`_rsruntime/lib/rs_userio.py@360:363`](/_rsruntime/lib/rs_userio.py#L360)
+[`_rsruntime/lib/rs_userio.py@363:366`](/_rsruntime/lib/rs_userio.py#L363)
 
 <details>
 <summary>Source Code</summary>
@@ -3333,7 +3618,7 @@ def register_func(self, func: typing.Callable[[UserManager.User, ...], None], al
 ```python
 def run_command(user: User, line: str, not_secure: bool = False)
 ```
-[`_rsruntime/lib/rs_userio.py@342:358`](/_rsruntime/lib/rs_userio.py#L342)
+[`_rsruntime/lib/rs_userio.py@345:361`](/_rsruntime/lib/rs_userio.py#L345)
 
 <details>
 <summary>Source Code</summary>
