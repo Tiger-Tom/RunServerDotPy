@@ -39,7 +39,6 @@ class BaseServerManager(ABC):
     Config.set_default('server_manager/command_line', '{java_binary} {java_args} {server_jar_path} {server_args}')
     Config.mass_set_default('java/', java_binary='java', java_args='-Xmx{allocated_ram} -Xms{allocated_ram} -jar')
     Config.mass_set_default('minecraft/', allocated_ram='1024M', server_args='--nogui')
-    Config.mass_set_default('path/', base='./minecraft', server_jar='server.jar')
 
     def __init__(self):
         self.logger = RS.logger.getChild(f'SM<{self.name}>')

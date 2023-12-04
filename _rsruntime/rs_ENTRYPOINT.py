@@ -25,17 +25,19 @@ class RunServer(types.ModuleType):
         'Config', 'C',
         'ExceptionHandlers', 'EH',
         # Load: 2
+        'MinecraftManager', 'MC',
+        # Load: 3
         'MCLang', 'L',
         'LineParser', 'LP',
         'PluginManager', 'PM',
-        # Load: 3
+        # Load: 4
         'ServerManager', 'SM',
         'UserManager', 'UM',
-        # Load: 4
-        'TellRaw', 'TR',
         # Load: 5
+        'TellRaw', 'TR',
+        # Load: 6
         'ChatCommands', 'CC',
-        # Load: 7
+        # Load: 8
         'Convenience', '_',
     )
     def __init__(self, bs: 'Bootstrapper'):
@@ -72,6 +74,12 @@ class RunServer(types.ModuleType):
         self.logger.debug(f'finish:load_1@T+{pc}')
         # Load: 2
         self.logger.debug(f'start:load_2@T+{pc}')
+        self.__setup_frommod('rs_mcmgr', {
+            ('MinecraftManager', 'MC'): 'MinecraftManager',
+        })
+        self.logger.debug(f'finish:load_2@T+{pc}')
+        # Load: 3
+        self.logger.debug(f'start:load_3@T+{pc}')
         self.__setup_frommod('rs_lineparser', {
             ('MCLang', 'L'): 'MCLang',
             ('LineParser', 'LP'): 'LineParser',
@@ -80,37 +88,37 @@ class RunServer(types.ModuleType):
             ('PluginManager', 'PM'): 'PluginManager',
         })
         self.PM.early_load_plugins()
-        self.logger.debug(f'finish:load_2@T+{pc}')
-        # Load: 3
-        self.logger.debug(f'start:load_3@T+{pc}')
+        self.logger.debug(f'finish:load_3@T+{pc}')
+        # Load: 4
+        self.logger.debug(f'start:load_4@T+{pc}')
         self.__setup_frommod('rs_servmgr', {
             ('ServerManager', 'SM'): 'ServerManager',
         }, call=False)
         self.__setup_frommod('rs_usermgr', {
             ('UserManager', 'UM'): 'UserManager',
         })
-        self.logger.debug(f'finish:load_3@T+{pc}')
-        # Load: 4
-        self.logger.debug(f'start:load_4@T+{pc}')
-        self.__setup_frommod('rs_userio', {
-            ('TellRaw', 'TR'): 'TellRaw',
-        }, call=False)
         self.logger.debug(f'finish:load_4@T+{pc}')
         # Load: 5
         self.logger.debug(f'start:load_5@T+{pc}')
         self.__setup_frommod('rs_userio', {
-            ('ChatCommands', 'CC'): 'ChatCommands',
-        })
+            ('TellRaw', 'TR'): 'TellRaw',
+        }, call=False)
         self.logger.debug(f'finish:load_5@T+{pc}')
         # Load: 6
         self.logger.debug(f'start:load_6@T+{pc}')
-        self.Convenience = self._ = self.__import_mod('rs_convenience')
+        self.__setup_frommod('rs_userio', {
+            ('ChatCommands', 'CC'): 'ChatCommands',
+        })
         self.logger.debug(f'finish:load_6@T+{pc}')
         # Load: 7
         self.logger.debug(f'start:load_7@T+{pc}')
+        self.Convenience = self._ = self.__import_mod('rs_convenience')
+        self.logger.debug(f'finish:load_7@T+{pc}')
+        # Load: 8
+        self.logger.debug(f'start:load_8@T+{pc}')
         self.Config.sync()
         self.PM.load_plugins()
-        self.logger.debug(f'finish:load_7@T+{pc}')
+        self.logger.debug(f'finish:load_8@T+{pc}')
         # Final log
         self.logger.debug(f'finish@T+{pc}')
     def __setup_frommod(self, module: str, keys: dict[tuple[str, str], str], *, call: bool = True):

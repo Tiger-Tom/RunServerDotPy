@@ -23,7 +23,6 @@ class MCLang:
     prefix = re.compile(r'^\[(?P<time>[0-9:]{8})\] \[(?P<thread>[^/]+)/(?P<level>[A-Z]+)\]: (?P<line>.*?)$')
 
     # Setup config
-    Config.mass_set_default('minecraft/path', base='./minecraft/', server_jar='server.jar')
     Config.mass_set_default('minecraft/lang_parser', version=None, lang='en_us')
 
     def __init__(self):
