@@ -10,7 +10,7 @@ from .perfcounter import PerfCounter
 #> Header >/
 __all__ = ('TimedLoadDebug',)
 
-type t_messagefmt = tuple[tuple[str, str], tuple[str, str], typing.Callable[[type | None, typing.Any | None, TracebackType | None | typing.Literal[False]], str | None]]
+type t_messagefmt = tuple[tuple[str, str], tuple[str, str], typing.Callable[[type | None, typing.Any | None, TracebackType | None], str | None | typing.Literal[False]]]
 class TimedLoadDebug:
     '''Helper class for debugging time spent doing things'''
     __slots__ = ('logfn', 'msgfmt', 'cur', 'ocounter', 'icounter')
