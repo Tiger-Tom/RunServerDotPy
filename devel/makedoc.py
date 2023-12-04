@@ -112,9 +112,9 @@ def translate_sig(s: inspect.Signature, eglobs: dict = {}, elocs: dict = {}, *, 
 # Markdown classes
 class mdHeader(str):
     __slots__ = ()
-    patt = re.compile(r'[^\w]')
+    patt = re.compile(r'[^\w\-]')
     def linkable(self) -> str:
-        return self.patt.sub('', self.replace(' ', '-'))
+        return self.patt.sub('', self.replace(' ', '-')).lower()
     def link(self, name: str | None = None) -> str:
         if name is None: name = self
         return f'[{name}](#{self.linkable()})  '
