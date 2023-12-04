@@ -54,68 +54,60 @@ class RunServer(types.ModuleType):
             self.logger.fatal('RS already exists in sys.modules, continuing by overwriting but this may have consequences!')
         sys.modules['RS'] = self
         # Setup perf counter
-        pc = util.PerfCounter(sec='', secs='')
-        self.logger.debug(f'start@T+{pc}')
+        tld = util.TimedLoadDebug(self.logger.info)
         # Load: 0
-        self.logger.debug(f'start:load_0@T+{pc}')
-        sys.modules['RS.Util'] = self.Util = self.U = util
-        self.Flags = self.F = SimpleNamespace()
-        self.F.force_restart = False
-        self.F.force_no_restart = False
-        self.logger.debug(f'finish:load_0@T+{pc}')
+        with tld:
+            sys.modules['RS.Util'] = self.Util = self.U = util
+            self.Flags = self.F = SimpleNamespace()
+            self.F.force_restart = False
+            self.F.force_no_restart = False
         # Load: 1
-        self.logger.debug(f'start:load_1@T+{pc}')
-        self.__setup_frommod('rs_config', {
-            ('Config', 'C'): 'Config',
-        })
-        self.__setup_frommod('rs_exceptionhandlers', {
-            ('ExceptionHandlers', 'EH'): 'ExceptionHandlers',
-        })
-        self.logger.debug(f'finish:load_1@T+{pc}')
+        with tld:
+            self.__setup_frommod('rs_config', {
+                ('Config', 'C'): 'Config',
+            })
+            self.__setup_frommod('rs_exceptionhandlers', {
+                ('ExceptionHandlers', 'EH'): 'ExceptionHandlers',
+            })
         # Load: 2
-        self.logger.debug(f'start:load_2@T+{pc}')
-        self.__setup_frommod('rs_mcmgr', {
-            ('MinecraftManager', 'MC'): 'MinecraftManager',
-        })
-        self.logger.debug(f'finish:load_2@T+{pc}')
+        with tld:
+            self.__setup_frommod('rs_mcmgr', {
+                ('MinecraftManager', 'MC'): 'MinecraftManager',
+            })
         # Load: 3
-        self.logger.debug(f'start:load_3@T+{pc}')
-        self.__setup_frommod('rs_lineparser', {
-            ('MCLang', 'L'): 'MCLang',
-            ('LineParser', 'LP'): 'LineParser',
-        })
-        self.__setup_frommod('rs_plugins', {
-            ('PluginManager', 'PM'): 'PluginManager',
-        })
-        self.PM.early_load_plugins()
-        self.logger.debug(f'finish:load_3@T+{pc}')
+        with tld:
+            self.__setup_frommod('rs_lineparser', {
+                ('MCLang', 'L'): 'MCLang',
+                ('LineParser', 'LP'): 'LineParser',
+            })
+            self.__setup_frommod('rs_plugins', {
+                ('PluginManager', 'PM'): 'PluginManager',
+            })
+            self.PM.early_load_plugins()
         # Load: 4
-        self.logger.debug(f'start:load_4@T+{pc}')
-        self.__setup_frommod('rs_servmgr', {
-            ('ServerManager', 'SM'): 'ServerManager',
-        }, call=False)
-        self.__setup_frommod('rs_usermgr', {
-            ('UserManager', 'UM'): 'UserManager',
-        })
-        self.logger.debug(f'finish:load_4@T+{pc}')
+        with tld:
+            self.__setup_frommod('rs_servmgr', {
+                ('ServerManager', 'SM'): 'ServerManager',
+            }, call=False)
+            self.__setup_frommod('rs_usermgr', {
+                ('UserManager', 'UM'): 'UserManager',
+            })
         # Load: 5
-        self.logger.debug(f'start:load_5@T+{pc}')
-        self.__setup_frommod('rs_userio', {
-            ('TellRaw', 'TR'): 'TellRaw',
-        }, call=False)
-        self.logger.debug(f'finish:load_5@T+{pc}')
+        with tld:
+            self.__setup_frommod('rs_userio', {
+                ('TellRaw', 'TR'): 'TellRaw',
+            }, call=False)
         # Load: 6
-        self.logger.debug(f'start:load_6@T+{pc}')
-        self.__setup_frommod('rs_userio', {
-            ('ChatCommands', 'CC'): 'ChatCommands',
-        })
-        self.logger.debug(f'finish:load_6@T+{pc}')
+        with tld:
+            self.__setup_frommod('rs_userio', {
+                ('ChatCommands', 'CC'): 'ChatCommands',
+            })
         # Load: 7
-        self.logger.debug(f'start:load_7@T+{pc}')
-        self.Convenience = self._ = self.__import_mod('rs_convenience')
-        self.logger.debug(f'finish:load_7@T+{pc}')
+        with tld:
+            self.Convenience = self._ = self.__import_mod('rs_convenience')
         # Final log
-        self.logger.debug(f'finish@T+{pc}')
+        tld.final()
+
     def __setup_frommod(self, module: str, keys: dict[tuple[str, str], str], *, call: bool = True):
         pc = util.PerfCounter(sec='', secs='')
         self.logger.info(f'Importing module: .lib.{module} [T+{pc}]')
@@ -127,6 +119,7 @@ class RunServer(types.ModuleType):
             self.logger.debug(f'{l} = {s} = {module}.{n} [T+{pc}]')
     def __import_mod(self, module: str) -> types.ModuleType:
         return importlib.import_module(f'.lib.{module}', __package__)
+
     def __call__(self):
         self.logger.infop('Entrypoint starting')
         if self.BS.is_dry_run:
@@ -134,11 +127,13 @@ class RunServer(types.ModuleType):
             return
         # Second stage init
         self.logger.warning('Running second-stage initialization')
-        self.MinecraftManager.init2()
-        self.MCLang.init2()
-        self.LineParser.init2()
-        self.UserManager.init2()
-        self.ChatCommands.init2()
+        util.TimedLoadDebug.foreach(self.logger.info,
+            ('MinecraftManager', self.MinecraftManager.init2),
+            ('MCLang', self.MCLang.init2),
+            ('LineParser', self.LineParser.init2),
+            ('UserManager', self.UserManager.init2),
+            ('ChatCommands', self.ChatCommands.init2),
+        )
         # Instantiate ServerManager
         self.ServerManager = self.SM = self.ServerManager()
         # Initialize plugins
