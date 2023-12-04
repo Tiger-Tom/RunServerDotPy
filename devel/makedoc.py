@@ -200,13 +200,13 @@ def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, s
         build.append(md_function(f, level + 1))
     return '\n'.join(build)
 def md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, short: str | None = None) -> str | None:
-        r = _md_rs_heldclass(headl, heads, level, cls, long, short)
-        if r is None: return None
-        rp = Path(f'parts/{headl.replace(".", "/")}/{long}.md')
-        p = Path('docs/autodocs/', rp)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(r if not level else _md_rs_heldclass(headl, heads, 0, cls, long, short))
-        return r
+    r = _md_rs_heldclass(headl, heads, level, cls, long, short)
+    if r is None: return None
+    rp = Path(f'parts/{headl.replace(".", "/")}/{long}.md')
+    p = Path('docs/autodocs/', rp)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(r if not level else _md_rs_heldclass(headl, heads, 0, cls, long, short))
+    return r
 #</Header
 
 #> Main >/
