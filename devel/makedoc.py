@@ -181,6 +181,7 @@ def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, s
     #    build.append('\n'.join(md_docstr(d)))
     if inspect.ismodule(cls):
         if not cls.__file__.startswith(str(Path.cwd())): return None
+        already_added = set()
         for sn in sorted(dir(cls)):
             if hasattr(cls, '__all__'):
                 if sn not in getattr(cls, '__all__', set()): continue
@@ -188,7 +189,14 @@ def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, s
             #elif sn.startswith('_'): continue
             build.append('')
             eprint(f'subrender {sn=}')
-            build.append(md_rs_heldclass(f'{headl}.{long}', f'{heads}.{short or long}', level + 1, getattr(cls, sn), sn))
+            for aasn in already_added:
+                if getattr(cls, sn) is getattr(cls, aasn):
+                    build.append(mdHeader(f'`{sn}` (`{headl}.{long}.{sn}` | `{heads}.{short or long}.{sn}`)').render(level + 1))
+                    build.append(f'Alias to {mdHeader(f"`{aasn}` (`{headl}.{long}.{aasn}` | `{heads}.{short or long}.{aasn}`)").link()}')
+                    break
+            else:
+                build.append(md_rs_heldclass(f'{headl}.{long}', f'{heads}.{short or long}', level + 1, getattr(cls, sn), sn))
+                already_added.add(sn)
         return '\n\n'.join(b for b in build if b is not None)
     membs = tuple((a, getattr(cls, a)) for a in dir(cls) if (not a.startswith('_')) and hasattr(cls, a))
     for f in sorted((f for n,f in membs if (inspect.isroutine(f) and callable(f))), key=func_get_name):
