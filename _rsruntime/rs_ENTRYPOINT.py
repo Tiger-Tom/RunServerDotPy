@@ -114,11 +114,6 @@ class RunServer(types.ModuleType):
         self.logger.debug(f'start:load_7@T+{pc}')
         self.Convenience = self._ = self.__import_mod('rs_convenience')
         self.logger.debug(f'finish:load_7@T+{pc}')
-        # Load: 8
-        self.logger.debug(f'start:load_8@T+{pc}')
-        self.Config.sync()
-        self.PM.load_plugins()
-        self.logger.debug(f'finish:load_8@T+{pc}')
         # Final log
         self.logger.debug(f'finish@T+{pc}')
     def __setup_frommod(self, module: str, keys: dict[tuple[str, str], str], *, call: bool = True):
@@ -137,10 +132,17 @@ class RunServer(types.ModuleType):
         if self.BS.is_dry_run:
             self.logger.fatal('Is a dry run')
             return
-        # Registering help command
-        self.CC.register_func(self.CC.help, {'?',})
+        # Second stage init
+        self.logger.warning('Running second-stage initialization')
+        self.MinecraftManager.init2()
+        self.MCLang.init2()
+        self.LineParser.init2()
+        self.UserManager.init2()
+        self.ChatCommands.init2()
         # Instantiate ServerManager
         self.ServerManager = self.SM = self.ServerManager()
+        # Initialize plugins
+        self.PM.load_plugins()
         # Start plugins
         self.PM.start()
         # Main server loop

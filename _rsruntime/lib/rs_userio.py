@@ -287,8 +287,6 @@ class ChatCommands:
         self.commands = {}
         self.aliases = {}
         self.help_sections = {self.HELP_SUBSECTIONS: {}}
-        # Register hooks
-        LineParser.register_chat_callback(self.run_command)
         # Precompile command pattern
         self.command_patt = re.compile(Config['chat_commands/patterns/line_outer'].format(
             line=Config['chat_commands/patterns/line'].format(
@@ -296,6 +294,11 @@ class ChatCommands:
                 command=f'(?P<cmd>{Config["chat_commands/patterns/command"]})',
                 argsep=f'(?: )*',
                 args='(?P<args>.*)')))
+    def init2(self):
+        # Register hooks
+        LineParser.register_chat_callback(self.run_command)
+        # Register help command
+        self.register_func(self.help, {'?',})
     def __call__(self, func: typing.Callable[[UserManager.User, ...], None] | None = None, **kwargs):
         '''
             Decorator to use register_func

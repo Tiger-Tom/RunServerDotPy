@@ -27,6 +27,7 @@ class MCLang:
 
     def __init__(self):
         self.logger = RS.logger.getChild('L')
+    def init2(self):
         self.extract_lang()
 
     # Lang interaction
@@ -102,6 +103,7 @@ class LineParser:
         self.hooks_prefix = Hooks.ReHooks('fullmatch')
         self.hooks_no_prefix = Hooks.ReHooks('fullmatch')
         self.hooks_chat = Hooks.SingleHook()
+    def init2(self):
         self.chat_patt = RS.MCLang.lang_to_pattern(RS.MCLang.lang['chat.type.text'], ('username', 'message'), prefix_suffix=r'^(?P<not_secure>(?:\[Not Secure\] )?){}$')
     def register_callback(self, patt: re.Pattern, callback: typing.Callable[[re.Match, re.Match, time.struct_time], None] | typing.Callable[[re.Match], None], with_prefix: bool = True):
         '''

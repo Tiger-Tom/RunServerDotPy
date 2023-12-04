@@ -29,7 +29,7 @@ class MinecraftManager:
 
     def __init__(self):
         self.logger = RS.logger.getChild('MC')
-        super().__init__()
+    def init2(self):
         if Config['minecraft/manager/auto_fetch_if_missing'] or Config['minecraft/manager/auto_update']:
             try: self.setup_manifest()
             except Exception as e:

@@ -144,6 +144,7 @@ class UserManager:
         path.mkdir(parents=True, exist_ok=True)
         self.fbd = JSONBackedDict(path, Config['users/fbd/sync_time'])
         Bootstrapper.register_onclose(self.close)
+    def init2(self):
         # Register hooks
         LineParser.register_callback( # player joins
             MCLang.lang_to_pattern(MCLang.lang['multiplayer.player.joined'], ('username',)),
