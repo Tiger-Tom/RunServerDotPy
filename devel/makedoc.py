@@ -219,6 +219,7 @@ bs.args.dry_run = bs.is_dry_run = True
 ## Entrypoint
 RS_outer = bs.access_entrypoint('./_rsruntime/rs_ENTRYPOINT.py')
 RS = bs.stage_entrypoint(RS_outer)
+bs.init_entrypoint(RS)
 bs.close()
 
 if not os.getenv('RSDOC_NORUN'):
