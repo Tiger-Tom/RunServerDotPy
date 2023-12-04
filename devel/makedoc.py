@@ -147,7 +147,7 @@ def md_function(func: typing.Callable, level: int = 0, max_source_lines: int = 1
     build = []
     sig = inspect.signature(func)
     try:
-        source = inspect.cleandoc("\n"+inspect.getsource(func))
+        source = inspect.cleandoc('\n'+inspect.getsource(func))
     except TypeError: source = None
     else:
         if source.count('\n') > max_source_lines: source = None
