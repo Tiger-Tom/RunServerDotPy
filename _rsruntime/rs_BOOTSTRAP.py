@@ -64,6 +64,8 @@ class Bootstrapper:
         self.shutdown_callbacks = set()
         self.is_closed = False
 
+#pragma:makedoc:skip:@until
+
     # Pre-bootstrap setup
     ## Check Python version
     @classmethod
@@ -225,6 +227,8 @@ class Bootstrapper:
         self.logger.warning(f'ENTERING ENTRYPOINT: {rs.__call__}')
         rs()
         self.logger.fatal('EXITED ENTRYPOINT')
+
+#pragma:makedoc:skip:&until
 
     # Utility functions
     ## Shutdown functions

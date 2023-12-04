@@ -163,29 +163,65 @@ def md_function(func: typing.Callable, level: int = 0, max_source_lines: int = 1
     return '\n'.join(build)
 # RS
 types = set(t for t in builtins.__dict__.values() if isinstance(t, type))
+def_patt = re.compile(r'^\s*def +([\w][\w\d]*)\(', re.MULTILINE)
 def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, short: str | None = None, no_header: bool = False) -> str | None:
     eprint(f'render {headl=} {heads=} {level=} {cls=} {long=} {short=}')
     if (p := Path(f'docs/doc/._headoverride/{headl}/{long}.md')).exists():
         eprint(f'render {headl=} {long=} overridden @ {p=}')
         return p.read_text()
     if cls is None: return None
+    pragma = set()
+    try:
+        lines = inspect.getsourcelines(getattr(cls, '__class__', cls))
+    except Exception: pass
+    else:
+        skipthis = False
+        skipuntil = False
+        for line in lines[0]:
+            line = line.strip()
+            if (line.strip().lower()).startswith('#pragma:makedoc:'):
+                l = line.strip().lower().removeprefix('#pragma:makedoc:').strip()
+                if l == 'skip:@this': skipthis = True
+                elif l == 'skip:@until': skipuntil = True
+                elif l == 'skip:&until': skipuntil = False
+                else: pragma.add(l)
+            elif (skipthis or skipuntil) and (m := def_patt.match(line)):
+                pragma.add(f'skip:{m.group(1).lower()}')
+                skipthis = False
+        #`pragma:makedoc:` directives:
+        '''
+            sorted - functions / attrs are already sorted, don't sort them again (does not work for modules)
+            skip:[name] - ignore [name]
+            skip:* - skip all contained (but not this)
+            skip:@this - skip the next defined function
+            skip:@until - skip all defined functions until skip:&until is encountered
+            skip:&until - stop a skip:@until
+            skip - skip this and all contained
+            no_docstr - don't add __doc__ str
+            no_source - don't add link to source
+        '''
+    eprint(f'{pragma=}')
+    if 'skip' in pragma: return None
     build = []
     if not no_header:
         build.append(mdHeader(f'`{long}` (`{headl}.{long}` | `{heads}.{short or long}`)').render(level))
-    if m := sys.modules.get(getattr(cls, '__module__', None), None):
+    if (m := sys.modules.get(getattr(cls, '__module__', None), None)) and ('no_source' not in pragma):
         p = Path(m.__file__).relative_to(Path.cwd())
         build.append(f'[`{p}`](/{p} "Source")  ')
     rp = f'parts/{headl.replace(".", "/")}/{long}.md'
     build.append(f'[Standalone doc: {rp}](./{rp})  ')
-    if d := getattr(cls, '__doc__', None): build.append('\n'.join(md_docstr(d)))
+    if (d := getattr(cls, '__doc__', None)) and ('no_docstr' not in pragma): build.append('\n'.join(md_docstr(d)))
     #if d := getattr(getattr(cls, '__init__', None), '__doc__', None):
     #    build.append('\n'.join(md_docstr(d)))
+    if 'skip:*' in pragma: return '\n'.join(build)
     if inspect.ismodule(cls):
         if not cls.__file__.startswith(str(Path.cwd())): return None
         clses = {id(getattr(cls, sn)): {sn,} for sn in dir(cls)
-                 if (hasattr(cls, '__all__') and sn in cls.__all__) or ((not hasattr(cls, '__all__')) and sn[0].isupper())}
+                 if (f'skip:{sn.lower()}' not in pragma) and \
+                 ((hasattr(cls, '__all__') and sn in cls.__all__) or
+                  ((not hasattr(cls, '__all__')) and sn[0].isupper()))}
         for sn in dir(cls):
-            if (i := id(getattr(cls, sn))) in clses:
+            if ((i := id(getattr(cls, sn))) in clses) and (f'skip:{sn.lower()}' not in pragma):
                 clses[i].add(sn)
         for sns in clses.values():
             sns = sorted(sns, key=lambda sn: (not sn[0].isupper(), -len(sn), sn))
@@ -195,8 +231,9 @@ def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, s
                 build.append(mdHeader(f' OR `{sn}` (`{headl}.{long}.{sn}` | `{heads}.{short or long}.{sn}`)').render(level + 2))
             build.append(md_rs_heldclass(f'{headl}.{long}', f'{heads}.{short or long}', level + 1, getattr(cls, sns[0]), sns[0], no_header=True))
         return '\n'.join(b for b in build if b is not None)
-    membs = tuple((a, getattr(cls, a)) for a in dir(cls) if (not a.startswith('_')) and hasattr(cls, a))
-    for f in sorted((f for n,f in membs if (inspect.isroutine(f) and callable(f))), key=func_get_name):
+    membs = tuple((a, getattr(cls, a)) for a in dir(cls) if (f'skip:{a.lower()}' not in pragma) and (not a.startswith('_')) and hasattr(cls, a))
+    funcs = (f for n,f in membs if (inspect.isroutine(f) and callable(f) and (f'skip:{n.lower()}' not in pragma)))
+    for f in (funcs if ('sorted' in pragma) else (sorted(funcs, key=func_get_name))):
         if getattr(f, '__objclass__', None) in types: continue
         if hasattr(f, '__name__') and hasattr(f, '__self__') and ((fs := getattr(f.__self__.__class__, '_fields', None)) is not None):
             # namedtuples
