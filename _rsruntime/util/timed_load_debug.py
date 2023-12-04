@@ -38,6 +38,7 @@ class TimedLoadDebug:
     __exit__ = iexit
 
 def foreach_TimedLoadDebug(logfunc: typing.Callable[[str], None], *each: tuple[tuple[str, typing.Callable[[], None], ...]], **tld_args):
+    '''Executes each callable (second element of every "each" tuple) in each and times it with TimedLoadDebug, setting {c} as the first element of every "each" tuple'''
     tld = TimedLoadDebug(logfunc, iterable=(n for n,c in each), **tld_args)
     for n,c in each:
         with tld: c()
