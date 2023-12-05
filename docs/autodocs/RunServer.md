@@ -10,81 +10,11 @@
 [Standalone doc: parts/RunServer/Bootstrapper.md](./parts/RunServer/Bootstrapper.md)  
 > Does the necessary startup and take-down for RunServer
 
-## access_entrypoint(...)
-```python
-def access_entrypoint(ep: str) -> types.ModuleType
-```
-[`_rsruntime/rs_BOOTSTRAP.py@210:214`](/_rsruntime/rs_BOOTSTRAP.py#L210)
-
-<details>
-<summary>Source Code</summary>
-
-```python
-def access_entrypoint(self, ep: str) -> types.ModuleType:
-    '''Loads the entrypoint's surrounding module'''
-    fl = SourceFileLoader(f'{__package__}.RS', ep)
-    self.logger.warning(f'ACCESSING ENTRYPOINT: {fl}')
-    return fl.load_module()
-```
-</details>
-
-> Loads the entrypoint's surrounding module
-
-## bootstrap(...)
-```python
-def bootstrap(close_after: bool = True)
-```
-[`_rsruntime/rs_BOOTSTRAP.py@182:196`](/_rsruntime/rs_BOOTSTRAP.py#L182)
-
-<details>
-<summary>Source Code</summary>
-
-```python
-def bootstrap(self, close_after: bool = True):
-    '''Executes the base manifest, then accesses, assigns, and chainloads the entrypoint'''
-    self.run_base_manifest()
-    if self.args.update_only:
-        self.logger.fatal('--update-only argument supplied, exiting')
-        return
-    self.__contained_RS_module = self.access_entrypoint('_rsruntime/rs_ENTRYPOINT.py')
-    self.__contained_RS = self.stage_entrypoint(self.__contained_RS_module)
-    global RS
-    if RS != NotImplemented:
-        self.logger.warning(f'Tried to set {__file__}-level RS, but it appears to have already been set?')
-    else: RS = self.__contained_RS
-    self.init_entrypoint(RS)
-    self.chainload_entrypoint(RS)
-    if close_after: self.close()
-```
-</details>
-
-> Executes the base manifest, then accesses, assigns, and chainloads the entrypoint
-
-## chainload_entrypoint(...)
-```python
-def chainload_entrypoint(rs: RS)
-```
-[`_rsruntime/rs_BOOTSTRAP.py@223:227`](/_rsruntime/rs_BOOTSTRAP.py#L223)
-
-<details>
-<summary>Source Code</summary>
-
-```python
-def chainload_entrypoint(self, rs: 'RS'):
-    '''Runs the entrypoint's __call__ method'''
-    self.logger.warning(f'ENTERING ENTRYPOINT: {rs.__call__}')
-    rs()
-    self.logger.fatal('EXITED ENTRYPOINT')
-```
-</details>
-
-> Runs the entrypoint's __call__ method
-
 ## close(...)
 ```python
 def close(do_exit: bool | int = False)
 ```
-[`_rsruntime/rs_BOOTSTRAP.py@231:239`](/_rsruntime/rs_BOOTSTRAP.py#L231)
+[`_rsruntime/rs_BOOTSTRAP.py@235:243`](/_rsruntime/rs_BOOTSTRAP.py#L235)
 
 <details>
 <summary>Source Code</summary>
@@ -104,58 +34,11 @@ def close(self, do_exit: bool | int = False):
 
 > Executes all shutdown callbacks and closes logging (logging.shutdown()), and exits with exit code do_exit if it isn't False
 
-## ensure_python_version()
-```python
-@classmethod
-def ensure_python_version()
-```
-[`_rsruntime/rs_BOOTSTRAP.py@69:73`](/_rsruntime/rs_BOOTSTRAP.py#L69)
-
-<details>
-<summary>Source Code</summary>
-
-```python
-@classmethod
-def ensure_python_version(cls):
-    '''Ensure that the Python version meets the minimum requirements'''
-    if sys.version_info < cls.minimum_vers:
-        raise NotImplementedError(f'Python version {".".join(map(str, sys.version_info[:3]))} doesn\'t meet the minimum requirements, needs {".".join(map(str, cls.minimum_vers))}')
-```
-</details>
-
-> Ensure that the Python version meets the minimum requirements
-
-## init_entrypoint(...)
-```python
-def init_entrypoint(rs: RS)
-```
-[`_rsruntime/rs_BOOTSTRAP.py@219:222`](/_rsruntime/rs_BOOTSTRAP.py#L219)
-
-<details>
-<summary>Source Code</summary>
-
-```python
-def init_entrypoint(self, rs: 'RS'):
-    '''Initializes the entrypoint's class (with self as an argument)'''
-    self.logger.warning(f'INITIALIZING ENTRYPOINT: {rs.__init__}')
-    rs.__init__(self)
-```
-</details>
-
-> Initializes the entrypoint's class (with self as an argument)
-
-## parse_arguments(...)
-```python
-def parse_arguments(args=None)
-```
-[`_rsruntime/rs_BOOTSTRAP.py@75:93`](/_rsruntime/rs_BOOTSTRAP.py#L75)
-> Generate and ArgumentParser and parse (known) arguments
-
 ## register_onclose(...)
 ```python
 def register_onclose(cb: Callable)
 ```
-[`_rsruntime/rs_BOOTSTRAP.py@240:242`](/_rsruntime/rs_BOOTSTRAP.py#L240)
+[`_rsruntime/rs_BOOTSTRAP.py@244:246`](/_rsruntime/rs_BOOTSTRAP.py#L244)
 
 <details>
 <summary>Source Code</summary>
@@ -168,58 +51,6 @@ def register_onclose(self, cb: typing.Callable[[], None]):
 </details>
 
 > Registers a function to run when self.close() is called
-
-## run_base_manifest()
-```python
-def run_base_manifest()
-```
-[`_rsruntime/rs_BOOTSTRAP.py@198:208`](/_rsruntime/rs_BOOTSTRAP.py#L198)
-
-<details>
-<summary>Source Code</summary>
-
-```python
-def run_base_manifest(self):
-    '''Executes the base manifest (_rsruntime/MANIFEST.ini)'''
-    mp = Path('_rsruntime/MANIFEST.ini')
-    if not mp.exists():
-        self.logger.error(f'Manifest at {mp} does not exist, attempting to download')
-        try: request.urlretrieve(self.dl_man, mp)
-        except Exception as e:
-            self.logger.fatal(f'Could not fetch manifest from {self.dl_man}:\n{"".join(traceback.format_exception(e))}')
-            return
-    self.logger.info(f'Loading in {mp}')
-    self.base_manifest = Manifest.from_file(mp)()
-```
-</details>
-
-> Executes the base manifest (_rsruntime/MANIFEST.ini)
-
-## setup_logger()
-```python
-def setup_logger() -> logging.Logger
-```
-[`_rsruntime/rs_BOOTSTRAP.py@95:178`](/_rsruntime/rs_BOOTSTRAP.py#L95)
-> Sets up self.logger, as well as logging.INFOPLUS/IRRECOVERABLE and Logger.infop/irrec()
-
-## stage_entrypoint(...)
-```python
-def stage_entrypoint(rs_outer: types.ModuleType) -> RunServer
-```
-[`_rsruntime/rs_BOOTSTRAP.py@215:218`](/_rsruntime/rs_BOOTSTRAP.py#L215)
-
-<details>
-<summary>Source Code</summary>
-
-```python
-def stage_entrypoint(self, rs_outer: types.ModuleType) -> 'rs_outer.RunServer':
-    '''Stages the entrypoint's class'''
-    self.logger.warning(f'STAGING ENTRYPOINT: {rs_outer.RunServer.__new__}')
-    return rs_outer.RunServer.__new__(rs_outer.RunServer)
-```
-</details>
-
-> Stages the entrypoint's class
 
 
 # `Util` (`RunServer.Util` | `RS.U`)
@@ -2178,6 +2009,80 @@ def set_timer(timer_type: type['Timer.BaseTimer'], func: typing.Callable, secs: 
 
 > <no doc>
 
+## `fetch` (`RunServer.Util.fetch` | `RS.U.fetch`)
+[Standalone doc: parts/RunServer/Util/fetch.md](./parts/RunServer/Util/fetch.md)  
+
+### `CHUNK_FETCH_ABORT` (`RunServer.Util.fetch.CHUNK_FETCH_ABORT` | `RS.U.fetch.CHUNK_FETCH_ABORT`)
+[Standalone doc: parts/RunServer/Util/fetch/CHUNK_FETCH_ABORT.md](./parts/RunServer/Util/fetch/CHUNK_FETCH_ABORT.md)  
+> The base class of the class hierarchy.
+> 
+> When called, it accepts no arguments and returns a new featureless
+> instance that has no instance attributes and cannot be given any.
+
+### `chunk_fetch` (`RunServer.Util.fetch.chunk_fetch` | `RS.U.fetch.chunk_fetch`)
+[`_rsruntime/util/fetch.py`](/_rsruntime/util/fetch.py "Source")  
+[Standalone doc: parts/RunServer/Util/fetch/chunk_fetch.md](./parts/RunServer/Util/fetch/chunk_fetch.md)  
+> Fetch and yield bytes from the URL in chunks of chunksize
+> Yields a Chunk object
+> If the URL is cached, and ignore_cache is false, then yields the data (as Chunk, with from_cache=True) and returns it
+> Once all data has been read and yielded, it is returned as bytes, and added to the cache if add_to_cache is true
+>> Cache is not written to if CHUNK_FETCH_ABORT is used to interrupt the download
+
+### `fetch` (`RunServer.Util.fetch.fetch` | `RS.U.fetch.fetch`)
+[`_rsruntime/util/fetch.py`](/_rsruntime/util/fetch.py "Source")  
+[Standalone doc: parts/RunServer/Util/fetch/fetch.md](./parts/RunServer/Util/fetch/fetch.md)  
+> Fetch bytes from the URL
+> If the URL is cached, and ignore_cache is false, then returns the cached value
+> Otherwise, fetch the data and return it, as well as add it to the cache if add_to_cache is true
+
+### `fetch_nocache` (`RunServer.Util.fetch.fetch_nocache` | `RS.U.fetch.fetch_nocache`)
+[Standalone doc: parts/RunServer/Util/fetch/fetch_nocache.md](./parts/RunServer/Util/fetch/fetch_nocache.md)  
+> partial(func, *args, **keywords) - new function with partial application
+> of the given arguments and keywords.
+
+#### fetch(...)
+```python
+@staticmethod
+def fetch(...) -> bytes
+```
+<details>
+<summary>Parameters...</summary>
+
+```python
+    url: str, add_to_cache: bool = True, ignore_cache: bool = False,
+    urlopen_kwargs
+```
+</details>
+[`_rsruntime/util/fetch.py@14:25`](/_rsruntime/util/fetch.py#L14)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def fetch(url: str, *, add_to_cache: bool = True, ignore_cache: bool = False, **urlopen_kwargs) -> bytes:
+    '''
+        Fetch bytes from the URL
+        If the URL is cached, and ignore_cache is false, then returns the cached value
+        Otherwise, fetch the data and return it, as well as add it to the cache if add_to_cache is true
+    '''
+    h = hash(url)
+    if (not ignore_cache) and (h in cache): return _cache[h]
+    with request.urlopen(url, **urlopen_kwargs) as r:
+        d = r.read()
+        if add_to_cache: cache[h] = d
+        return d
+```
+</details>
+
+> Fetch bytes from the URL
+> If the URL is cached, and ignore_cache is false, then returns the cached value
+> Otherwise, fetch the data and return it, as well as add it to the cache if add_to_cache is true
+
+### `foreach_chunk_fetch` (`RunServer.Util.fetch.foreach_chunk_fetch` | `RS.U.fetch.foreach_chunk_fetch`)
+[`_rsruntime/util/fetch.py`](/_rsruntime/util/fetch.py "Source")  
+[Standalone doc: parts/RunServer/Util/fetch/foreach_chunk_fetch.md](./parts/RunServer/Util/fetch/foreach_chunk_fetch.md)  
+> Calls callback for each Chunk yielded by chunk_fetch, then returns the bytes
+
 
 # `Flags` (`RunServer.Flags` | `RS.F`)
 [Standalone doc: parts/RunServer/Flags.md](./parts/RunServer/Flags.md)  
@@ -2808,15 +2713,15 @@ def register_unraisable_hook(self, callback: typing.Callable[['UnraisableHookArg
 ```python
 def init2()
 ```
-[`_rsruntime/lib/rs_mcmgr.py@32:47`](/_rsruntime/lib/rs_mcmgr.py#L32)
+[`_rsruntime/lib/rs_mcmgr.py@36:52`](/_rsruntime/lib/rs_mcmgr.py#L36)
 
 <details>
 <summary>Source Code</summary>
 
 ```python
 def init2(self):
-    if Config['minecraft/manager/auto_fetch_if_missing'] or Config['minecraft/manager/auto_update']:
-        try: self.setup_manifest()
+    if Config['minecraft/manager/dl/auto_fetch_if_missing'] or Config['minecraft/manager/dl/auto_update']:
+        try: self.versions = self.setup_manifest()
         except Exception as e:
             self.logger.fatal(f'Could not setup Minecraft version manifest:\n{"".join(traceback.format_exception(e))}')
             self.has_manifest = False
@@ -2826,58 +2731,80 @@ def init2(self):
         if not self.has_manifest:
             self.logger.irrec('Minecraft version manifest failed earlier; cannot continue')
             raise FileNotFoundError(str(p))
-        if not Config['minecraft/manager/auto_fetch_if_missing']:
-            self.logger.irrec('Config minecraft/manager/auto_fetch_if_missing is false, cannot download!')
+        if not Config['minecraft/manager/dl/auto_fetch_if_missing']:
+            self.logger.irrec('Config minecraft/manager/dl/auto_fetch_if_missing is false, cannot download!')
             raise FileNotFoundError(str(p))
-        self.missing_fetch()
+        if not self.install_update():
+            raise ExceptionGroup('The server JAr couldn\'t be found, and the downloaded version failed verification. Cannot possibly continue', (FileNotFoundError(p), ValueError('Verification failed')))
 ```
 </details>
 
 > <no doc>
 
-## missing_fetch()
+## install_update()
 ```python
-def missing_fetch()
+def install_update() -> bool
 ```
-[`_rsruntime/lib/rs_mcmgr.py@65:66`](/_rsruntime/lib/rs_mcmgr.py#L65)
-
-<details>
-<summary>Source Code</summary>
-
-```python
-def missing_fetch(self):
-    ...
-```
-</details>
-
+[`_rsruntime/lib/rs_mcmgr.py@78:97`](/_rsruntime/lib/rs_mcmgr.py#L78)
 > <no doc>
 
 ## setup_manifest()
 ```python
-def setup_manifest()
+def setup_manifest() -> VersionsType
 ```
-[`_rsruntime/lib/rs_mcmgr.py@49:63`](/_rsruntime/lib/rs_mcmgr.py#L49)
+[`_rsruntime/lib/rs_mcmgr.py@54:67`](/_rsruntime/lib/rs_mcmgr.py#L54)
 
 <details>
 <summary>Source Code</summary>
 
 ```python
-def setup_manifest(self):
-    self.logger.info(f'Fetching {Config["minecraft/manager/version_manifest_url"]}')
-    with request.urlopen(Config['minecraft/manager/version_manifest_url']) as r:
-        data = json.load(r)
-    tfmt = Config['minecraft/manager/time_fmt']
+def setup_manifest(self) -> 'VersionsType':
+    self.logger.info(f'Fetching {Config["minecraft/manager/dl/version_manifest_url"]}')
+    data = json.loads(fetch.fetch(Config['minecraft/manager/dl/version_manifest_url']).decode())
+    tfmt = Config['minecraft/manager/dl/time_fmt']
     versions = {v['id']: v | {
             'time': strptime(v['time'], tfmt), '_time': v['time'],
             'releaseTime': strptime(v['releaseTime'], tfmt), '_releaseTime': v['releaseTime']
         } for v in data['versions']}
-    self.versions = self.VersionsType(versions=versions,
+    return self.VersionsType(versions=versions,
         latest=max((versions[data['latest']['release']], versions[data['latest']['snapshot']]), key=lambda v: v['time']),
         latest_release=versions[data['latest']['release']],
         latest_snapshot=versions[data['latest']['snapshot']],
         releases = {k: v for k,v in versions.items() if v['type'] == 'release'},
         snapshots = {k: v for k,v in versions.items() if v['type'] == 'snapshot'},
     )
+```
+</details>
+
+> <no doc>
+
+## verify_update(...)
+```python
+def verify_update(data: bytes, target_hash: str, target_size: int) -> bool
+```
+[`_rsruntime/lib/rs_mcmgr.py@98:114`](/_rsruntime/lib/rs_mcmgr.py#L98)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def verify_update(self, data: bytes, target_hash: str, target_size: int) -> bool:
+    failed_hash, failed_size = False, False
+    if Config['minecraft/manager/dl/hash_verify'] and (target_hash != (actual_hash := sha1(data).hexdigest())):
+        self.logger.fatal(f'The Minecraft server JAr failed hash verification:\n{target_hash=}\n{actual_hash=}')
+        failed_hash = True
+    if Config['minecraft/manager/dl/size_verify'] and (target_size != (actual_size := len(data))):
+        self.logger.fatal(f'The Minecraft server JAr failed size verification:\n{target_size=}\n{actual_size=}')
+        failed_size = True
+    if failed_hash or failed_size:
+        if (not Config['minecraft/manager/dl/prompt_on_fail_verify']) or \
+           (input(f'The Minecraft server JAr failed '
+                  f'{"hash" if failed_hash else ""}{" and " if (failed_hash and failed_size) else ""}{"size" if failed_size else ""} '
+                  f'verification. Install it anyway? (y/N) >').lower() != 'y'):
+            self.logger.error('Not installing')
+            return False
+        self.logger.warning('Installing anyway, proceed with caution')
+    return True
 ```
 </details>
 
