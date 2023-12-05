@@ -2964,7 +2964,7 @@ def register_chat_callback(self, callback: typing.Callable[[typing.ForwardRef('R
 ```python
 def early_load_plugins()
 ```
-[`_rsruntime/lib/rs_plugins.py@171:179`](/_rsruntime/lib/rs_plugins.py#L171)
+[`_rsruntime/lib/rs_plugins.py@172:180`](/_rsruntime/lib/rs_plugins.py#L172)
 
 <details>
 <summary>Source Code</summary>
@@ -2988,7 +2988,7 @@ def early_load_plugins(self):
 ```python
 def load_plugins()
 ```
-[`_rsruntime/lib/rs_plugins.py@181:183`](/_rsruntime/lib/rs_plugins.py#L181)
+[`_rsruntime/lib/rs_plugins.py@182:184`](/_rsruntime/lib/rs_plugins.py#L182)
 
 <details>
 <summary>Source Code</summary>
@@ -3006,7 +3006,7 @@ def load_plugins(self):
 ```python
 def restart()
 ```
-[`_rsruntime/lib/rs_plugins.py@212:213`](/_rsruntime/lib/rs_plugins.py#L212)
+[`_rsruntime/lib/rs_plugins.py@213:214`](/_rsruntime/lib/rs_plugins.py#L213)
 
 <details>
 <summary>Source Code</summary>
@@ -3023,7 +3023,7 @@ def restart(self):
 ```python
 def start()
 ```
-[`_rsruntime/lib/rs_plugins.py@210:211`](/_rsruntime/lib/rs_plugins.py#L210)
+[`_rsruntime/lib/rs_plugins.py@211:212`](/_rsruntime/lib/rs_plugins.py#L211)
 
 <details>
 <summary>Source Code</summary>
