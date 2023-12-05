@@ -168,6 +168,7 @@ class PluginManager:
         self.logger = RS.logger.getChild('PM')
         self.ManifestLoader = self.ML = self._ManifestLoader(self)
         self.plugins = {}
+        Path(Config['plugins/plugins_path']).mkdir(parents=True, exist_ok=True)
     def early_load_plugins(self):
         self.ML.scrape_orphaned_manifests(Path(Config['plugins/plugins_path']))
         self.logger.infop('Loading manifests...')
