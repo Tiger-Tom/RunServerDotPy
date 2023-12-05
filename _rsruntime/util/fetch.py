@@ -67,6 +67,7 @@ def chunk_fetch(url: str, chunksize: int = 1024**2*4, *, add_to_cache: bool = Fa
     if add_to_cache: cache[h] = data
     return bytes(data)
 def foreach_chunk_fetch(url: str, callback: typing.Callable[[Chunk], None | typing.Literal[CHUNK_FETCH_ABORT]] = lambda *d: ..., chunksize: int = 1024**2*4, **cfetch_kwargs) -> bytes:
+    '''Calls callback for each Chunk yielded by chunk_fetch, then returns the bytes'''
     cfi = chunk_fetch(url, chunksize, **cfetch_kwargs)
     while True:
         try: chunk = next(cfi)
