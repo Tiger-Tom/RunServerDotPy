@@ -156,9 +156,9 @@ def md_function(func: typing.Callable, level: int = 0, max_source_lines: int = 1
                  f'{"@abstractmethod\n" if getattr(func, "__isabstractmethod__", False) else ""}'
                  f'def {func_get_name(func)}{"".join(translate_sig(sig, getattr(func, "__globals__", None)))}')
     if c := getattr(inspect.unwrap(func), '__code__', None):
-        if p.is_relative_to(Path.cwd()):
-            p = Path(c.co_filename).relative_to(Path.cwd())
-            build.append(f'[`{p}@{c.co_firstlineno}:{max(lent[-1] for lent in c.co_lines() if isinstance(lent[-1], int))}`](/{p}#L{c.co_firstlineno})')
+        try: p = Path(c.co_filename).relative_to(Path.cwd())
+        except ValueError: pass
+        else: build.append(f'[`{p}@{c.co_firstlineno}:{max(lent[-1] for lent in c.co_lines() if isinstance(lent[-1], int))}`](/{p}#L{c.co_firstlineno})')
     if source: build.append(f'\n<details>\n<summary>Source Code</summary>\n\n```python\n{source}\n```\n</details>\n')
     build.extend(md_docstr(inspect.getdoc(func)))
     return '\n'.join(build)
@@ -207,8 +207,9 @@ def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, s
     if not no_header:
         build.append(mdHeader(f'`{long}` (`{headl}.{long}` | `{heads}.{short or long}`)').render(level))
     if (m := sys.modules.get(getattr(cls, '__module__', None), None)) and ('no_source' not in pragma):
-        p = Path(m.__file__).relative_to(Path.cwd())
-        build.append(f'[`{p}`](/{p} "Source")  ')
+        try: p = Path(m.__file__).relative_to(Path.cwd())
+        except ValueError: pass
+        else: build.append(f'[`{p}`](/{p} "Source")  ')
     rp = f'parts/{headl.replace(".", "/")}/{long}.md'
     build.append(f'[Standalone doc: {rp}](./{rp})  ')
     if (d := getattr(cls, '__doc__', None)) and ('no_docstr' not in pragma): build.append('\n'.join(md_docstr(d)))
