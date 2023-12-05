@@ -28,7 +28,6 @@ class MinecraftManager:
                             version_manifest_url='https://launchermeta.mojang.com/mc/game/version_manifest.json',
                             bleeding_edge=False, only_snapshot=False,
                             hash_verify=True, size_verify=True, prompt_on_fail_verify=True,
-                            large_dl_threshold=1024*8, large_dl_chunksize=1024*4,
                             time_fmt='%%Y-%%m-%%dT%%H:%%M:%%S%%z')
 
     def __init__(self):
