@@ -54,7 +54,7 @@ def chunk_fetch(url: str, chunksize: int = 1024**2*4, *, add_to_cache: bool = Fa
         Once all data has been read and yielded, it is returned as bytes, and added to the cache if add_to_cache is true
             Cache is not written to if CHUNK_FETCH_ABORT is used to interrupt the download
     '''
-    d_attrs = {'target': url, 'chunk_size': chunksize, from_cache: False}
+    d_attrs = {'target': url, 'chunk_size': chunksize, 'from_cache': False}
     h = hash(url)
     if (not ignore_cache) and (h in cache):
         d = cache[h]
