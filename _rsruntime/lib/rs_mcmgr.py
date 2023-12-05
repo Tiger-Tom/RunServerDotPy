@@ -47,7 +47,8 @@ class MinecraftManager:
             if not Config['minecraft/manager/dl/auto_fetch_if_missing']:
                 self.logger.irrec('Config minecraft/manager/dl/auto_fetch_if_missing is false, cannot download!')
                 raise FileNotFoundError(str(p))
-            self.install_update()
+            if not self.install_update():
+                raise ExceptionGroup('The server JAr couldn\'t be found, and the downloaded version failed verification. Cannot possibly continue', FileNotFoundError(p), ValueError('Verification failed'))
 
     @staticmethod
     def _fetch_url(url: str) -> bytes:
