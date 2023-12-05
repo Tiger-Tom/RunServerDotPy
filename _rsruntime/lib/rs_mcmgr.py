@@ -96,6 +96,7 @@ class MinecraftManager:
         if not self.verify_update(data, tserver['sha1'], tserver['size']):
             return False
         jp.parent.mkdir(parents=True, exist_ok=True)
+        self.logger.infop(f'Server JAr fetched, writing {len(data)} byte(s) to {jp}')
         jp.write_bytes(data)
         return True
     def verify_update(self, data: bytes, target_hash: str, target_size: int) -> bool:
