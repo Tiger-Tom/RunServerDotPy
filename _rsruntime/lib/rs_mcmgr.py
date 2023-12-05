@@ -4,16 +4,16 @@
 import json
 import traceback
 from pathlib import Path
-from urllib import request
 from collections import namedtuple
 from time import strptime
-from functools import cache
 from hashlib import sha1
+from math import ceil
 #</Imports
 
 # RunServer Module
 import RS
 from RS import Bootstrapper, Config
+from RS.Util import fetch
 
 #> Header >/
 class MinecraftManager:
@@ -28,6 +28,7 @@ class MinecraftManager:
                             version_manifest_url='https://launchermeta.mojang.com/mc/game/version_manifest.json',
                             bleeding_edge=False, only_snapshot=False,
                             hash_verify=True, size_verify=True, prompt_on_fail_verify=True,
+                            large_dl_threshold=1024*8, large_dl_chunksize=1024*4,
                             time_fmt='%%Y-%%m-%%dT%%H:%%M:%%S%%z')
 
     def __init__(self):
@@ -50,17 +51,9 @@ class MinecraftManager:
             if not self.install_update():
                 raise ExceptionGroup('The server JAr couldn\'t be found, and the downloaded version failed verification. Cannot possibly continue', (FileNotFoundError(p), ValueError('Verification failed')))
 
-    @staticmethod
-    def _fetch_url(url: str) -> bytes:
-        with request.urlopen(url) as r: return r.read()
-    @staticmethod
-    @cache
-    def _cached_fetch_url(url: str) -> bytes:
-        with request.urlopen(url) as r: return r.read()
-
     def setup_manifest(self) -> 'VersionsType':
         self.logger.info(f'Fetching {Config["minecraft/manager/dl/version_manifest_url"]}')
-        data = json.loads(self._fetch_url(Config['minecraft/manager/dl/version_manifest_url']).decode())
+        data = json.loads(fetch.fetch(Config['minecraft/manager/dl/version_manifest_url']).decode())
         tfmt = Config['minecraft/manager/dl/time_fmt']
         versions = {v['id']: v | {
                 'time': strptime(v['time'], tfmt), '_time': v['time'],
@@ -80,7 +73,7 @@ class MinecraftManager:
                self.versions.latest_snapshot if Config['minecraft/manager/dl/only_snapshot'] else self.versions.latest_release
     @property
     def target_metadata(self) -> dict:
-        return json.loads(self._cached_fetch_url(self.target['url']).decode())
+        return json.loads(fetch.fetch(self.target['url']).decode())
 
     def install_update(self) -> bool:
         jp = Path(Config['minecraft/path/base'], Config['minecraft/path/server_jar'])
@@ -92,7 +85,10 @@ class MinecraftManager:
                 op.write_bytes(jp.read_bytes())
         tserver = self.target_metadata['downloads']['server']
         self.logger.warning(f'Fetching server JAr of target version ID {self.target["id"]}')
-        data = self._fetch_url(tserver['url'])
+        data = fetch.foreach_chunk_fetch(tserver['url'],
+                                         lambda c: self.logger.infop(f'Downloading {c.target}: chunk {int(c.obtained/c.chunk_size+0.5)} '
+                                                                     f'of {int((c.remain+c.obtained)/c.chunk_size+1)} '
+                                                                     f'({c.obtained} fetched / {c.remain} remain)'))
         if not self.verify_update(data, tserver['sha1'], tserver['size']):
             return False
         jp.parent.mkdir(parents=True, exist_ok=True)
