@@ -3,6 +3,7 @@
 #> Imports
 import typing
 from urllib import request
+from ssl import SSLContext
 from functools import partial
 #</Imports
 
@@ -10,6 +11,8 @@ from functools import partial
 __all__ = ('CHUNK_FETCH_ABORT', 'fetch', 'fetch_nocache', 'chunk_fetch', 'foreach_chunk_fetch')
 
 cache = {}
+
+SSL_CONTEXT = SSLContext()
 
 def fetch(url: str, *, add_to_cache: bool = True, ignore_cache: bool = False, **urlopen_kwargs) -> bytes:
     '''
@@ -19,7 +22,7 @@ def fetch(url: str, *, add_to_cache: bool = True, ignore_cache: bool = False, **
     '''
     h = hash(url)
     if (not ignore_cache) and (h in cache): return _cache[h]
-    with request.urlopen(url, **urlopen_kwargs) as r:
+    with request.urlopen(url, context=SSL_CONTEXT, **urlopen_kwargs) as r:
         d = r.read()
         if add_to_cache: cache[h] = d
         return d
@@ -58,7 +61,7 @@ def chunk_fetch(url: str, chunksize: int = 1024**2*4, *, add_to_cache: bool = Fa
         yield Chunk(d)(d_attrs, from_cache=True, obtained=len(d), remain=0)
         return d
     data = bytearray()
-    with request.urlopen(url) as r:
+    with request.urlopen(url, context=SSL_CONTEXT) as r:
         while r.length:
             d = r.read(chunksize)
             data.extend(d)
