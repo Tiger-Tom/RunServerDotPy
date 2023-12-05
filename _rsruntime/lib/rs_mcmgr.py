@@ -101,15 +101,18 @@ class MinecraftManager:
         return True
     def verify_update(self, data: bytes, target_hash: str, target_size: int) -> bool:
         failed_hash, failed_size = False, False
-        if (target_hash != (actual_hash := sha1(data).hexdigest())):
+        if Config['minecraft/manager/dl/hash_verify'] and (target_hash != (actual_hash := sha1(data).hexdigest())):
             self.logger.fatal(f'The Minecraft server JAr failed hash verification:\n{target_hash=}\n{actual_hash=}')
             failed_hash = True
-        if target_size != (actual_size := len(data)):
+        if Config['minecraft/manager/dl/size_verify'] and (target_size != (actual_size := len(data))):
             self.logger.fatal(f'The Minecraft server JAr failed size verification:\n{target_size=}\n{actual_size=}')
             failed_size = True
         if failed_hash or failed_size:
-            if input(f'The Minecraft server JAr failed '
-                     f'{"hash" if failed_hash else ""}{" and " if (failed_hash and failed_size) else ""}{"size" if failed_size else ""} '
-                     f'verification. Install it anyway? (y/N) >').lower() != 'y': return False
+            if (not Config['minecraft/manager/dl/prompt_on_fail_verify']) or \
+               (input(f'The Minecraft server JAr failed '
+                      f'{"hash" if failed_hash else ""}{" and " if (failed_hash and failed_size) else ""}{"size" if failed_size else ""} '
+                      f'verification. Install it anyway? (y/N) >').lower() != 'y'):
+                self.logger.error('Not installing')
+                return False
             self.logger.warning('Installing anyway, proceed with caution')
         return True
