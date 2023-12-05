@@ -402,6 +402,7 @@ class Manifest(UserDict):
             d = path.read_bytes()
             self.logger.infop(f'Copying {path} ({len(d)} byte(s)) to {bkppath}')
             bkppath.write_bytes(d)
+        else: path.parent.mkdir(parents=True, exist_ok=True)
         self.logger.info(f'Fetching {url} to {path}')
         try:
             with request.urlopen(url) as r:
