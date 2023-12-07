@@ -212,8 +212,8 @@ def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, s
         try: p = Path(m.__file__).relative_to(Path.cwd())
         except ValueError: pass
         else: build.append(f'[`{p}`](/{p} "Source")  ')
-    rp = f'parts/{headl.replace(".", "/")}/{long}.md'
-    build.append(f'[Standalone doc: {rp}](./{rp})  ')
+    rp = f'parts/{headl.replace(".", "/")}/{headl}.{long}.md'
+    build.append(f'[Standalone doc: {rp}]({headl}.{long}.md)  ')
     if (d := getattr(cls, '__doc__', None)) and ('no_docstr' not in pragma): build.append('\n'.join(md_docstr(d)))
     #if d := getattr(getattr(cls, '__init__', None), '__doc__', None):
     #    build.append('\n'.join(md_docstr(d)))
@@ -248,7 +248,7 @@ def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, s
 def md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, short: str | None = None, no_header: bool = False) -> str | None:
     r = _md_rs_heldclass(headl, heads, level, cls, long, short, no_header)
     if r is None: return None
-    rp = Path(f'parts/{headl.replace(".", "/")}/{long}.md')
+    rp = Path(f'parts/{headl.replace(".", "/")}/{headl}.{long}.md')
     p = Path('docs/autodocs/', rp)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(r if not level else _md_rs_heldclass(headl, heads, 0, cls, long, short, no_header))
