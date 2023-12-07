@@ -2,8 +2,8 @@
 
 #> Imports
 import typing
-from urllib import request
-from ssl import SSLContext
+import requests
+from urllib3 import request
 from functools import partial
 #</Imports
 
@@ -12,8 +12,6 @@ __all__ = ('CHUNK_FETCH_ABORT', 'fetch', 'fetch_nocache', 'chunk_fetch', 'foreac
 
 cache = {}
 
-SSL_CONTEXT = SSLContext()
-
 def fetch(url: str, *, add_to_cache: bool = True, ignore_cache: bool = False, **urlopen_kwargs) -> bytes:
     '''
         Fetch bytes from the URL
@@ -21,11 +19,10 @@ def fetch(url: str, *, add_to_cache: bool = True, ignore_cache: bool = False, **
         Otherwise, fetch the data and return it, as well as add it to the cache if add_to_cache is true
     '''
     h = hash(url)
-    if (not ignore_cache) and (h in cache): return _cache[h]
-    with request.urlopen(url, context=SSL_CONTEXT, **urlopen_kwargs) as r:
-        d = r.read()
-        if add_to_cache: cache[h] = d
-        return d
+    if (not ignore_cache) and (h in cache): return cache[h]
+    d = request('GET', url).read()
+    if add_to_cache: cache[h] = d
+    return d
 #__call__ = fetch   # one day...
 fetch_nocache = partial(fetch, add_to_cache=False, ignore_cache=True)
 
@@ -61,7 +58,7 @@ def chunk_fetch(url: str, chunksize: int = 1024**2*4, *, add_to_cache: bool = Fa
         yield Chunk(d)(d_attrs, from_cache=True, obtained=len(d), remain=0)
         return d
     data = bytearray()
-    with request.urlopen(url, context=SSL_CONTEXT) as r:
+    with request('GET', url, preload_content=False) as r:
         while r.length:
             d = r.read(chunksize)
             data.extend(d)
