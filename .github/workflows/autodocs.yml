@@ -30,7 +30,7 @@ jobs:
           - name: "Commit and push changes"
             uses: EndBug/add-and-commit@v9
             with:
-                add: "./docs/autodocs/"
+                add: "./docs/autodocs/**"
                 message: "Automatic documentation update (triggered by ${{ github.actor }}: ${{ github.sha }})"
                 pull: "--rebase"
     docs_to_wiki:
