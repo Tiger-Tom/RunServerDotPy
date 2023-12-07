@@ -2053,7 +2053,7 @@ def fetch(...) -> bytes
     urlopen_kwargs
 ```
 </details>
-[`_rsruntime/util/fetch.py@14:25`](/_rsruntime/util/fetch.py#L14)
+[`_rsruntime/util/fetch.py@17:28`](/_rsruntime/util/fetch.py#L17)
 
 <details>
 <summary>Source Code</summary>
@@ -2067,7 +2067,7 @@ def fetch(url: str, *, add_to_cache: bool = True, ignore_cache: bool = False, **
     '''
     h = hash(url)
     if (not ignore_cache) and (h in cache): return _cache[h]
-    with request.urlopen(url, **urlopen_kwargs) as r:
+    with request.urlopen(url, context=SSL_CONTEXT, **urlopen_kwargs) as r:
         d = r.read()
         if add_to_cache: cache[h] = d
         return d
@@ -2713,7 +2713,7 @@ def register_unraisable_hook(self, callback: typing.Callable[['UnraisableHookArg
 ```python
 def init2()
 ```
-[`_rsruntime/lib/rs_mcmgr.py@36:52`](/_rsruntime/lib/rs_mcmgr.py#L36)
+[`_rsruntime/lib/rs_mcmgr.py@35:51`](/_rsruntime/lib/rs_mcmgr.py#L35)
 
 <details>
 <summary>Source Code</summary>
@@ -2745,14 +2745,14 @@ def init2(self):
 ```python
 def install_update() -> bool
 ```
-[`_rsruntime/lib/rs_mcmgr.py@78:97`](/_rsruntime/lib/rs_mcmgr.py#L78)
+[`_rsruntime/lib/rs_mcmgr.py@77:96`](/_rsruntime/lib/rs_mcmgr.py#L77)
 > <no doc>
 
 ## setup_manifest()
 ```python
 def setup_manifest() -> VersionsType
 ```
-[`_rsruntime/lib/rs_mcmgr.py@54:67`](/_rsruntime/lib/rs_mcmgr.py#L54)
+[`_rsruntime/lib/rs_mcmgr.py@53:66`](/_rsruntime/lib/rs_mcmgr.py#L53)
 
 <details>
 <summary>Source Code</summary>
@@ -2782,7 +2782,7 @@ def setup_manifest(self) -> 'VersionsType':
 ```python
 def verify_update(data: bytes, target_hash: str, target_size: int) -> bool
 ```
-[`_rsruntime/lib/rs_mcmgr.py@98:114`](/_rsruntime/lib/rs_mcmgr.py#L98)
+[`_rsruntime/lib/rs_mcmgr.py@97:113`](/_rsruntime/lib/rs_mcmgr.py#L97)
 
 <details>
 <summary>Source Code</summary>
