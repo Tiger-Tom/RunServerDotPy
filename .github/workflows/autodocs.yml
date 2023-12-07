@@ -21,6 +21,8 @@ jobs:
             with:
                 python-version: '3.12'
                 cache: pip
+          - name: "Remove existing docs"
+            run: "rm --force --recursive ./docs/autodocs/"
           - name: "Explicitly install requirements"
             run: "python3 -m pip install -r requirements.txt"
           - name: "Execute makedoc.py"
