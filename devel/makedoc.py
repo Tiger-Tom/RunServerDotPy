@@ -127,8 +127,10 @@ class mdCode(str):
 class mdBlockQuote(str):
     __slots__ = ()
     def irender(self, level: int = 0) -> typing.Generator[str, None, None]:
-        for line in inspect.cleandoc(self).split('\n'):
-            yield f'>{">"*int(level)} {line}'
+        lines = inspect.cleandoc(self).split('\n')
+        for line in lines[:-1]:
+            yield f'>{">"*int(level)} {line}  '
+        yield f'>{">"*int(level)} {lines[-1]}'
     def render(self, level: int = 0) -> str:
         return '\n'.join(self.irender(level))
 # Complex markdown functions
