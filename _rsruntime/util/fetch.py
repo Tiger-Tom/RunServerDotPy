@@ -8,11 +8,21 @@ from functools import partial
 #</Imports
 
 #> Header >/
-__all__ = ('CHUNK_FETCH_ABORT', 'fetch', 'fetch_nocache', 'chunk_fetch', 'foreach_chunk_fetch')
+__all__ = ('CHUNK_FETCH_ABORT', 'fetch', 'fetch_nocache', 'chunk_fetch', 'foreach_chunk_fetch', 'flush_cache')
 
 cache = {}
+def flush_cache(url: str | None):
+    '''Removes a URL entry from the cache, or everything if url is None'''
+    if url is None:
+        cache.clear()
+        return
+    h = hash(url)
+    if h not in cache: return
+    del cache[h]
 
-def fetch(url: str, *, add_to_cache: bool = True, ignore_cache: bool = False, **urlopen_kwargs) -> bytes:
+user_agent = 'Mozilla/5.0'
+
+def fetch(url: str, *, add_to_cache: bool = True, ignore_cache: bool = False, **add_headers) -> bytes:
     '''
         Fetch bytes from the URL
         If the URL is cached, and ignore_cache is false, then returns the cached value
@@ -20,7 +30,7 @@ def fetch(url: str, *, add_to_cache: bool = True, ignore_cache: bool = False, **
     '''
     h = hash(url)
     if (not ignore_cache) and (h in cache): return cache[h]
-    d = request('GET', url).read()
+    d = request('GET', url, headers={'User-Agent': user_agent} | add_headers).data
     if add_to_cache: cache[h] = d
     return d
 #__call__ = fetch   # one day...
@@ -43,7 +53,7 @@ class Chunk(bytes):
     __format__ = format
 
 CHUNK_FETCH_ABORT = object()
-def chunk_fetch(url: str, chunksize: int = 1024**2*4, *, add_to_cache: bool = False, ignore_cache: bool = False) -> typing.Generator[Chunk, None | typing.Literal[CHUNK_FETCH_ABORT], bytes]:
+def chunk_fetch(url: str, chunksize: int = 1024**2*4, *, add_to_cache: bool = False, ignore_cache: bool = False, **add_headers) -> typing.Generator[Chunk, None | typing.Literal[CHUNK_FETCH_ABORT], bytes]:
     '''
         Fetch and yield bytes from the URL in chunks of chunksize
         Yields a Chunk object
@@ -58,11 +68,11 @@ def chunk_fetch(url: str, chunksize: int = 1024**2*4, *, add_to_cache: bool = Fa
         yield Chunk(d)(d_attrs, from_cache=True, obtained=len(d), remain=0)
         return d
     data = bytearray()
-    with request('GET', url, preload_content=False) as r:
-        while r.length:
+    with request('GET', url, preload_content=False, headers={'User-Agent': user_agent} | add_headers) as r:
+        while r.length_remaining:
             d = r.read(chunksize)
             data.extend(d)
-            if (yield Chunk(d)(d_attrs, obtained=len(data), remain=r.length, chunk_size=chunksize)) is CHUNK_FETCH_ABORT:
+            if (yield Chunk(d)(d_attrs, obtained=len(data), remain=r.length_remaining, chunk_size=chunksize)) is CHUNK_FETCH_ABORT:
                 return bytes(b) # do not add aborted data to cache
     if add_to_cache: cache[h] = data
     return bytes(data)
