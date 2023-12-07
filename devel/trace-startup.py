@@ -98,7 +98,8 @@ class GraphvizOutputX(GraphvizOutput):
             #'strict': 'true',
             'overlap': 'prism',
             'overlap_shrink': 'true',
-            'splines': 'true',
+            #'splines': 'true',
+            'concentrate': 'true',
         }
         self.graph_attributes['edge'] |= {
             # Head
