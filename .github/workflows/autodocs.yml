@@ -27,6 +27,8 @@ jobs:
             run: "python3 -m pip install -r requirements.txt"
           - name: "Execute makedoc.py"
             run: "python3 ./devel/makedoc.py"
+          - name: "Run git status for debugging"
+            run: "git status"
           - name: "Commit and push changes"
             uses: EndBug/add-and-commit@v9
             with:
