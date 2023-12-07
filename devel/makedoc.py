@@ -158,7 +158,7 @@ def md_function(func: typing.Callable, level: int = 0, max_source_lines: int = 1
     if c := getattr(inspect.unwrap(func), '__code__', None):
         try: p = Path(c.co_filename).relative_to(Path.cwd())
         except ValueError: pass
-        else: build.append(f'[`{p}@{c.co_firstlineno}:{max(lent[-1] for lent in c.co_lines() if isinstance(lent[-1], int))}`](/{p}#L{c.co_firstlineno})')
+        else: build.append(f'\n[`{p}@{c.co_firstlineno}:{max(lent[-1] for lent in c.co_lines() if isinstance(lent[-1], int))}`](/{p}#L{c.co_firstlineno})')
     if source: build.append(f'\n<details>\n<summary>Source Code</summary>\n\n```python\n{source}\n```\n</details>\n')
     build.extend(md_docstr(inspect.getdoc(func)))
     return '\n'.join(build)
