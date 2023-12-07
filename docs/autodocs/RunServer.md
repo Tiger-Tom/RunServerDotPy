@@ -2050,33 +2050,37 @@ def fetch(...) -> bytes
 
 ```python
     url: str, add_to_cache: bool = True, ignore_cache: bool = False,
-    urlopen_kwargs
+    add_headers
 ```
 </details>
-[`_rsruntime/util/fetch.py@17:28`](/_rsruntime/util/fetch.py#L17)
+[`_rsruntime/util/fetch.py@24:34`](/_rsruntime/util/fetch.py#L24)
 
 <details>
 <summary>Source Code</summary>
 
 ```python
-def fetch(url: str, *, add_to_cache: bool = True, ignore_cache: bool = False, **urlopen_kwargs) -> bytes:
+def fetch(url: str, *, add_to_cache: bool = True, ignore_cache: bool = False, **add_headers) -> bytes:
     '''
         Fetch bytes from the URL
         If the URL is cached, and ignore_cache is false, then returns the cached value
         Otherwise, fetch the data and return it, as well as add it to the cache if add_to_cache is true
     '''
     h = hash(url)
-    if (not ignore_cache) and (h in cache): return _cache[h]
-    with request.urlopen(url, context=SSL_CONTEXT, **urlopen_kwargs) as r:
-        d = r.read()
-        if add_to_cache: cache[h] = d
-        return d
+    if (not ignore_cache) and (h in cache): return cache[h]
+    d = request('GET', url, headers={'User-Agent': user_agent} | add_headers).data
+    if add_to_cache: cache[h] = d
+    return d
 ```
 </details>
 
 > Fetch bytes from the URL
 > If the URL is cached, and ignore_cache is false, then returns the cached value
 > Otherwise, fetch the data and return it, as well as add it to the cache if add_to_cache is true
+
+### `flush_cache` (`RunServer.Util.fetch.flush_cache` | `RS.U.fetch.flush_cache`)
+[`_rsruntime/util/fetch.py`](/_rsruntime/util/fetch.py "Source")  
+[Standalone doc: parts/RunServer/Util/fetch/flush_cache.md](./parts/RunServer/Util/fetch/flush_cache.md)  
+> Removes a URL entry from the cache, or everything if url is None
 
 ### `foreach_chunk_fetch` (`RunServer.Util.fetch.foreach_chunk_fetch` | `RS.U.fetch.foreach_chunk_fetch`)
 [`_rsruntime/util/fetch.py`](/_rsruntime/util/fetch.py "Source")  
