@@ -2,7 +2,6 @@
 
 #> Imports
 import typing
-import requests
 from urllib3 import request
 from functools import partial
 #</Imports
