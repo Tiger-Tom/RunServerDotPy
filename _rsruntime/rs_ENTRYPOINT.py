@@ -63,62 +63,67 @@ class RunServer(types.ModuleType):
             self.F.force_no_restart = False
         # Load: 1
         with tld:
-            self.__setup_frommod('rs_config', {
+            from .lib import rs_config
+            self.__setup_frommod(rs_config, {
                 ('Config', 'C'): 'Config',
             })
-            self.__setup_frommod('rs_exceptionhandlers', {
+            from .lib import rs_exceptionhandlers
+            self.__setup_frommod(rs_exceptionhandlers, {
                 ('ExceptionHandlers', 'EH'): 'ExceptionHandlers',
             })
         # Load: 2
         with tld:
-            self.__setup_frommod('rs_mcmgr', {
+            from .lib import rs_mcmgr
+            self.__setup_frommod(rs_mcmgr, {
                 ('MinecraftManager', 'MC'): 'MinecraftManager',
             })
         # Load: 3
         with tld:
-            self.__setup_frommod('rs_lineparser', {
+            from .lib import rs_lineparser
+            self.__setup_frommod(rs_lineparser, {
                 ('MCLang', 'L'): 'MCLang',
                 ('LineParser', 'LP'): 'LineParser',
             })
-            self.__setup_frommod('rs_plugins', {
+            from .lib import rs_plugins
+            self.__setup_frommod(rs_plugins, {
                 ('PluginManager', 'PM'): 'PluginManager',
             })
             self.PM.early_load_plugins()
         # Load: 4
         with tld:
-            self.__setup_frommod('rs_servmgr', {
+            from .lib import rs_servmgr
+            self.__setup_frommod(rs_servmgr, {
                 ('ServerManager', 'SM'): 'ServerManager',
             }, call=False)
-            self.__setup_frommod('rs_usermgr', {
+            from .lib import rs_usermgr
+            self.__setup_frommod(rs_usermgr, {
                 ('UserManager', 'UM'): 'UserManager',
             })
         # Load: 5
         with tld:
-            self.__setup_frommod('rs_userio', {
+            from .lib import rs_userio
+            self.__setup_frommod(rs_userio, {
                 ('TellRaw', 'TR'): 'TellRaw',
             }, call=False)
         # Load: 6
         with tld:
-            self.__setup_frommod('rs_userio', {
+            self.__setup_frommod(rs_userio, {
                 ('ChatCommands', 'CC'): 'ChatCommands',
             })
         # Load: 7
         with tld:
-            self.Convenience = self._ = self.__import_mod('rs_convenience')
+            from .lib import rs_convenience
+            self.Convenience = self._ = rs_convenience
         # Final log
         tld.final()
 
     def __setup_frommod(self, module: str, keys: dict[tuple[str, str], str], *, call: bool = True):
         pc = util.PerfCounter(sec='', secs='')
-        self.logger.info(f'Importing module: .lib.{module} [T+{pc}]')
-        m = self.__import_mod(module)
-        self.logger.info(f'.lib.{module} imported into {m} [T+{pc}]')
+        self.logger.info(f'Setting up from module: {module} [T+{pc}]')
         for (l,s),n in keys.items():
-            setattr(self, l, getattr(m, n)() if call else getattr(m, n))
+            setattr(self, l, getattr(module, n)() if call else getattr(module, n))
             setattr(self, s, getattr(self, l))
             self.logger.debug(f'{l} = {s} = {module}.{n} [T+{pc}]')
-    def __import_mod(self, module: str) -> types.ModuleType:
-        return importlib.import_module(f'.lib.{module}', __package__)
 
     def __call__(self):
         self.logger.infop('Entrypoint starting')
