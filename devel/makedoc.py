@@ -213,7 +213,7 @@ def _md_rs_heldclass(headl: str, heads: str, level: int, cls: type, long: str, s
         except ValueError: pass
         else: build.append(f'[`{p}`](/{p} "Source")  ')
     rp = f'parts/{headl.replace(".", "/")}/{headl}.{long}.md'
-    build.append(f'[Standalone doc: {rp}]({headl}.{long}.md)  ')
+    build.append(f'[Standalone doc: {rp}]({headl}.{long})  ')
     if (d := getattr(cls, '__doc__', None)) and ('no_docstr' not in pragma): build.append('\n'.join(md_docstr(d)))
     #if d := getattr(getattr(cls, '__init__', None), '__doc__', None):
     #    build.append('\n'.join(md_docstr(d)))
