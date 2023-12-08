@@ -34,7 +34,7 @@ jobs:
             with:
                 add: "./docs/autodocs"
                 message: "Automatic documentation update (triggered by ${{ github.actor }}: ${{ github.sha }})"
-                pull: "--rebase"
+                pull: "--rebase --autostash"
     docs_to_wiki:
         name: "Upload docs to wiki"
         needs: gen_autodocs
