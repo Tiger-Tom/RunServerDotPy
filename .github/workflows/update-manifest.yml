@@ -44,6 +44,6 @@ jobs:
             run: "rm ./key.pyk"
           - name: "Commit and push changes"
             run: |
-              git add "$MAN_PATH/MANIFEST.ini
+              git add "$MAN_PATH/MANIFEST.ini"
               git commit -m "Automatic manifest update for ${{ inputs.path }} (triggered by ${{ github.actor }}: ${{ github.sha }})"
               git push
