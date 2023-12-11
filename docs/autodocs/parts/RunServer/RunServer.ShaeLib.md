@@ -787,6 +787,9 @@ def fetch(url: str, *, add_to_cache: bool = True, ignore_cache: bool = False, **
 [Standalone doc: parts/RunServer/ShaeLib/net/fetch/RunServer.ShaeLib.net.fetch.foreach_chunk_fetch.md](RunServer.ShaeLib.net.fetch.foreach_chunk_fetch)  
 > Calls callback for each Chunk yielded by chunk_fetch, then returns the bytes
 
+### `pattern` (`RunServer.ShaeLib.net.pattern` | `RS.SL.net.pattern`)
+[Standalone doc: parts/RunServer/ShaeLib/net/RunServer.ShaeLib.net.pattern.md](RunServer.ShaeLib.net.pattern)  
+
 ## `timing` (`RunServer.ShaeLib.timing` | `RS.SL.timing`)
 [Standalone doc: parts/RunServer/ShaeLib/RunServer.ShaeLib.timing.md](RunServer.ShaeLib.timing)  
 
