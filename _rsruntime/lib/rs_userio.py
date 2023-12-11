@@ -250,6 +250,13 @@ class ChatCommands:
             return self._help
 
     # Setup config
+    Config.mass_set_default('chat_commands/errors/',
+        error_msg='A failure occured whilst running the command:\n {excmsg}',
+        long_excmsg=True,
+        reverse_frames=True,
+        header_forward='Traceback (most recent call last):',
+        header_reverse='Frame cascade (most recent call first):',
+    )
     Config.mass_set_default('chat_commands/patterns/',
         char='>',
         line='{char}{command}{argsep}{args}',
@@ -344,15 +351,16 @@ class ChatCommands:
                 raise KeyError(f'ChatCommand {mat[1]} was not found, perhaps try {self.helpcmd_for()}?')
             mat[1](user, *mat[1].params.parse_args(*mat[1].split_args(mat[2])))
         except Exception as e:
+            framet = ''.join(
+                traceback.format_list(reversed(traceback.extract_tb(e.__traceback__)) if Config['chat_commands/errors/reverse_frames']
+                                      else traceback.extract_tb(e.__traceback__))).rstrip()
+            msg = Config['chat_commands/errors/error_msg'].format(excmsg=''.join(traceback.format_exception_only(e)).strip() if Config['chat_commands/errors/long_excmsg'] else repr(e))
             if user is user.CONSOLE:
-                print(f'Failure whilst running command {line!r}:\n{"".join(traceback.format_exception(e))}')
+                print(f'{msg}\n{Config[f"""chat_commands/errors/header_{"reverse" if Config["chat_commands/errors/reverse_frames"] else "forward"}"""]}\n{"".join(framet)}')
                 return
-            exc = ''.join(traceback.format_exception(e))
-            user.tell(TellRaw.text(f'A failure occured whilst running command {line!r}:', TellRaw.TextFormat(color='#FF0000')).line_break() \
-                             .text(repr(e), '#FF0000').line_break() \
-                             .text('Click to copy full error message', '#FF0000',
-                                   click_event=TellRaw.ClickEvent.COPY, click_contents=exc,
-                                   hover_event=TellRaw.HoverEvent.TEXT, hover_contents=TellRaw().text(exc, '#FF0000', TellRaw.TF.UNDERLINED)))
+            TellRaw.itell(user, msg, '#FF0000', TellRaw.TextFormat.BOLD | TellRaw.TextFormat.UNDERLINED,
+                          click_event=TellRaw.ClickEvent.COPY, click_contents=framet,
+                          hover_event=TellRaw.HoverEvent.TEXT, hover_contents=TellRaw().text(framet, color='#FF0000'))
 
     def register_func(self, func: typing.Callable[[UserManager.User, ...], None], aliases: set = set(), *, permission: UserManager.Perm = UserManager.Perm.USER, help_section: str | tuple[str, ...] = ()) -> 'ChatCommands.ChatCommand':
         cc = self.ChatCommand(func, permission=permission, help_section=help_section)
