@@ -15,7 +15,8 @@ import typing
 # RunServer Module
 import RS
 from RS import Bootstrapper, Config
-from RS.ShaeLib.types import Hooks, PerfCounter
+from RS.ShaeLib.types import Hooks
+from RS.ShaeLib.timing import PerfCounter
 
 #> Header >/
 class MCLang:
