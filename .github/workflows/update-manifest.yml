@@ -51,4 +51,5 @@ jobs:
               git config user.name github-actions
               git add "$MAN_PATH/MANIFEST.ini"
               git commit -m "Automatic manifest update for ${{ inputs.path }} (triggered by ${{ github.actor }}: ${{ github.sha }})"
+              git pull --rebase
               git push
