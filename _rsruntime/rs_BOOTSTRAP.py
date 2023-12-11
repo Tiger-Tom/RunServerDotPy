@@ -656,12 +656,13 @@ class Manifest(UserDict):
             'platform': sys.platform, 'os_release': os.uname().release, 'os_version': os.uname().version, 'hostname': os.uname().nodename,
             'python_version': sys.version_info[:]}
         FILE_PATTERNS = ('**/*',)
+        FILE_EXCLUDED_PARTS = ('__pycache__', '.git', '.gitignore', 'requirements.txt')
         FILE_EXCLUDED_SUFFIXES = {'.pyc', '.json', '.ini', '.old'}
         @classmethod
         def gen_field_files(cls, algorithm: typing.Literal[*hashlib.algorithms_available], path: Path) -> ManifestDict_files:
             return {file.relative_to(path).as_posix():
                         base64.b85encode(hashlib.new(algorithm, file.read_bytes()).digest()).decode()
-                    for patt in cls.FILE_PATTERNS for file in path.glob(patt) if (file.suffix not in cls.FILE_EXCLUDED_SUFFIXES) and file.is_file()}
+                    for patt in cls.FILE_PATTERNS for file in path.glob(patt) if (not any((p in cls.FILE_EXCLUDED_PARTS) for p in file.parts) and (file.suffix not in cls.FILE_EXCLUDED_SUFFIXES) and file.is_file())}
         # Generation functions
         def generate_outline(self, *,
                              system_info_level: typing.Literal['full', 'lite', 'none'] = 'full',
