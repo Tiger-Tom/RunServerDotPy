@@ -21,7 +21,10 @@ jobs:
             MAN_PATH: ${{ inputs.path }}
         steps:
           - uses: actions/checkout@v3
-          - uses: snickerbockers/submodules-init@v4
+          - name: "Initialize & update submodules"
+            run: |
+              git submodules init
+              git submodules update
           - uses: actions/setup-python@v4
             with:
                 python-version: '3.12'
