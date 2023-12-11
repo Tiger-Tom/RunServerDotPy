@@ -27,7 +27,8 @@ except ModuleNotFoundError: RCONClient = None
 # RunServer Module
 import RS
 from RS import Config, LineParser
-from RS.Util import Hooks, PerfCounter
+from RS.ShaeLib.types import Hooks
+from RS.ShaeLib.timing import PerfCounter
 
 #> Header >/
 # Base classes

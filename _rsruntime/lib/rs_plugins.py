@@ -15,7 +15,7 @@ from types import ModuleType
 # RunServer Module
 import RS
 from RS import Config, BS
-from RS.Util import INIBackedDict, PerfCounter
+from RS.ShaeLib.types.fbd import INIBackedDict, PerfCounter
 
 #> Header >/
 class PluginManager:

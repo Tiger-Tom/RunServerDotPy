@@ -15,7 +15,7 @@ import types
 
 # RunServer Module
 import RS
-from RS.Util import Hooks
+from RS.ShaeLib.types import Hooks
 
 #> Header >/
 class ExceptionHandlers:

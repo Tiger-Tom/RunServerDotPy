@@ -9,7 +9,7 @@ import importlib
 import time
 from types import SimpleNamespace
 # RSModules
-from . import util
+from . import ShaeLib
 #</Imports
 
 #> Header >/
@@ -19,7 +19,7 @@ class RunServer(types.ModuleType):
         # Load: -1
         'Bootstrapper', 'BS',
         # Load: 0
-        'Util', 'U',
+        'ShaeLib', 'SL',
         'Flags', 'F',
         # Load: 1
         'Config', 'C',
@@ -54,10 +54,10 @@ class RunServer(types.ModuleType):
             self.logger.fatal('RS already exists in sys.modules, continuing by overwriting but this may have consequences!')
         sys.modules['RS'] = self
         # Setup perf counter
-        tld = util.TimedLoadDebug(self.logger.info)
+        tld = ShaeLib.timing.TimedLoadDebug(self.logger.info)
         # Load: 0
         with tld:
-            sys.modules['RS.Util'] = self.Util = self.U = util
+            sys.modules['RS.ShaeLib'] = self.ShaeLib = self.SL = ShaeLib
             self.Flags = self.F = SimpleNamespace()
             self.F.force_restart = False
             self.F.force_no_restart = False
@@ -118,7 +118,7 @@ class RunServer(types.ModuleType):
         tld.final()
 
     def __setup_frommod(self, module: str, keys: dict[tuple[str, str], str], *, call: bool = True):
-        pc = util.PerfCounter(sec='', secs='')
+        pc = ShaeLib.timing.PerfCounter(sec='', secs='')
         self.logger.info(f'Setting up from module: {module} [T+{pc}]')
         for (l,s),n in keys.items():
             setattr(self, l, getattr(module, n)() if call else getattr(module, n))
@@ -132,7 +132,7 @@ class RunServer(types.ModuleType):
             return
         # Second stage init
         self.logger.warning('Running second-stage initialization')
-        util.TimedLoadDebug.foreach(self.logger.info,
+        ShaeLib.timing.TimedLoadDebug.foreach(self.logger.info,
             ('MinecraftManager', self.MinecraftManager.init2),
             ('MCLang', self.MCLang.init2),
             ('LineParser', self.LineParser.init2),

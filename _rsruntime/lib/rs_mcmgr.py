@@ -12,7 +12,7 @@ from hashlib import sha1
 # RunServer Module
 import RS
 from RS import Bootstrapper, Config
-from RS.Util import fetch
+from RS.ShaeLib.net import fetch
 
 #> Header >/
 class MinecraftManager:

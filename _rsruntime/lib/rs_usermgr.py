@@ -13,7 +13,7 @@ from time import asctime, struct_time
 # RunServer Module
 import RS
 from RS import Bootstrapper, Config, MCLang, LineParser
-from RS.Util import JSONBackedDict
+from RS.ShaeLib.types.fbd import JSONBackedDict
 
 #> Header >/
 class UserManager:

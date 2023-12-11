@@ -8,7 +8,7 @@ from pathlib import Path
 
 # RunServer Module
 import RS
-from RS.Util import INIBackedDict
+from RS.ShaeLib.types.fbd import INIBackedDict
 
 #> Header >/
 class Config(INIBackedDict):
