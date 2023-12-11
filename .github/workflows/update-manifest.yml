@@ -44,6 +44,8 @@ jobs:
             run: "rm ./key.pyk"
           - name: "Commit and push changes"
             run: |
+              git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+              git config user.name github-actions
               git add "$MAN_PATH/MANIFEST.ini"
               git commit -m "Automatic manifest update for ${{ inputs.path }} (triggered by ${{ github.actor }}: ${{ github.sha }})"
               git push
