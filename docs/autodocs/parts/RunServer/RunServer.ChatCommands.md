@@ -7,7 +7,7 @@
 def compose_command(cmd: str, args: str | None) -> str
 ```
 
-[`_rsruntime/lib/rs_userio.py@328:333`](/_rsruntime/lib/rs_userio.py#L328)
+[`_rsruntime/lib/rs_userio.py@329:334`](/_rsruntime/lib/rs_userio.py#L329)
 
 <details>
 <summary>Source Code</summary>
@@ -37,7 +37,7 @@ def help(...)
 ```
 </details>
 
-[`_rsruntime/lib/rs_userio.py@395:461`](/_rsruntime/lib/rs_userio.py#L395)
+[`_rsruntime/lib/rs_userio.py@397:463`](/_rsruntime/lib/rs_userio.py#L397)
 > Shows help on commands or sections.  
 > If on is "section", then shows help on the section specified by "section"  
 > If on is a command, then shows help on that command  
@@ -48,7 +48,7 @@ def help(...)
 def helpcmd_for(item: str | None = None, for_section: bool = False)
 ```
 
-[`_rsruntime/lib/rs_userio.py@468:475`](/_rsruntime/lib/rs_userio.py#L468)
+[`_rsruntime/lib/rs_userio.py@470:477`](/_rsruntime/lib/rs_userio.py#L470)
 
 <details>
 <summary>Source Code</summary>
@@ -72,7 +72,7 @@ def helpcmd_for(self, item: str | None = None, for_section: bool = False):
 def init2()
 ```
 
-[`_rsruntime/lib/rs_userio.py@297:301`](/_rsruntime/lib/rs_userio.py#L297)
+[`_rsruntime/lib/rs_userio.py@298:302`](/_rsruntime/lib/rs_userio.py#L298)
 
 <details>
 <summary>Source Code</summary>
@@ -93,7 +93,7 @@ def init2(self):
 def parse_command(line: str) -> tuple[bool, _rsruntime.lib.rs_userio.ChatCommands.ChatCommand | str, str]
 ```
 
-[`_rsruntime/lib/rs_userio.py@334:344`](/_rsruntime/lib/rs_userio.py#L334)
+[`_rsruntime/lib/rs_userio.py@335:345`](/_rsruntime/lib/rs_userio.py#L335)
 
 <details>
 <summary>Source Code</summary>
@@ -123,7 +123,7 @@ def parse_command(self, line: str) -> tuple[bool, ChatCommand | str, str]:
 def register(cmd: ChatCommands.ChatCommand, aliases: set = set()) -> ChatCommands.ChatCommand
 ```
 
-[`_rsruntime/lib/rs_userio.py@367:385`](/_rsruntime/lib/rs_userio.py#L367)
+[`_rsruntime/lib/rs_userio.py@369:387`](/_rsruntime/lib/rs_userio.py#L369)
 > <no doc>
 
 ## register_func(...)
@@ -139,7 +139,7 @@ def register_func(...) -> ChatCommands.ChatCommand
 ```
 </details>
 
-[`_rsruntime/lib/rs_userio.py@363:366`](/_rsruntime/lib/rs_userio.py#L363)
+[`_rsruntime/lib/rs_userio.py@365:368`](/_rsruntime/lib/rs_userio.py#L365)
 
 <details>
 <summary>Source Code</summary>
@@ -159,30 +159,5 @@ def register_func(self, func: typing.Callable[[UserManager.User, ...], None], al
 def run_command(user: User, line: str, not_secure: bool = False)
 ```
 
-[`_rsruntime/lib/rs_userio.py@345:361`](/_rsruntime/lib/rs_userio.py#L345)
-
-<details>
-<summary>Source Code</summary>
-
-```python
-def run_command(self, user: UserManager.User, line: str, not_secure: bool = False):
-    mat = self.parse_command(line)
-    if mat is None: return # not a ChatCommand
-    try:
-        if not mat[0]:
-            raise KeyError(f'ChatCommand {mat[1]} was not found, perhaps try {self.helpcmd_for()}?')
-        mat[1](user, *mat[1].params.parse_args(*mat[1].split_args(mat[2])))
-    except Exception as e:
-        if user is user.CONSOLE:
-            print(f'Failure whilst running command {line!r}:\n{"".join(traceback.format_exception(e))}')
-            return
-        exc = ''.join(traceback.format_exception(e))
-        user.tell(TellRaw.text(f'A failure occured whilst running command {line!r}:', TellRaw.TextFormat(color='#FF0000')).line_break() \
-                         .text(repr(e), '#FF0000').line_break() \
-                         .text('Click to copy full error message', '#FF0000',
-                               click_event=TellRaw.ClickEvent.COPY, click_contents=exc,
-                               hover_event=TellRaw.HoverEvent.TEXT, hover_contents=TellRaw().text(exc, '#FF0000', TellRaw.TF.UNDERLINED)))
-```
-</details>
-
+[`_rsruntime/lib/rs_userio.py@346:363`](/_rsruntime/lib/rs_userio.py#L346)
 > <no doc>
