@@ -1,21 +1,21 @@
 # `Convenience` (`RunServer.Convenience` | `RS._`)
-[Standalone doc: parts/RunServer/RunServer.Convenience.md](RunServer.Convenience.md)  
+[Standalone doc: parts/RunServer/RunServer.Convenience.md](RunServer.Convenience)  
 
 ## `command` (`RunServer.Convenience.command` | `RS._.command`)
 [`_rsruntime/lib/rs_convenience.py`](/_rsruntime/lib/rs_convenience.py "Source")  
-[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.command.md](RunServer.Convenience.command.md)  
+[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.command.md](RunServer.Convenience.command)  
 > Writes a command to the server
 >> Equivelant to RS.SM.write(line)
 
 ## `inject_line` (`RunServer.Convenience.inject_line` | `RS._.inject_line`)
 [`_rsruntime/lib/rs_convenience.py`](/_rsruntime/lib/rs_convenience.py "Source")  
-[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.inject_line.md](RunServer.Convenience.inject_line.md)  
+[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.inject_line.md](RunServer.Convenience.inject_line)  
 > Injects a line into LineParser, as if it was read from the ServerManager
 >> Equivelant to RS.LP.handle_line(line)
 
 ## `listen_chat` (`RunServer.Convenience.listen_chat` | `RS._.listen_chat`)
 [`_rsruntime/lib/rs_convenience.py`](/_rsruntime/lib/rs_convenience.py "Source")  
-[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.listen_chat.md](RunServer.Convenience.listen_chat.md)  
+[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.listen_chat.md](RunServer.Convenience.listen_chat)  
 > Registers a callback for when LineParser reads a chat message
 >> The callback should have three arguments:  
 >> - the user (RS.UM.User object)  
@@ -24,15 +24,15 @@
 
 ## `say` (`RunServer.Convenience.say` | `RS._.say`)
 [`_rsruntime/lib/rs_convenience.py`](/_rsruntime/lib/rs_convenience.py "Source")  
-[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.say.md](RunServer.Convenience.say.md)  
+[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.say.md](RunServer.Convenience.say)  
 
 ## `tell` (`RunServer.Convenience.tell` | `RS._.tell`)
 [`_rsruntime/lib/rs_convenience.py`](/_rsruntime/lib/rs_convenience.py "Source")  
-[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.tell.md](RunServer.Convenience.tell.md)  
+[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.tell.md](RunServer.Convenience.tell)  
 
 ## `tellraw` (`RunServer.Convenience.tellraw` | `RS._.tellraw`)
 [`_rsruntime/lib/rs_convenience.py`](/_rsruntime/lib/rs_convenience.py "Source")  
-[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.tellraw.md](RunServer.Convenience.tellraw.md)  
+[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.tellraw.md](RunServer.Convenience.tellraw)  
 > Tells a user something. See RS.TR.text for more advanced usage
 >> This function uses RS.TR.itell
 

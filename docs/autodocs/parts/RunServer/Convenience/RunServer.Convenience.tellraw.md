@@ -1,5 +1,5 @@
 [`_rsruntime/lib/rs_convenience.py`](/_rsruntime/lib/rs_convenience.py "Source")  
-[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.tellraw.md](RunServer.Convenience.tellraw.md)  
+[Standalone doc: parts/RunServer/Convenience/RunServer.Convenience.tellraw.md](RunServer.Convenience.tellraw)  
 > Tells a user something. See RS.TR.text for more advanced usage
 >> This function uses RS.TR.itell
 

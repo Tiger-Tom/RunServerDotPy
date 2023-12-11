@@ -1,6 +1,6 @@
 # `Bootstrapper` (`RunServer.Bootstrapper` | `RS.BS`)
 [`_rsruntime/rs_BOOTSTRAP.py`](/_rsruntime/rs_BOOTSTRAP.py "Source")  
-[Standalone doc: parts/RunServer/RunServer.Bootstrapper.md](RunServer.Bootstrapper.md)  
+[Standalone doc: parts/RunServer/RunServer.Bootstrapper.md](RunServer.Bootstrapper)  
 > Does the necessary startup and take-down for RunServer
 
 ## close(...)

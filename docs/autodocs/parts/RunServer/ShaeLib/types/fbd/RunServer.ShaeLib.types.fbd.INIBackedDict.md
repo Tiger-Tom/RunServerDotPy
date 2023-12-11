@@ -1,12 +1,20 @@
-# `Config` (`RunServer.Config` | `RS.C`)
-[`_rsruntime/lib/rs_config.py`](/_rsruntime/lib/rs_config.py "Source")  
-[Standalone doc: parts/RunServer/RunServer.Config.md](RunServer.Config)  
-> A thin wrapper around INIBackedDict
+[`_rsruntime/ShaeLib/types/fbd.py`](/_rsruntime/ShaeLib/types/fbd.py "Source")  
+[Standalone doc: parts/RunServer/ShaeLib/types/fbd/RunServer.ShaeLib.types.fbd.INIBackedDict.md](RunServer.ShaeLib.types.fbd.INIBackedDict)  
+> A FileBackedDict implementation that uses ConfigParser as a backend
 
 ## bettergetter(...)
 ```python
-def bettergetter(key: Key, default: ForwardRef('FileBackedDict.Behavior.RAISE') | Any = Behavior.RAISE, set_default: bool = True) -> Deserialized | Any
+@staticmethod
+def bettergetter(...) -> Deserialized | Any
 ```
+<details>
+<summary>Parameters...</summary>
+
+```python
+    self, key: Key, default: ForwardRef('FileBackedDict.Behavior.RAISE') | Any = Behavior.RAISE,
+    set_default: bool = True
+```
+</details>
 
 [`_rsruntime/ShaeLib/types/fbd.py@137:153`](/_rsruntime/ShaeLib/types/fbd.py#L137)
 
@@ -39,29 +47,10 @@ def bettergetter(self, key: Key, default: typing.ForwardRef('FileBackedDict.Beha
 >> if default is Behavior.RAISE: raises KeyError  
 >> otherwise: returns default, and if set_default is truthy then sets the key to default
 
-## close()
-```python
-def close()
-```
-
-[`_rsruntime/lib/rs_config.py@65:68`](/_rsruntime/lib/rs_config.py#L65)
-
-<details>
-<summary>Source Code</summary>
-
-```python
-def close(self):
-    self.stop_autosync()
-    self.sort()
-    self.sync()
-```
-</details>
-
-> <no doc>
-
 ## contains(...)
 ```python
-def contains(key: Key, _tree: MutableMapping | None = None) -> bool
+@staticmethod
+def contains(self, key: Key, _tree: MutableMapping | None = None) -> bool
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@188:194`](/_rsruntime/ShaeLib/types/fbd.py#L188)
@@ -84,8 +73,17 @@ def contains(self, key: Key, *, _tree: MutableMapping | None = None) -> bool:
 
 ## get(...)
 ```python
-def get(key: Key, default: ForwardRef('FileBackedDict.Behavior.RAISE') | Serializable = Behavior.RAISE, _tree: MutableMapping | None = None) -> Deserialized
+@staticmethod
+def get(...) -> Deserialized
 ```
+<details>
+<summary>Parameters...</summary>
+
+```python
+    self, key: Key, default: ForwardRef('FileBackedDict.Behavior.RAISE') | Serializable = Behavior.RAISE,
+    _tree: MutableMapping | None = None
+```
+</details>
 
 [`_rsruntime/ShaeLib/types/fbd.py@160:175`](/_rsruntime/ShaeLib/types/fbd.py#L160)
 
@@ -117,8 +115,17 @@ def get(self, key: Key, default: typing.ForwardRef('FileBackedDict.Behavior.RAIS
 
 ## get(...)
 ```python
-def get(key: Key, default: ForwardRef('FileBackedDict.Behavior.RAISE') | Serializable = Behavior.RAISE, _tree: MutableMapping | None = None) -> Deserialized
+@staticmethod
+def get(...) -> Deserialized
 ```
+<details>
+<summary>Parameters...</summary>
+
+```python
+    self, key: Key, default: ForwardRef('FileBackedDict.Behavior.RAISE') | Serializable = Behavior.RAISE,
+    _tree: MutableMapping | None = None
+```
+</details>
 
 [`_rsruntime/ShaeLib/types/fbd.py@160:175`](/_rsruntime/ShaeLib/types/fbd.py#L160)
 
@@ -148,9 +155,10 @@ def get(self, key: Key, default: typing.ForwardRef('FileBackedDict.Behavior.RAIS
 > Gets the value of key  
 > If the key is missing, then raises KeyError if default is Behavior.RAISE, otherwise returns default
 
-## is_autosyncing()
+## is_autosyncing(...)
 ```python
-def is_autosyncing() -> bool
+@staticmethod
+def is_autosyncing(self) -> bool
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@97:100`](/_rsruntime/ShaeLib/types/fbd.py#L97)
@@ -170,7 +178,8 @@ def is_autosyncing(self) -> bool:
 
 ## items_full(...)
 ```python
-def items_full(start_key: Key, key_join: bool = True) -> Generator[tuple[str | tuple[str, ...], Deserialized], None, None]
+@staticmethod
+def items_full(self, start_key: Key, key_join: bool = True) -> Generator[tuple[str | tuple[str, ...], Deserialized], None, None]
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@197:200`](/_rsruntime/ShaeLib/types/fbd.py#L197)
@@ -190,7 +199,8 @@ def items_full(self, start_key: Key, key_join: bool = True) -> typing.Generator[
 
 ## items_short(...)
 ```python
-def items_short(start_key: Key)
+@staticmethod
+def items_short(self, start_key: Key)
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@201:204`](/_rsruntime/ShaeLib/types/fbd.py#L201)
@@ -241,7 +251,8 @@ def key(cls, key: Key, *, top_level: bool = False) -> tuple[str, ...]: # key key
 
 ## keys(...)
 ```python
-def keys(start_key: Key | None = None, key_join: bool = True) -> Generator[str | tuple[str, ...], None, None]
+@staticmethod
+def keys(self, start_key: Key | None = None, key_join: bool = True) -> Generator[str | tuple[str, ...], None, None]
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@205:214`](/_rsruntime/ShaeLib/types/fbd.py#L205)
@@ -265,25 +276,10 @@ def keys(self, start_key: Key | None = None, key_join: bool = True) -> typing.Ge
 
 > Iterates over every key
 
-## mass_set_default(...)
-```python
-def mass_set_default(pfx: str | None = None, dict_vals: dict[str, Serializable] | None = None, values: Serializable)
-```
-
-[`_rsruntime/lib/rs_config.py@28:64`](/_rsruntime/lib/rs_config.py#L28)
-> Sets a large amount of default values
->> When pfx is not None, it is prepended (with a / if it doesn't already have one) to each key
-> Values are either given through dict_vals or **values (keyword args)
->> Using both is probably bad but not prohibited
->>> A SyntaxWarning shall be issued upon you to remind you of your choices.
->> If a value is in both and is not the same, a ValueError is raised
->>> Once this has been checked, they are merged together
-> If a total of 0 values are given, an error is logged  
-> Otherwise, an info is logged decribing how many keys will be set
-
 ## path_from_topkey(...)
 ```python
-def path_from_topkey(topkey: str)
+@staticmethod
+def path_from_topkey(self, topkey: str)
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@79:81`](/_rsruntime/ShaeLib/types/fbd.py#L79)
@@ -302,7 +298,8 @@ def path_from_topkey(self, topkey: str):
 
 ## readin(...)
 ```python
-def readin(topkey: str)
+@staticmethod
+def readin(self, topkey: str)
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@127:132`](/_rsruntime/ShaeLib/types/fbd.py#L127)
@@ -322,9 +319,10 @@ def readin(self, topkey: str):
 
 > Reads in a top-level key
 
-## readin_modified()
+## readin_modified(...)
 ```python
-def readin_modified()
+@staticmethod
+def readin_modified(self)
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@116:126`](/_rsruntime/ShaeLib/types/fbd.py#L116)
@@ -349,30 +347,19 @@ def readin_modified(self):
 
 > Reads in top-level keys that have been changed
 
-## set_default(...)
-```python
-def set_default(option: str | tuple[str], value: Serializable)
-```
-
-[`_rsruntime/lib/rs_config.py@24:27`](/_rsruntime/lib/rs_config.py#L24)
-
-<details>
-<summary>Source Code</summary>
-
-```python
-def set_default(self, option: str | tuple[str], value: INIBackedDict.__bases__[0].__parameters__[0]):
-    '''Sets an option if it does not exist'''
-    if option not in self:
-        self[option] = value
-```
-</details>
-
-> Sets an option if it does not exist
-
 ## setitem(...)
 ```python
-def setitem(key: Key, val: Serializable, _tree: MutableMapping | None = None)
+@staticmethod
+def setitem(...)
 ```
+<details>
+<summary>Parameters...</summary>
+
+```python
+    self, key: Key, val: Serializable,
+    _tree: MutableMapping | None = None
+```
+</details>
 
 [`_rsruntime/ShaeLib/types/fbd.py@178:185`](/_rsruntime/ShaeLib/types/fbd.py#L178)
 
@@ -395,7 +382,8 @@ def setitem(self, key: Key, val: Serializable, *, _tree: MutableMapping | None =
 
 ## sort(...)
 ```python
-def sort(by: Callable(str | tuple[str, ...]) -> Any = <lambda>)
+@staticmethod
+def sort(self, by: Callable(str | tuple[str, ...]) -> Any = <lambda>)
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@277:283`](/_rsruntime/ShaeLib/types/fbd.py#L277)
@@ -416,9 +404,10 @@ def sort(self, by: typing.Callable[[str | tuple[str, ...]], typing.Any] = lambda
 
 > Sorts the data of this INIBackedDict in-place, marking all touched sections as dirty
 
-## start_autosync()
+## start_autosync(...)
 ```python
-def start_autosync()
+@staticmethod
+def start_autosync(self)
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@89:92`](/_rsruntime/ShaeLib/types/fbd.py#L89)
@@ -436,9 +425,10 @@ def start_autosync(self):
 
 > Starts the internal watchdog timer
 
-## stop_autosync()
+## stop_autosync(...)
 ```python
-def stop_autosync()
+@staticmethod
+def stop_autosync(self)
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@93:96`](/_rsruntime/ShaeLib/types/fbd.py#L93)
@@ -456,9 +446,10 @@ def stop_autosync(self):
 
 > Stops the internal watchdog timer
 
-## sync()
+## sync(...)
 ```python
-def sync()
+@staticmethod
+def sync(self)
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@83:87`](/_rsruntime/ShaeLib/types/fbd.py#L83)
@@ -479,7 +470,8 @@ def sync(self):
 
 ## values(...)
 ```python
-def values(start_key: Key) -> Generator[[Deserialized], None, None]
+@staticmethod
+def values(self, start_key: Key) -> Generator[[Deserialized], None, None]
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@216:219`](/_rsruntime/ShaeLib/types/fbd.py#L216)
@@ -499,8 +491,17 @@ def values(self, start_key: Key) -> typing.Generator[[Deserialized], None, None]
 
 ## writeback(...)
 ```python
-def writeback(topkey: str, only_if_dirty: bool = True, clean: bool = True)
+@staticmethod
+def writeback(...)
 ```
+<details>
+<summary>Parameters...</summary>
+
+```python
+    self, topkey: str, only_if_dirty: bool = True,
+    clean: bool = True
+```
+</details>
 
 [`_rsruntime/ShaeLib/types/fbd.py@106:112`](/_rsruntime/ShaeLib/types/fbd.py#L106)
 
@@ -520,9 +521,10 @@ def writeback(self, topkey: str, *, only_if_dirty: bool = True, clean: bool = Tr
 
 > Writes back a top-level key
 
-## writeback_dirty()
+## writeback_dirty(...)
 ```python
-def writeback_dirty()
+@staticmethod
+def writeback_dirty(self)
 ```
 
 [`_rsruntime/ShaeLib/types/fbd.py@102:105`](/_rsruntime/ShaeLib/types/fbd.py#L102)

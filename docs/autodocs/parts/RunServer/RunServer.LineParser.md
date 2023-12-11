@@ -1,13 +1,13 @@
 # `LineParser` (`RunServer.LineParser` | `RS.LP`)
 [`_rsruntime/lib/rs_lineparser.py`](/_rsruntime/lib/rs_lineparser.py "Source")  
-[Standalone doc: parts/RunServer/RunServer.LineParser.md](RunServer.LineParser.md)  
+[Standalone doc: parts/RunServer/RunServer.LineParser.md](RunServer.LineParser)  
 
 ## handle_line(...)
 ```python
 def handle_line(line: str)
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@121:126`](/_rsruntime/lib/rs_lineparser.py#L121)
+[`_rsruntime/lib/rs_lineparser.py@122:127`](/_rsruntime/lib/rs_lineparser.py#L122)
 
 <details>
 <summary>Source Code</summary>
@@ -29,7 +29,7 @@ def handle_line(self, line: str):
 def init2()
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@106:107`](/_rsruntime/lib/rs_lineparser.py#L106)
+[`_rsruntime/lib/rs_lineparser.py@107:108`](/_rsruntime/lib/rs_lineparser.py#L107)
 
 <details>
 <summary>Source Code</summary>
@@ -47,7 +47,7 @@ def init2(self):
 def register_callback(patt: Pattern, callback: Callable(Match, Match, struct_time) | Callable(Match), with_prefix: bool = True)
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@108:114`](/_rsruntime/lib/rs_lineparser.py#L108)
+[`_rsruntime/lib/rs_lineparser.py@109:115`](/_rsruntime/lib/rs_lineparser.py#L109)
 
 <details>
 <summary>Source Code</summary>
@@ -72,7 +72,7 @@ def register_callback(self, patt: re.Pattern, callback: typing.Callable[[re.Matc
 def register_chat_callback(callback: Callable(ForwardRef('RS.UM.User'), str, bool))
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@115:120`](/_rsruntime/lib/rs_lineparser.py#L115)
+[`_rsruntime/lib/rs_lineparser.py@116:121`](/_rsruntime/lib/rs_lineparser.py#L116)
 
 <details>
 <summary>Source Code</summary>

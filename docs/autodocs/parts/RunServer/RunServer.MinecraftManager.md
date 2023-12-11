@@ -1,6 +1,6 @@
 # `MinecraftManager` (`RunServer.MinecraftManager` | `RS.MC`)
 [`_rsruntime/lib/rs_mcmgr.py`](/_rsruntime/lib/rs_mcmgr.py "Source")  
-[Standalone doc: parts/RunServer/RunServer.MinecraftManager.md](RunServer.MinecraftManager.md)  
+[Standalone doc: parts/RunServer/RunServer.MinecraftManager.md](RunServer.MinecraftManager)  
 
 ## init2()
 ```python

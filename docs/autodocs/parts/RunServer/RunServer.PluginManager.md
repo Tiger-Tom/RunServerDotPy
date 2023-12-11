@@ -1,13 +1,13 @@
 # `PluginManager` (`RunServer.PluginManager` | `RS.PM`)
 [`_rsruntime/lib/rs_plugins.py`](/_rsruntime/lib/rs_plugins.py "Source")  
-[Standalone doc: parts/RunServer/RunServer.PluginManager.md](RunServer.PluginManager.md)  
+[Standalone doc: parts/RunServer/RunServer.PluginManager.md](RunServer.PluginManager)  
 
 ## early_load_plugins()
 ```python
 def early_load_plugins()
 ```
 
-[`_rsruntime/lib/rs_plugins.py@172:180`](/_rsruntime/lib/rs_plugins.py#L172)
+[`_rsruntime/lib/rs_plugins.py@173:181`](/_rsruntime/lib/rs_plugins.py#L173)
 
 <details>
 <summary>Source Code</summary>
@@ -32,7 +32,7 @@ def early_load_plugins(self):
 def load_plugins()
 ```
 
-[`_rsruntime/lib/rs_plugins.py@182:184`](/_rsruntime/lib/rs_plugins.py#L182)
+[`_rsruntime/lib/rs_plugins.py@183:185`](/_rsruntime/lib/rs_plugins.py#L183)
 
 <details>
 <summary>Source Code</summary>
@@ -51,7 +51,7 @@ def load_plugins(self):
 def restart()
 ```
 
-[`_rsruntime/lib/rs_plugins.py@213:214`](/_rsruntime/lib/rs_plugins.py#L213)
+[`_rsruntime/lib/rs_plugins.py@214:215`](/_rsruntime/lib/rs_plugins.py#L214)
 
 <details>
 <summary>Source Code</summary>
@@ -69,7 +69,7 @@ def restart(self):
 def start()
 ```
 
-[`_rsruntime/lib/rs_plugins.py@211:212`](/_rsruntime/lib/rs_plugins.py#L211)
+[`_rsruntime/lib/rs_plugins.py@212:213`](/_rsruntime/lib/rs_plugins.py#L212)
 
 <details>
 <summary>Source Code</summary>

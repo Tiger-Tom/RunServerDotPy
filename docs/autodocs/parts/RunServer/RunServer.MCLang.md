@@ -1,13 +1,13 @@
 # `MCLang` (`RunServer.MCLang` | `RS.L`)
 [`_rsruntime/lib/rs_lineparser.py`](/_rsruntime/lib/rs_lineparser.py "Source")  
-[Standalone doc: parts/RunServer/RunServer.MCLang.md](RunServer.MCLang.md)  
+[Standalone doc: parts/RunServer/RunServer.MCLang.md](RunServer.MCLang)  
 
 ## extract_lang()
 ```python
 def extract_lang() -> dict[str, str]
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@77:96`](/_rsruntime/lib/rs_lineparser.py#L77)
+[`_rsruntime/lib/rs_lineparser.py@78:97`](/_rsruntime/lib/rs_lineparser.py#L78)
 > Extracts the language file from a server JAR file, sets and returns self.lang
 
 ## init2()
@@ -15,7 +15,7 @@ def extract_lang() -> dict[str, str]
 def init2()
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@30:31`](/_rsruntime/lib/rs_lineparser.py#L30)
+[`_rsruntime/lib/rs_lineparser.py@31:32`](/_rsruntime/lib/rs_lineparser.py#L31)
 
 <details>
 <summary>Source Code</summary>
@@ -33,7 +33,7 @@ def init2(self):
 def lang_to_pattern(lang: str, group_names: tuple[str, ...] | None = None, prefix_suffix: str = '^{}$') -> Pattern
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@41:75`](/_rsruntime/lib/rs_lineparser.py#L41)
+[`_rsruntime/lib/rs_lineparser.py@42:76`](/_rsruntime/lib/rs_lineparser.py#L42)
 > <no doc>
 
 ## strip_prefix(...)
@@ -41,7 +41,7 @@ def lang_to_pattern(lang: str, group_names: tuple[str, ...] | None = None, prefi
 def strip_prefix(line: str) -> tuple[tuple[re.Match, time.struct_time] | None, str]
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@35:39`](/_rsruntime/lib/rs_lineparser.py#L35)
+[`_rsruntime/lib/rs_lineparser.py@36:40`](/_rsruntime/lib/rs_lineparser.py#L36)
 
 <details>
 <summary>Source Code</summary>

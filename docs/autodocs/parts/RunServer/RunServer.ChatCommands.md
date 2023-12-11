@@ -1,6 +1,6 @@
 # `ChatCommands` (`RunServer.ChatCommands` | `RS.CC`)
 [`_rsruntime/lib/rs_userio.py`](/_rsruntime/lib/rs_userio.py "Source")  
-[Standalone doc: parts/RunServer/RunServer.ChatCommands.md](RunServer.ChatCommands.md)  
+[Standalone doc: parts/RunServer/RunServer.ChatCommands.md](RunServer.ChatCommands)  
 
 ## compose_command(...)
 ```python

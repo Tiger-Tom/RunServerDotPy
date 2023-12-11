@@ -1,6 +1,6 @@
 # `TellRaw` (`RunServer.TellRaw` | `RS.TR`)
 [`_rsruntime/lib/rs_userio.py`](/_rsruntime/lib/rs_userio.py "Source")  
-[Standalone doc: parts/RunServer/RunServer.TellRaw.md](RunServer.TellRaw.md)  
+[Standalone doc: parts/RunServer/RunServer.TellRaw.md](RunServer.TellRaw)  
 > Generates a TellRaw JSON
 >> Praise be to https://www.minecraftjson.com !
 > Who doesn't want object-oriented TellRaws???

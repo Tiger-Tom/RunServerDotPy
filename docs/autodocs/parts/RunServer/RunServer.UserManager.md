@@ -1,6 +1,6 @@
 # `UserManager` (`RunServer.UserManager` | `RS.UM`)
 [`_rsruntime/lib/rs_usermgr.py`](/_rsruntime/lib/rs_usermgr.py "Source")  
-[Standalone doc: parts/RunServer/RunServer.UserManager.md](RunServer.UserManager.md)  
+[Standalone doc: parts/RunServer/RunServer.UserManager.md](RunServer.UserManager)  
 
 ## close()
 ```python

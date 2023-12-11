@@ -1,6 +1,6 @@
 # `ExceptionHandlers` (`RunServer.ExceptionHandlers` | `RS.EH`)
 [`_rsruntime/lib/rs_exceptionhandlers.py`](/_rsruntime/lib/rs_exceptionhandlers.py "Source")  
-[Standalone doc: parts/RunServer/RunServer.ExceptionHandlers.md](RunServer.ExceptionHandlers.md)  
+[Standalone doc: parts/RunServer/RunServer.ExceptionHandlers.md](RunServer.ExceptionHandlers)  
 
 ## hookin()
 ```python
