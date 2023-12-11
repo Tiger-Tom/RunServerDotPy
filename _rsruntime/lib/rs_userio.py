@@ -147,10 +147,6 @@ class ChatCommands:
             self.params = tuple(inspect.signature(func).parameters.values())[1:]
             self.args_line = self.render_args(self.params)
 
-        custom_vals_to_strs = {
-            True: Config['chat_commands/help/formatter/special_literal/true_yes'], False: Config['chat_commands/help/formatter/special_literal/false_no'],
-        }; custom_strs_to_vals = {v: k for k,v in custom_vals_to_strs.items()}
-
         def parse_args(self, *args) -> typing.Generator[typing.Any, None, None]:
             eargs = enumerate(args)
             prms = iter(self.params)
@@ -165,7 +161,6 @@ class ChatCommands:
                         raise ValueError(f'Expected one of {p.annotation.__args__}, not {a}')
                     yield a
                 elif isinstance(p.annotation, type): yield p.annotation(a)
-                elif a in custom_strs_to_vals: yield custom_strs_to_vals[a]
                 else: yield a
             for p in prms:
                 if p.kind == p.VAR_POSITIONAL: yield ()
@@ -194,8 +189,7 @@ class ChatCommands:
             return braks.format(argstr=Config['chat_commands/help/formatter/argument/joiners/tokens'].join(build))
         @classmethod
         def render_annotation(cls, ann: typing.Any) -> str:
-            if ann in cls.custom_vals_to_strs: return cls.custom_vals_to_strs[ann]
-            elif ann in {None, type(None)}: return 'None'
+            if ann in {None, type(None)}: return 'None'
             elif getattr(ann, '__origin__', None) is typing.Literal:
                 return Config['chat_commands/help/formatter/argument/joiners/literals'].join(cls.render_annotation(aa) for aa in ann.__args__ if aa not in {None, type(None)})
             elif (getattr(ann, '__origin__', None) is typing.Union) or isinstance(ann, UnionType):
