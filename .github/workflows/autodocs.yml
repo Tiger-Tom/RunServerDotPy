@@ -19,8 +19,8 @@ jobs:
           - uses: actions/checkout@v3
           - name: "Initialize & update submodules"
             run: |
-              git submodules init
-              git submodules update
+              git submodule init
+              git submodule update
           - uses: actions/setup-python@v4
             with:
                 python-version: '3.12'
