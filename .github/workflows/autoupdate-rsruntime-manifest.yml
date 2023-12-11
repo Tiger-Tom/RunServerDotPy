@@ -6,6 +6,10 @@ on:
         paths:
           - '_rsruntime/**'
           - '_rsruntime/**/*'
+    workflow_run:
+        workflows: ['Misc/Update Submodules']
+        types:
+          - completed
     workflow_dispatch:
 jobs:
     update_manif:

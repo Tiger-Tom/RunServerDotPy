@@ -6,6 +6,10 @@ on:
         paths:
           - '_rsruntime/*.py'
           - '_rsruntime/**/*.py'
+    workflow_run:
+        workflows: ['Misc/Update Submodules']
+        types:
+          - completed
     workflow_dispatch:
 
 concurrency:
