@@ -43,8 +43,7 @@ jobs:
           - name: "Remove key"
             run: "rm ./key.pyk"
           - name: "Commit and push changes"
-            uses: EndBug/add-and-commit@v9
-            with:
-                add: "$MAN_PATH/MANIFEST.ini"
-                message: "Automatic manifest update for ${{ inputs.path }} (triggered by ${{ github.actor }}: ${{ github.sha }})"
-                pull: "--rebase"
+            run: |
+              git add "$MAN_PATH/MANIFEST.ini
+              git commit -m "Automatic manifest update for ${{ inputs.path }} (triggered by ${{ github.actor }}: ${{ github.sha }})"
+              git push
