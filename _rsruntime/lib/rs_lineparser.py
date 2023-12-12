@@ -110,8 +110,8 @@ class LineParser:
     def register_callback(self, patt: re.Pattern, callback: typing.Callable[[re.Match, re.Match, time.struct_time], None] | typing.Callable[[re.Match], None], with_prefix: bool = True):
         '''
             Registers a callback
-                If keep_prefix, then lines that have the prefix are passed. callback should have the signature: `callback(match: re.Match, prefix: re.Match, t: time.struct_time)`
-                Otherwise, lines that don't have a prefix are passed; the callback should have the signature: `callback(match: re.Match)`
+                If keep_prefix, then lines that have the prefix are passed. callback should have the signature: `callback(line: re.Match, prefix: re.Match, time: time.struct_time)`
+                Otherwise, lines that don't have a prefix are passed; the callback should have the signature: `callback(line: re.Match)`
         '''
         (self.hooks_prefix if with_prefix else self.hooks_no_prefix).register(patt, callback)
     def register_chat_callback(self, callback: typing.Callable[[typing.ForwardRef('RS.UM.User'), str, bool], None]):
