@@ -93,10 +93,10 @@ class UserManager:
             if self.is_console: raise AttributeError('Cannot set permission of console')
             RS.UserManager.fbd[f'{self.uuid}/ChatCommand Permission Level'] = int(val)
 
-        def tell(self, text: typing.ForwardRef('TellRaw') | tuple[str | dict] | str):
+        def tell(self, text: typing.ForwardRef('RS.TellRaw') | tuple[str | dict] | str):
             if not (hasattr(self, 'name') or self.is_console):
                 raise TypeError(f'User {self} has no name; cannot tell')
-            if isinstance(text, TellRaw): text = text.render()
+            if isinstance(text, RS.TellRaw): text = text.render()
             if self.is_console: print(f'CONSOLE.tell: {text if isinstance(text, str) else json.dumps(text, indent=4)}')
             else: RS.SM.write(f'tellraw {self.name} {json.dumps(text)}')
 

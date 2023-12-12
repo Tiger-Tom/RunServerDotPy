@@ -326,7 +326,7 @@ class ChatCommands:
     def __contains__(self, cmd_or_alias: str) -> bool:
         return (cmd_or_alias in self.commands) or (cmd_or_alias in self.aliases)
 
-    def compose_command(self, cmd: str, args: str | None) -> str:
+    def compose_command(self, cmd: str, args: str | None = None) -> str:
         '''Compiles cmd and args together using various configuration to compose a command string'''
         return Config['chat_commands/patterns/line'].format(
             char=Config['chat_commands/patterns/char'], command=cmd,
