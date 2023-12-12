@@ -36,6 +36,7 @@ def _shutdown(tell: RS.UM.User, for_: str, delay: int):
               this.c['shutdown/warning/message'].format(for_=for_, timefmt=this.c['/shutdown/warning/now']),
               '#FF0000', TellRaw.TF.BOLD|TellRaw.TF.UNDERLINED)
     time.sleep(1)
+    RS.SM.stop()
 
 @RS.CC(permission=UserManager.User.perm_from_value(this.c['commands/stop/permission']), help_section=('Server Control',))
 def stop(user: RS.UM.User, delay: int = this.c['functions/shutdown/default_delay'], announce: bool = True):
