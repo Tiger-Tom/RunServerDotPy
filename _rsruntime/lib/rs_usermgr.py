@@ -2,6 +2,7 @@
 
 #> Imports
 import re
+import json
 from pathlib import Path
 # Types
 import typing
@@ -160,7 +161,7 @@ class UserManager:
             lambda m,p,t: self[m.group('username')](uuid=m.group('uuid')))
         LineParser.register_callback( # player is assigned entity ID and origin
             re.compile(r'^(?P<username>\w+)\[\/(?P<origin>(?P<ip>[\d.]+):(?P<port>[\d]+))\] logged in with entity id (?P<entity_id>[\d]+) at \((?P<x>\-?[\d.]+), (?P<y>\-?[\d.]+), (?P<z>\-?[\d.]+)\)$'),
-            lambda p,t,m: self[m.group('username')](ip=m.group('ip'), port=int(m.group('port')), origin=m.group('origin'), login_coords=(float(m.group('x')), float(m.group('y')), float(m.group('z')))))
+            lambda m,p,t: self[m.group('username')](ip=m.group('ip'), port=int(m.group('port')), origin=m.group('origin'), login_coords=(float(m.group('x')), float(m.group('y')), float(m.group('z')))))
 
     def __getitem__(self, username: str) -> User:
         if username in self.users: return self.users[username]
