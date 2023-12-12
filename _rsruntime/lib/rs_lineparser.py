@@ -34,6 +34,7 @@ class MCLang:
     # Lang interaction
     ## Lines
     def strip_prefix(self, line: str) -> tuple[tuple[re.Match, time.struct_time] | None, str]:
+        line = line.strip()
         if (m := self.prefix.fullmatch(line)) is not None:
             # almost as bad as my first idea: `time.strptime(f'{m.time}|{time.strftime("%x")}', '%H:%M:%S|%x')`
             return ((m, time.struct_time(time.localtime()[:3] + time.strptime(m.group('time'), '%H:%M:%S')[3:6] + time.localtime()[6:])), m.group('line'))
