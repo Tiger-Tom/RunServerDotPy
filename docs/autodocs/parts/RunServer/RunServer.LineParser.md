@@ -7,7 +7,7 @@
 def handle_line(line: str)
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@122:127`](/_rsruntime/lib/rs_lineparser.py#L122)
+[`_rsruntime/lib/rs_lineparser.py@123:128`](/_rsruntime/lib/rs_lineparser.py#L123)
 
 <details>
 <summary>Source Code</summary>
@@ -29,7 +29,7 @@ def handle_line(self, line: str):
 def init2()
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@107:108`](/_rsruntime/lib/rs_lineparser.py#L107)
+[`_rsruntime/lib/rs_lineparser.py@108:109`](/_rsruntime/lib/rs_lineparser.py#L108)
 
 <details>
 <summary>Source Code</summary>
@@ -47,7 +47,7 @@ def init2(self):
 def register_callback(patt: Pattern, callback: Callable(Match, Match, struct_time) | Callable(Match), with_prefix: bool = True)
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@109:115`](/_rsruntime/lib/rs_lineparser.py#L109)
+[`_rsruntime/lib/rs_lineparser.py@110:116`](/_rsruntime/lib/rs_lineparser.py#L110)
 
 <details>
 <summary>Source Code</summary>
@@ -56,23 +56,23 @@ def register_callback(patt: Pattern, callback: Callable(Match, Match, struct_tim
 def register_callback(self, patt: re.Pattern, callback: typing.Callable[[re.Match, re.Match, time.struct_time], None] | typing.Callable[[re.Match], None], with_prefix: bool = True):
     '''
         Registers a callback
-            If keep_prefix, then lines that have the prefix are passed. callback should have the signature: `callback(match: re.Match, prefix: re.Match, t: time.struct_time)`
-            Otherwise, lines that don't have a prefix are passed; the callback should have the signature: `callback(match: re.Match)`
+            If keep_prefix, then lines that have the prefix are passed. callback should have the signature: `callback(line: re.Match, prefix: re.Match, time: time.struct_time)`
+            Otherwise, lines that don't have a prefix are passed; the callback should have the signature: `callback(line: re.Match)`
     '''
     (self.hooks_prefix if with_prefix else self.hooks_no_prefix).register(patt, callback)
 ```
 </details>
 
 > Registers a callback  
-> If keep_prefix, then lines that have the prefix are passed. callback should have the signature: `callback(match: re.Match, prefix: re.Match, t: time.struct_time)`  
-> Otherwise, lines that don't have a prefix are passed; the callback should have the signature: `callback(match: re.Match)`
+> If keep_prefix, then lines that have the prefix are passed. callback should have the signature: `callback(line: re.Match, prefix: re.Match, time: time.struct_time)`  
+> Otherwise, lines that don't have a prefix are passed; the callback should have the signature: `callback(line: re.Match)`
 
 ## register_chat_callback(...)
 ```python
 def register_chat_callback(callback: Callable(ForwardRef('RS.UM.User'), str, bool))
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@116:121`](/_rsruntime/lib/rs_lineparser.py#L116)
+[`_rsruntime/lib/rs_lineparser.py@117:122`](/_rsruntime/lib/rs_lineparser.py#L117)
 
 <details>
 <summary>Source Code</summary>

@@ -2859,110 +2859,168 @@ def register_unraisable_hook(self, callback: typing.Callable[['UnraisableHookArg
 [`_rsruntime/lib/rs_mcmgr.py`](/_rsruntime/lib/rs_mcmgr.py "Source")  
 [Standalone doc: parts/RunServer/RunServer.MinecraftManager.md](RunServer.MinecraftManager)  
 
+## auto_update(...)
+```python
+def auto_update(force: bool = False)
+```
+
+[`_rsruntime/lib/rs_mcmgr.py@142:154`](/_rsruntime/lib/rs_mcmgr.py#L142)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def auto_update(self, force: bool = False):
+    '''Automatically update to the latest version'''
+    if not force:
+        if not Config['minecraft/manager/auto_update']:
+            self.logger.warning('Skipping auto update (config minecraft/manager/auto_update)')
+            return
+        if self.jar_is_latest():
+            self.logger.infop(f'No need to update: {self.latest["id"]} is the latest viable version')
+            return
+        if not (Config['minecraft/manager/unattended_autoupdate'] or input('Check and update server JAr to latest version? (y/N) >').lower().startswith('y')):
+            self.logger.warning('Skipping auto update (user request)')
+            return
+    self.install_version(self.latest)
+```
+</details>
+
+> Automatically update to the latest version
+
+## fetch_versions()
+```python
+def fetch_versions() -> VersionsType
+```
+
+[`_rsruntime/lib/rs_mcmgr.py@75:96`](/_rsruntime/lib/rs_mcmgr.py#L75)
+> Fetches the upstream versions manifest
+
 ## init2()
 ```python
 def init2()
 ```
 
-[`_rsruntime/lib/rs_mcmgr.py@34:50`](/_rsruntime/lib/rs_mcmgr.py#L34)
+[`_rsruntime/lib/rs_mcmgr.py@40:59`](/_rsruntime/lib/rs_mcmgr.py#L40)
+> <no doc>
+
+## install_version(...)
+```python
+def install_version(ver: str | dict, chunk_notify: Callable(str) | None = None)
+```
+
+[`_rsruntime/lib/rs_mcmgr.py@105:123`](/_rsruntime/lib/rs_mcmgr.py#L105)
+> (Verifies and) installs the specified version
+
+## jar_is_latest()
+```python
+def jar_is_latest() -> bool
+```
+
+[`_rsruntime/lib/rs_mcmgr.py@72:73`](/_rsruntime/lib/rs_mcmgr.py#L72)
 
 <details>
 <summary>Source Code</summary>
 
 ```python
-def init2(self):
-    if Config['minecraft/manager/dl/auto_fetch_if_missing'] or Config['minecraft/manager/dl/auto_update']:
-        try: self.versions = self.setup_manifest()
-        except Exception as e:
-            self.logger.fatal(f'Could not setup Minecraft version manifest:\n{"".join(traceback.format_exception(e))}')
-            self.has_manifest = False
-        else: self.has_manifest = True
-    if not (p := Path(Config['minecraft/path/base'], Config['minecraft/path/server_jar'])).exists():
-        self.logger.warning(f'{p} does not exist!')
-        if not self.has_manifest:
-            self.logger.irrec('Minecraft version manifest failed earlier; cannot continue')
-            raise FileNotFoundError(str(p))
-        if not Config['minecraft/manager/dl/auto_fetch_if_missing']:
-            self.logger.irrec('Config minecraft/manager/dl/auto_fetch_if_missing is false, cannot download!')
-            raise FileNotFoundError(str(p))
-        if not self.install_update():
-            raise ExceptionGroup('The server JAr couldn\'t be found, and the downloaded version failed verification. Cannot possibly continue', (FileNotFoundError(p), ValueError('Verification failed')))
+def jar_is_latest(self) -> bool:
+    return self.jarvers() == self.latest['id']
 ```
 </details>
 
 > <no doc>
 
-## install_update()
+## jarvers()
 ```python
-def install_update() -> bool
+def jarvers() -> str | None
 ```
 
-[`_rsruntime/lib/rs_mcmgr.py@76:95`](/_rsruntime/lib/rs_mcmgr.py#L76)
-> <no doc>
-
-## setup_manifest()
-```python
-def setup_manifest() -> VersionsType
-```
-
-[`_rsruntime/lib/rs_mcmgr.py@52:65`](/_rsruntime/lib/rs_mcmgr.py#L52)
+[`_rsruntime/lib/rs_mcmgr.py@64:67`](/_rsruntime/lib/rs_mcmgr.py#L64)
 
 <details>
 <summary>Source Code</summary>
 
 ```python
-def setup_manifest(self) -> 'VersionsType':
-    self.logger.info(f'Fetching {Config["minecraft/manager/dl/version_manifest_url"]}')
-    data = json.loads(fetch.fetch(Config['minecraft/manager/dl/version_manifest_url']).decode())
-    tfmt = Config['minecraft/manager/dl/time_fmt']
-    versions = {v['id']: v | {
-            'time': strptime(v['time'], tfmt), '_time': v['time'],
-            'releaseTime': strptime(v['releaseTime'], tfmt), '_releaseTime': v['releaseTime']
-        } for v in data['versions']}
-    return self.VersionsType(versions=versions,
-        latest=max((versions[data['latest']['release']], versions[data['latest']['snapshot']]), key=lambda v: v['time']),
-        latest_release=versions[data['latest']['release']],
-        latest_snapshot=versions[data['latest']['snapshot']],
-        releases = {k: v for k,v in versions.items() if v['type'] == 'release'},
-        snapshots = {k: v for k,v in versions.items() if v['type'] == 'snapshot'},
-    )
+def jarvers(self) -> str | None:
+    if not self.jarpath.exists(): return None
+    with ZipFile(self.jarpath) as zf, zf.open('version.json') as f:
+        return json.load(f)['id']
 ```
 </details>
 
 > <no doc>
 
-## verify_update(...)
+## refresh()
 ```python
-def verify_update(data: bytes, target_hash: str, target_size: int) -> bool
+def refresh()
 ```
 
-[`_rsruntime/lib/rs_mcmgr.py@96:112`](/_rsruntime/lib/rs_mcmgr.py#L96)
+[`_rsruntime/lib/rs_mcmgr.py@97:100`](/_rsruntime/lib/rs_mcmgr.py#L97)
 
 <details>
 <summary>Source Code</summary>
 
 ```python
-def verify_update(self, data: bytes, target_hash: str, target_size: int) -> bool:
-    failed_hash, failed_size = False, False
-    if Config['minecraft/manager/dl/hash_verify'] and (target_hash != (actual_hash := sha1(data).hexdigest())):
-        self.logger.fatal(f'The Minecraft server JAr failed hash verification:\n{target_hash=}\n{actual_hash=}')
-        failed_hash = True
-    if Config['minecraft/manager/dl/size_verify'] and (target_size != (actual_size := len(data))):
-        self.logger.fatal(f'The Minecraft server JAr failed size verification:\n{target_size=}\n{actual_size=}')
-        failed_size = True
-    if failed_hash or failed_size:
-        if (not Config['minecraft/manager/dl/prompt_on_fail_verify']) or \
-           (input(f'The Minecraft server JAr failed '
-                  f'{"hash" if failed_hash else ""}{" and " if (failed_hash and failed_size) else ""}{"size" if failed_size else ""} '
-                  f'verification. Install it anyway? (y/N) >').lower() != 'y'):
-            self.logger.error('Not installing')
-            return False
-        self.logger.warning('Installing anyway, proceed with caution')
-    return True
+def refresh(self):
+    '''Update internal versions manifest'''
+    self.versions = self.fetch_versions()
+    self.version_load_time = int(time.time())
 ```
 </details>
 
-> <no doc>
+> Update internal versions manifest
+
+## upon_version(...)
+```python
+def upon_version(ver: str | dict)
+```
+
+[`_rsruntime/lib/rs_mcmgr.py@102:104`](/_rsruntime/lib/rs_mcmgr.py#L102)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def upon_version(self, ver: str | dict):
+    '''Returns the upstream manifest for the specified version ID or dictionary'''
+    return json.loads(fetch.fetch((ver if isinstance(ver, dict) else self.versions.versions[ver])['url']).decode())
+```
+</details>
+
+> Returns the upstream manifest for the specified version ID or dictionary
+
+## verify(...)
+```python
+def verify(data: bytes, target_hash: str, target_size: int)
+```
+
+[`_rsruntime/lib/rs_mcmgr.py@124:140`](/_rsruntime/lib/rs_mcmgr.py#L124)
+
+<details>
+<summary>Source Code</summary>
+
+```python
+def verify(self, data: bytes, target_hash: str, target_size: int):
+    '''Checks the data against a variety of configurable verifications'''
+    v = Config['minecraft/manager/download/verify']
+    exc = []
+    hash_failed = ('hash' in v) and (target_hash != sha1(data).hexdigest())
+    size_failed = ('size' in v) and (diff := (target_size - len(data)))
+    if 'zipf' in v:
+        try:
+            with ZipFile(BytesIO(data)) as zf:
+                zipf_failed = zf.testzip() is not None
+        except Exception as e:  zipf_failed = True
+    else: zipf_failed = False
+    failed = hash_failed + size_failed + zipf_failed
+    failstr = ('hash' if hash_failed else '') + ('size' if size_failed else '') + ('ZipF' if zipf_failed else '')
+    if failed: raise ValueError(f'{failstr[0].upper()}{failstr[1:4]}'
+                                f'{f", {failstr[4:8]}, and {failstr[8:]}" if (failed == 3) \
+                                    else f" and {failstr[4:]}" if failed == 2 else ""} verification failed')
+```
+</details>
+
+> Checks the data against a variety of configurable verifications
 
 
 # `MCLang` (`RunServer.MCLang` | `RS.L`)
@@ -2974,7 +3032,7 @@ def verify_update(self, data: bytes, target_hash: str, target_size: int) -> bool
 def extract_lang() -> dict[str, str]
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@78:97`](/_rsruntime/lib/rs_lineparser.py#L78)
+[`_rsruntime/lib/rs_lineparser.py@79:98`](/_rsruntime/lib/rs_lineparser.py#L79)
 > Extracts the language file from a server JAR file, sets and returns self.lang
 
 ## init2()
@@ -3000,7 +3058,7 @@ def init2(self):
 def lang_to_pattern(lang: str, group_names: tuple[str, ...] | None = None, prefix_suffix: str = '^{}$') -> Pattern
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@42:76`](/_rsruntime/lib/rs_lineparser.py#L42)
+[`_rsruntime/lib/rs_lineparser.py@43:77`](/_rsruntime/lib/rs_lineparser.py#L43)
 > <no doc>
 
 ## strip_prefix(...)
@@ -3008,13 +3066,14 @@ def lang_to_pattern(lang: str, group_names: tuple[str, ...] | None = None, prefi
 def strip_prefix(line: str) -> tuple[tuple[re.Match, time.struct_time] | None, str]
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@36:40`](/_rsruntime/lib/rs_lineparser.py#L36)
+[`_rsruntime/lib/rs_lineparser.py@36:41`](/_rsruntime/lib/rs_lineparser.py#L36)
 
 <details>
 <summary>Source Code</summary>
 
 ```python
 def strip_prefix(self, line: str) -> tuple[tuple[re.Match, time.struct_time] | None, str]:
+    line = line.strip()
     if (m := self.prefix.fullmatch(line)) is not None:
         # almost as bad as my first idea: `time.strptime(f'{m.time}|{time.strftime("%x")}', '%H:%M:%S|%x')`
         return ((m, time.struct_time(time.localtime()[:3] + time.strptime(m.group('time'), '%H:%M:%S')[3:6] + time.localtime()[6:])), m.group('line'))
@@ -3034,7 +3093,7 @@ def strip_prefix(self, line: str) -> tuple[tuple[re.Match, time.struct_time] | N
 def handle_line(line: str)
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@122:127`](/_rsruntime/lib/rs_lineparser.py#L122)
+[`_rsruntime/lib/rs_lineparser.py@123:128`](/_rsruntime/lib/rs_lineparser.py#L123)
 
 <details>
 <summary>Source Code</summary>
@@ -3056,7 +3115,7 @@ def handle_line(self, line: str):
 def init2()
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@107:108`](/_rsruntime/lib/rs_lineparser.py#L107)
+[`_rsruntime/lib/rs_lineparser.py@108:109`](/_rsruntime/lib/rs_lineparser.py#L108)
 
 <details>
 <summary>Source Code</summary>
@@ -3074,7 +3133,7 @@ def init2(self):
 def register_callback(patt: Pattern, callback: Callable(Match, Match, struct_time) | Callable(Match), with_prefix: bool = True)
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@109:115`](/_rsruntime/lib/rs_lineparser.py#L109)
+[`_rsruntime/lib/rs_lineparser.py@110:116`](/_rsruntime/lib/rs_lineparser.py#L110)
 
 <details>
 <summary>Source Code</summary>
@@ -3083,23 +3142,23 @@ def register_callback(patt: Pattern, callback: Callable(Match, Match, struct_tim
 def register_callback(self, patt: re.Pattern, callback: typing.Callable[[re.Match, re.Match, time.struct_time], None] | typing.Callable[[re.Match], None], with_prefix: bool = True):
     '''
         Registers a callback
-            If keep_prefix, then lines that have the prefix are passed. callback should have the signature: `callback(match: re.Match, prefix: re.Match, t: time.struct_time)`
-            Otherwise, lines that don't have a prefix are passed; the callback should have the signature: `callback(match: re.Match)`
+            If keep_prefix, then lines that have the prefix are passed. callback should have the signature: `callback(line: re.Match, prefix: re.Match, time: time.struct_time)`
+            Otherwise, lines that don't have a prefix are passed; the callback should have the signature: `callback(line: re.Match)`
     '''
     (self.hooks_prefix if with_prefix else self.hooks_no_prefix).register(patt, callback)
 ```
 </details>
 
 > Registers a callback  
-> If keep_prefix, then lines that have the prefix are passed. callback should have the signature: `callback(match: re.Match, prefix: re.Match, t: time.struct_time)`  
-> Otherwise, lines that don't have a prefix are passed; the callback should have the signature: `callback(match: re.Match)`
+> If keep_prefix, then lines that have the prefix are passed. callback should have the signature: `callback(line: re.Match, prefix: re.Match, time: time.struct_time)`  
+> Otherwise, lines that don't have a prefix are passed; the callback should have the signature: `callback(line: re.Match)`
 
 ## register_chat_callback(...)
 ```python
 def register_chat_callback(callback: Callable(ForwardRef('RS.UM.User'), str, bool))
 ```
 
-[`_rsruntime/lib/rs_lineparser.py@116:121`](/_rsruntime/lib/rs_lineparser.py#L116)
+[`_rsruntime/lib/rs_lineparser.py@117:122`](/_rsruntime/lib/rs_lineparser.py#L117)
 
 <details>
 <summary>Source Code</summary>
@@ -3257,7 +3316,7 @@ def register(cls, manager_type: typing.Type[BaseServerManager]):
 def close()
 ```
 
-[`_rsruntime/lib/rs_usermgr.py@169:171`](/_rsruntime/lib/rs_usermgr.py#L169)
+[`_rsruntime/lib/rs_usermgr.py@170:172`](/_rsruntime/lib/rs_usermgr.py#L170)
 
 <details>
 <summary>Source Code</summary>
@@ -3276,7 +3335,7 @@ def close(self):
 def init2()
 ```
 
-[`_rsruntime/lib/rs_usermgr.py@147:163`](/_rsruntime/lib/rs_usermgr.py#L147)
+[`_rsruntime/lib/rs_usermgr.py@148:164`](/_rsruntime/lib/rs_usermgr.py#L148)
 
 <details>
 <summary>Source Code</summary>
@@ -3298,7 +3357,7 @@ def init2(self):
         lambda m,p,t: self[m.group('username')](uuid=m.group('uuid')))
     LineParser.register_callback( # player is assigned entity ID and origin
         re.compile(r'^(?P<username>\w+)\[\/(?P<origin>(?P<ip>[\d.]+):(?P<port>[\d]+))\] logged in with entity id (?P<entity_id>[\d]+) at \((?P<x>\-?[\d.]+), (?P<y>\-?[\d.]+), (?P<z>\-?[\d.]+)\)$'),
-        lambda p,t,m: self[m.group('username')](ip=m.group('ip'), port=int(m.group('port')), origin=m.group('origin'), login_coords=(float(m.group('x')), float(m.group('y')), float(m.group('z')))))
+        lambda m,p,t: self[m.group('username')](ip=m.group('ip'), port=int(m.group('port')), origin=m.group('origin'), login_coords=(float(m.group('x')), float(m.group('y')), float(m.group('z')))))
 ```
 </details>
 
@@ -3453,7 +3512,7 @@ def text(...)
 
 ## compose_command(...)
 ```python
-def compose_command(cmd: str, args: str | None) -> str
+def compose_command(cmd: str, args: str | None = None) -> str
 ```
 
 [`_rsruntime/lib/rs_userio.py@329:334`](/_rsruntime/lib/rs_userio.py#L329)
@@ -3462,7 +3521,7 @@ def compose_command(cmd: str, args: str | None) -> str
 <summary>Source Code</summary>
 
 ```python
-def compose_command(self, cmd: str, args: str | None) -> str:
+def compose_command(self, cmd: str, args: str | None = None) -> str:
     '''Compiles cmd and args together using various configuration to compose a command string'''
     return Config['chat_commands/patterns/line'].format(
         char=Config['chat_commands/patterns/char'], command=cmd,
@@ -3653,19 +3712,19 @@ def run_command(user: User, line: str, not_secure: bool = False)
 ### tell(...)
 ```python
 @staticmethod
-def tell(self, text: ForwardRef('TellRaw') | tuple[str | dict] | str)
+def tell(self, text: ForwardRef('RS.TellRaw') | tuple[str | dict] | str)
 ```
 
-[`_rsruntime/lib/rs_usermgr.py@96:101`](/_rsruntime/lib/rs_usermgr.py#L96)
+[`_rsruntime/lib/rs_usermgr.py@97:102`](/_rsruntime/lib/rs_usermgr.py#L97)
 
 <details>
 <summary>Source Code</summary>
 
 ```python
-def tell(self, text: typing.ForwardRef('TellRaw') | tuple[str | dict] | str):
+def tell(self, text: typing.ForwardRef('RS.TellRaw') | tuple[str | dict] | str):
     if not (hasattr(self, 'name') or self.is_console):
         raise TypeError(f'User {self} has no name; cannot tell')
-    if isinstance(text, TellRaw): text = text.render()
+    if isinstance(text, RS.TellRaw): text = text.render()
     if self.is_console: print(f'CONSOLE.tell: {text if isinstance(text, str) else json.dumps(text, indent=4)}')
     else: RS.SM.write(f'tellraw {self.name} {json.dumps(text)}')
 ```

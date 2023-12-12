@@ -4,7 +4,7 @@
 
 ## compose_command(...)
 ```python
-def compose_command(cmd: str, args: str | None) -> str
+def compose_command(cmd: str, args: str | None = None) -> str
 ```
 
 [`_rsruntime/lib/rs_userio.py@329:334`](/_rsruntime/lib/rs_userio.py#L329)
@@ -13,7 +13,7 @@ def compose_command(cmd: str, args: str | None) -> str
 <summary>Source Code</summary>
 
 ```python
-def compose_command(self, cmd: str, args: str | None) -> str:
+def compose_command(self, cmd: str, args: str | None = None) -> str:
     '''Compiles cmd and args together using various configuration to compose a command string'''
     return Config['chat_commands/patterns/line'].format(
         char=Config['chat_commands/patterns/char'], command=cmd,

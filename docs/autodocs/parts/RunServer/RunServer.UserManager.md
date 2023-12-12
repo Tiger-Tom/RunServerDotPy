@@ -7,7 +7,7 @@
 def close()
 ```
 
-[`_rsruntime/lib/rs_usermgr.py@169:171`](/_rsruntime/lib/rs_usermgr.py#L169)
+[`_rsruntime/lib/rs_usermgr.py@170:172`](/_rsruntime/lib/rs_usermgr.py#L170)
 
 <details>
 <summary>Source Code</summary>
@@ -26,7 +26,7 @@ def close(self):
 def init2()
 ```
 
-[`_rsruntime/lib/rs_usermgr.py@147:163`](/_rsruntime/lib/rs_usermgr.py#L147)
+[`_rsruntime/lib/rs_usermgr.py@148:164`](/_rsruntime/lib/rs_usermgr.py#L148)
 
 <details>
 <summary>Source Code</summary>
@@ -48,7 +48,7 @@ def init2(self):
         lambda m,p,t: self[m.group('username')](uuid=m.group('uuid')))
     LineParser.register_callback( # player is assigned entity ID and origin
         re.compile(r'^(?P<username>\w+)\[\/(?P<origin>(?P<ip>[\d.]+):(?P<port>[\d]+))\] logged in with entity id (?P<entity_id>[\d]+) at \((?P<x>\-?[\d.]+), (?P<y>\-?[\d.]+), (?P<z>\-?[\d.]+)\)$'),
-        lambda p,t,m: self[m.group('username')](ip=m.group('ip'), port=int(m.group('port')), origin=m.group('origin'), login_coords=(float(m.group('x')), float(m.group('y')), float(m.group('z')))))
+        lambda m,p,t: self[m.group('username')](ip=m.group('ip'), port=int(m.group('port')), origin=m.group('origin'), login_coords=(float(m.group('x')), float(m.group('y')), float(m.group('z')))))
 ```
 </details>
 
