@@ -87,13 +87,13 @@ class TellRaw(list):
             assert isinstance(hover_event, self.HoverEvent)
             obj['hoverEvent'] = {'action': hover_event.value}
             if hover_event is self.HoverEvent.TEXT:
-                if isinstance(hover_value, self.__class__): obj['hoverEvent']['contents'] = hover_value.render()
+                if isinstance(hover_contents, self.__class__): obj['hoverEvent']['contents'] = hover_contents.render()
                 else:
-                    assert isinstance(hover_value, tuple, list)
-                    obj['hoverEvent']['contents'] = hover_value
+                    assert isinstance(hover_contents, tuple, list)
+                    obj['hoverEvent']['contents'] = hover_contents
             else:
-                assert isinstance(hover_value, (dict, tuple, list))
-                obj['hoverEvent']['contents'] = hover_value
+                assert isinstance(hover_contents, (dict, tuple, list))
+                obj['hoverEvent']['contents'] = hover_contents
         # finish
         self.append(obj); return self
     def line_break(self, count: int = 1):
