@@ -13,5 +13,6 @@ def __start__(self):
     auto_eula.check_eula()
 
 def __restart__(self):
+    auto_eula.check_eula()
     Flags.force_restart = False
     Flags.force_no_restart = False
