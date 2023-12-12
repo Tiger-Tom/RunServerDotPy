@@ -20,7 +20,7 @@ def tell(self, text: typing.ForwardRef('RS.TellRaw') | tuple[str | dict] | str):
         raise TypeError(f'User {self} has no name; cannot tell')
     if isinstance(text, RS.TellRaw): text = text.render()
     if self.is_console: print(f'CONSOLE.tell: {text if isinstance(text, str) else json.dumps(text, indent=4)}')
-    else: RS.SM.write(f'tellraw {self.name} {json.dumps(text)}')
+    else: RS.SM.command(f'tellraw {self.name} {json.dumps(text)}')
 ```
 </details>
 

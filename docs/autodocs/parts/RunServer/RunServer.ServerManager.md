@@ -8,7 +8,7 @@
 def preferred_order() -> list[type[BaseServerManager]]
 ```
 
-[`_rsruntime/lib/rs_servmgr.py@199:201`](/_rsruntime/lib/rs_servmgr.py#L199)
+[`_rsruntime/lib/rs_servmgr.py@204:206`](/_rsruntime/lib/rs_servmgr.py#L204)
 
 <details>
 <summary>Source Code</summary>
@@ -28,7 +28,7 @@ def preferred_order(cls) -> list[typing.Type[BaseServerManager]]:
 def register(manager_type: type[BaseServerManager])
 ```
 
-[`_rsruntime/lib/rs_servmgr.py@196:198`](/_rsruntime/lib/rs_servmgr.py#L196)
+[`_rsruntime/lib/rs_servmgr.py@201:203`](/_rsruntime/lib/rs_servmgr.py#L201)
 
 <details>
 <summary>Source Code</summary>
