@@ -2,111 +2,153 @@
 
 #> Imports
 import json
+import time
+import typing
 import traceback
 from pathlib import Path
-from collections import namedtuple
-from time import strptime
 from hashlib import sha1
+from io import BytesIO
+from zipfile import ZipFile
 #</Imports
 
 # RunServer Module
 import RS
-from RS import Bootstrapper, Config
+from RS import Config
 from RS.ShaeLib.net import fetch
+from RS.ShaeLib.types.shaespace import SlottedSpaceType
 
 #> Header >/
 class MinecraftManager:
-    __Slots__ = ('logger', 'has_manifest', 'versions', 'current_version')
-    VersionsType = namedtuple('Versions', ('latest', 'latest_release', 'latest_snapshot', 'versions', 'releases', 'snapshots'))
+    __slots__ = ('logger', 'versions', 'version_load_time')
+    VersionsType = SlottedSpaceType('latest', 'latest_bleeding', 'versions', 'releases', 'snapshots', 'other', name='VersionsType')
 
     # Setup config
     Config.mass_set_default('minecraft/path/', base='./minecraft/', server_jar='server.jar')
-    Config.mass_set_default('minecraft/manager/dl',
-                            auto_fetch_if_missing=True, auto_update=True,
-                            backup_replaced_jar=True,
-                            version_manifest_url='https://launchermeta.mojang.com/mc/game/version_manifest.json',
-                            bleeding_edge=False, only_snapshot=False,
-                            hash_verify=True, size_verify=True, prompt_on_fail_verify=True,
-                            time_fmt='%%Y-%%m-%%dT%%H:%%M:%%S%%z')
+    Config.mass_set_default('minecraft/manager/',
+        auto_fetch_if_missing=True, prompt_before_autofetch_missing=False,
+        auto_update=True, unattended_autoupdate=False)
+    Config.mass_set_default('minecraft/manager/download/',
+        bleeding_edge=False,
+        backup_replaced_jar=True,
+        version_manifest_url='https://launchermeta.mojang.com/mc/game/version_manifest.json',
+        verify=('hash', 'size', 'zipf'), prompt_on_fail_verify=True,
+        time_fmt='%%Y-%%m-%%dT%%H:%%M:%%S%%z')
 
     def __init__(self):
         self.logger = RS.logger.getChild('MC')
+        self.version_load_time = -1
     def init2(self):
-        if Config['minecraft/manager/dl/auto_fetch_if_missing'] or Config['minecraft/manager/dl/auto_update']:
-            try: self.versions = self.setup_manifest()
+        if self.jarpath.exists():
+            if not Config['minecraft/manager/auto_update']: return
+            try:
+                self.refresh()
+                self.auto_update()
             except Exception as e:
-                self.logger.fatal(f'Could not setup Minecraft version manifest:\n{"".join(traceback.format_exception(e))}')
-                self.has_manifest = False
-            else: self.has_manifest = True
-        if not (p := Path(Config['minecraft/path/base'], Config['minecraft/path/server_jar'])).exists():
-            self.logger.warning(f'{p} does not exist!')
-            if not self.has_manifest:
-                self.logger.irrec('Minecraft version manifest failed earlier; cannot continue')
-                raise FileNotFoundError(str(p))
-            if not Config['minecraft/manager/dl/auto_fetch_if_missing']:
-                self.logger.irrec('Config minecraft/manager/dl/auto_fetch_if_missing is false, cannot download!')
-                raise FileNotFoundError(str(p))
-            if not self.install_update():
-                raise ExceptionGroup('The server JAr couldn\'t be found, and the downloaded version failed verification. Cannot possibly continue', (FileNotFoundError(p), ValueError('Verification failed')))
+                self.logger.error(f'An exception occured whilst trying to auto-update:\n{"".join(traceback.format_exception(e))}')
+            return
+        if not Config['minecraft/manager/auto_fetch_if_missing']:
+            self.logger.fatal('The server JAr is missing, and downloads are disabled (config `minecraft/manager/auto_fetch_if_missing`). Will try to continue anyway...')
+            return
+        if Config['minecraft/manager/prompt_before_autofetch_missing'] and input('The server JAr is missing. Download the latest version? (Y/n) >').lower().startswith('n'):
+            self.logger.fatal('The server JAr is missing, and download was denied per user request. Will try to continue anyway...')
+            return
+        try:
+            self.refresh()
+            self.install_version(self.latest)
+        except Exception as e:
+            self.logger.fatal(f'An exception occured whilst trying to fetch missing JAr:\n{"".join(traceback.format_exception(e))}')
 
-    def setup_manifest(self) -> 'VersionsType':
-        self.logger.info(f'Fetching {Config["minecraft/manager/dl/version_manifest_url"]}')
-        data = json.loads(fetch.fetch(Config['minecraft/manager/dl/version_manifest_url']).decode())
-        tfmt = Config['minecraft/manager/dl/time_fmt']
+    @property
+    def jarpath(self) -> Path:
+        return Path(Config['minecraft/path/base'], Config['minecraft/path/server_jar'])
+    def jarvers(self) -> str | None:
+        if not self.jarpath.exists(): return None
+        with ZipFile(self.jarpath) as zf, zf.open('version.json') as f:
+            return json.load(f)['id']
+
+    @property
+    def latest(self) -> dict:
+        return self.versions.latest_bleeding if Config['minecraft/manager/download/bleeding_edge'] else self.versions.latest
+    def jar_is_latest(self) -> bool:
+        return self.jarvers() == self.latest['id']
+
+    def fetch_versions(self) -> 'VersionsType':
+        '''Fetches the upstream versions manifest'''
+        self.logger.info(f'Fetching {Config["minecraft/manager/download/version_manifest_url"]}')
+        data = json.loads(fetch.fetch(Config['minecraft/manager/download/version_manifest_url']))
+        tfmt = Config['minecraft/manager/download/time_fmt']
         versions = {v['id']: v | {
-                'time': strptime(v['time'], tfmt), '_time': v['time'],
-                'releaseTime': strptime(v['releaseTime'], tfmt), '_releaseTime': v['releaseTime']
+                'time': time.strptime(v['time'], tfmt), '_time': v['time'],
+                'releaseTime': time.strptime(v['releaseTime'], tfmt), '_releaseTime': v['releaseTime'],
             } for v in data['versions']}
-        return self.VersionsType(versions=versions,
-            latest=max((versions[data['latest']['release']], versions[data['latest']['snapshot']]), key=lambda v: v['time']),
-            latest_release=versions[data['latest']['release']],
-            latest_snapshot=versions[data['latest']['snapshot']],
-            releases = {k: v for k,v in versions.items() if v['type'] == 'release'},
-            snapshots = {k: v for k,v in versions.items() if v['type'] == 'snapshot'},
-        )
+        vt = self.VersionsType()
+        vt.versions = versions
+        vt.latest = versions[data['latest']['release']]
+        vt.latest_bleeding = versions[data['latest']['snapshot']]
+        vt.releases = {}; vt.snapshots = {}; vt.other = {'*': {}}
+        for i,v in versions.items():
+            if v['type'] == 'release': vt.releases[i] = v
+            elif v['type'] == 'snapshot': vt.snapshots[i] = v
+            else:
+                vt.other['*'][i] = v
+                if v['type'] not in vt.other: vt.other[v['type']] = {}
+                vt.other[v['type']][v['id']] = v
+        return vt
+    def refresh(self):
+        '''Update internal versions manifest'''
+        self.versions = self.fetch_versions()
+        self.version_load_time = int(time.time())
 
-    @property
-    def target(self) -> str:
-        return self.versions.latest if Config['minecraft/manager/dl/bleeding_edge'] else \
-               self.versions.latest_snapshot if Config['minecraft/manager/dl/only_snapshot'] else self.versions.latest_release
-    @property
-    def target_metadata(self) -> dict:
-        return json.loads(fetch.fetch(self.target['url']).decode())
+    def upon_version(self, ver: str | dict):
+        '''Returns the upstream manifest for the specified version ID or dictionary'''
+        return json.loads(fetch.fetch((ver if isinstance(ver, dict) else self.versions[ver])['url']).decode())
+    def install_version(self, ver: str | dict, chunk_notify: typing.Callable[[str], None] | None = None):
+        '''(Verifies and) installs the specified version'''
+        v = self.upon_version(ver)
+        self.logger.infop(f'Installing version {v["id"]}')
+        if self.jarpath.exists():
+            self.logger.warning('Instructed to fetch server JAr, but it already exists')
+            if Config['minecraft/manager/download/backup_replaced_jar']:
+                self.jarpath.with_suffix(f'{self.jarpath.suffix}.old').write_bytes(self.jarpath.read_bytes())
+                self.logger.warning('Backed up JAr')
+        self.logger.warning(f'Fetching server JAr of target version {v["id"]}')
+        vs = v['downloads']['server']
+        data = fetch.foreach_chunk_fetch(vs['url'],
+                                         lambda c: (lambda c: (self.logger.infop(c), (None if chunk_notify is None else chunk_notify(c))))(
+                                             f'Downloading {c.target}: chunk {int(c.obtained/c.chunk_size+0.5)}'
+                                             f' of {int((c.remain+c.obtained)/c.chunk_size+1)}'))
+        self.verify(data, vs['sha1'], vs['size'])
+        self.logger.warning('Writing new JAr')
+        self.jarpath.parent.mkdir(parents=True, exist_ok=True)
+        self.jarpath.write_bytes(data)
+    def verify(self, data: bytes, target_hash: str, target_size: int):
+        '''Checks the data against a variety of configurable verifications'''
+        v = Config['minecraft/manager/download/verify']
+        exc = []
+        hash_failed = ('hash' in v) and (target_hash != sha1(data).hexdigest())
+        size_failed = ('size' in v) and (diff := (target_size - len(data)))
+        if 'zipf' in v:
+            try:
+                with ZipFile(BytesIO(data)) as zf:
+                    zipf_failed = zf.testzip() is not None
+            except Exception as e:  zipf_failed = True
+        else: zipf_failed = False
+        failed = hash_failed + size_failed + zipf_failed
+        failstr = ('hash' if hash_failed else '') + ('size' if size_failed else '') + ('ZipF' if zipf_failed else '')
+        if failed: raise ValueError(f'{failstr[0].upper()}{failstr[1:4]}'
+                                    f'{f", {failstr[4:8]}, and {failstr[8:]}" if (failed == 3) \
+                                        else f" and {failstr[4:]}" if failed == 2 else ""} verification failed')
 
-    def install_update(self) -> bool:
-        jp = Path(Config['minecraft/path/base'], Config['minecraft/path/server_jar'])
-        if jp.exists():
-            self.logger.warning(f'Instructed to fetch server JAr, but it already exists at {jp}')
-            if Config['minecraft/manager/dl/backup_replaced_jar']:
-                op = jp.with_suffix(f'{jp.suffix}.old')
-                self.logger.warning(f'Copying {jp} to {op}')
-                op.write_bytes(jp.read_bytes())
-        tserver = self.target_metadata['downloads']['server']
-        self.logger.warning(f'Fetching server JAr of target version ID {self.target["id"]}')
-        data = fetch.foreach_chunk_fetch(tserver['url'],
-                                         lambda c: self.logger.infop(f'Downloading {c.target}: chunk {int(c.obtained/c.chunk_size+0.5)} '
-                                                                     f'of {int((c.remain+c.obtained)/c.chunk_size+1)} '
-                                                                     f'({c.obtained} fetched / {c.remain} remain)'))
-        if not self.verify_update(data, tserver['sha1'], tserver['size']):
-            return False
-        jp.parent.mkdir(parents=True, exist_ok=True)
-        self.logger.infop(f'Server JAr fetched, writing {len(data)} byte(s) to {jp}')
-        jp.write_bytes(data)
-        return True
-    def verify_update(self, data: bytes, target_hash: str, target_size: int) -> bool:
-        failed_hash, failed_size = False, False
-        if Config['minecraft/manager/dl/hash_verify'] and (target_hash != (actual_hash := sha1(data).hexdigest())):
-            self.logger.fatal(f'The Minecraft server JAr failed hash verification:\n{target_hash=}\n{actual_hash=}')
-            failed_hash = True
-        if Config['minecraft/manager/dl/size_verify'] and (target_size != (actual_size := len(data))):
-            self.logger.fatal(f'The Minecraft server JAr failed size verification:\n{target_size=}\n{actual_size=}')
-            failed_size = True
-        if failed_hash or failed_size:
-            if (not Config['minecraft/manager/dl/prompt_on_fail_verify']) or \
-               (input(f'The Minecraft server JAr failed '
-                      f'{"hash" if failed_hash else ""}{" and " if (failed_hash and failed_size) else ""}{"size" if failed_size else ""} '
-                      f'verification. Install it anyway? (y/N) >').lower() != 'y'):
-                self.logger.error('Not installing')
-                return False
-            self.logger.warning('Installing anyway, proceed with caution')
-        return True
+    def auto_update(self, force: bool = False):
+        '''Automatically update to the latest version'''
+        if not force:
+            if not Config['minecraft/manager/auto_update']:
+                self.logger.warning('Skipping auto update (config minecraft/manager/auto_update)')
+                return
+            if self.jar_is_latest():
+                self.logger.infop(f'No need to update: {self.latest["id"]} is the latest viable version')
+                return
+            if not (Config['minecraft/manager/unattended_autoupdate'] or input('Check and update server JAr to latest version? (y/N) >').lower().startswith('y')):
+                self.logger.warning('Skipping auto update (user request)')
+                return
+        self.install_version(self.latest)
