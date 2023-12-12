@@ -15,12 +15,12 @@ def _user_from_(user: RS.UM.User | str):
     return RS.UM.User[user]
 
 # Command writing
-def command(command: str) -> None | typing.Any:
+def command(*commands: str) -> None | typing.Any:
     '''
         Writes a command to the server
-            Equivelant to RS.SM.write(line)
+            Equivelant to RS.SM.command(*commands)
     '''
-    return RS.SM.write(line)
+    return RS.SM.command(*commands)
 ## Chat writing
 @functools.wraps(RS.UM.User, ('__annotations__', '__type_params__'))
 def tellraw(self, user: RS.UM.User | str, *args, **kwargs):

@@ -61,6 +61,11 @@ class BaseServerManager(ABC):
         RS.LP.handle_line(line)
     def handle_input(self, line: str):
         self.write(line)
+    def command(self, *commands: str):
+        for cmd in commands:
+            assert '\n' not in cmd, f'Commands should not be more than one line! (at command {cmd!r})'
+            self.logger.info(f'Running command {cmd}')
+            self.write(cmd); self.write('\n')
     @classmethod
     def _bias_config(cls) -> float:
         return (-float('inf') if Config(f'server_manager/blacklist/{cls.name}', False) else 0.0) + \
@@ -100,7 +105,7 @@ class BaseServerManager(ABC):
     @abstractmethod
     def start(self): pass
     @abstractmethod
-    def write(self): pass
+    def write(self, text: str): pass
     # Abstract properties
     @abstractproperty
     def bias() -> float: NotImplemented
@@ -314,11 +319,11 @@ class SelectManager(BasePopenManager):
         # Handle remaining lines
         for line in self.popen.stdout.readlines():
             self.handle_line(line)
-    def write(self, line: str):
-        self.popen.stdin.write(line)
+    def write(self, text: str):
+        self.popen.stdin.write(text)
     def stop(self):
-        self.write('save-all')
-        self.write('stop')
+        self.command('save-all')
+        self.command('stop')
 
     cap_arbitrary_read = True
 
@@ -332,7 +337,7 @@ class DummyServerManager(BaseServerManager):
     def start(self):
         self.hooks(input('>DUMMY SERVER INPUT >'))
     def write(self, line: str):
-        print(f'>DUMMY SERVER WRITE > {line}')
+        print(f'>DUMMY SERVER WRITE > {line!r}')
         
 
     cap_arbitrary_read = True
@@ -372,7 +377,7 @@ class NullServerManager(BaseServerManager):
     __slots__ = ()
     _type = ('null',)
     def start(self): pass
-    def write(self, line: str): pass
+    def write(self, text: str): pass
 
     cap_arbitrary_read = True
     cap_arbitrary_write = True
