@@ -101,7 +101,7 @@ class MinecraftManager:
 
     def upon_version(self, ver: str | dict):
         '''Returns the upstream manifest for the specified version ID or dictionary'''
-        return json.loads(fetch.fetch((ver if isinstance(ver, dict) else self.versions[ver])['url']).decode())
+        return json.loads(fetch.fetch((ver if isinstance(ver, dict) else self.versions.versions[ver])['url']).decode())
     def install_version(self, ver: str | dict, chunk_notify: typing.Callable[[str], None] | None = None):
         '''(Verifies and) installs the specified version'''
         v = self.upon_version(ver)
